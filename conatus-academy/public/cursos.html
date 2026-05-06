@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cursos Disponíveis | Conatus Institute</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="cursos-body">
+
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo"><img src="assets/img/Logo Institute.svg" alt="Conatus Institute" class="nav-logo-img"></a>
+            <ul class="nav-menu">
+                <li><a href="index.html#sobre">Sobre</a></li>
+                <li><a href="cursos.html">Cursos</a></li>
+                <li><a href="login.html">Portal do Aluno</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="cursos-header">
+        <h1>Cursos Disponíveis</h1>
+        <p>Capacitação técnica de alto nível para operação crítica em Data Centers.</p>
+    </div>
+
+    <div id="lista">
+        <!-- Renderizado via JS -->
+    </div>
+
+    <script>
+        fetch('/api/cursos')
+            .then(res => res.json())
+            .then(data => {
+                let html = "";
+                data.forEach(curso => {
+                    html += `
+                        <div class="card">
+                            <img src="${curso.image}" alt="${curso.nome}" class="card-image">
+                            <div class="card-content">
+                                <h3>${curso.nome}</h3>
+                                <span class="badge">Certificação Profissional</span>
+                                <p>Carga horária: <strong>${curso.duracao}</strong></p>
+                                <button style="margin-top: 15px; width: 100%;" onclick="alert('Funcionalidade de matrícula em breve!')">Matricular-se</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementById('lista').innerHTML = html;
+            });
+    </script>
+
+</body>
+</html>

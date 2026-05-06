@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal do Aluno | Conatus Institute</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-body">
+
+    <div class="login-page-wrapper">
+        <header class="login-header">
+            <a href="index.html" class="back-link">← Voltar ao Site</a>
+            <img src="assets/img/Logo Institute.svg" alt="Conatus Institute" class="login-logo">
+        </header>
+
+        <div class="container">
+            <h2>Portal do Aluno</h2>
+            <p>Acesse sua conta para gerenciar seus cursos e progresso acadêmico.</p>
+
+            <div>
+                <label>E-mail Institucional</label>
+                <input id="email" placeholder="seu.email@conatus.edu.br" type="email">
+                
+                <label>Senha</label>
+                <input id="password" type="password" placeholder="••••••••">
+            </div>
+
+            <button class="btn-submit btn-primary" onclick="login()">Entrar no Portal</button>
+            
+            <p class="login-hint">
+                Acesso demo: <strong>admin@dc.com</strong> / <strong>123456</strong>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function login() {
+            const emailVal = document.getElementById('email').value;
+            const passVal = document.getElementById('password').value;
+
+            if (!emailVal || !passVal) {
+                alert("Por favor, preencha todos os campos.");
+                return;
+            }
+
+            fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: emailVal,
+                    password: passVal
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    window.location = "dashboard.html";
+                } else {
+                    alert("Credenciais inválidas. Tente novamente.");
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Erro ao conectar com o servidor.");
+            });
+        }
+    </script>
+
+</body>
+</html>
