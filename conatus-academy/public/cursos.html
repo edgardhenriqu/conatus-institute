@@ -24,30 +24,97 @@
         <p>Capacitação técnica de alto nível para operação crítica em Data Centers.</p>
     </div>
 
-    <div id="lista">
-        <!-- Renderizado via JS -->
+    <div class="carousel-container">
+        <button class="carousel-btn carousel-prev" onclick="move(-1)">&#10094;</button>
+        <div class="carousel-wrapper">
+            <div id="lista" class="carousel-track">
+                <!-- Renderizado via JS -->
+            </div>
+        </div>
+        <button class="carousel-btn carousel-next" onclick="move(1)">&#10095;</button>
     </div>
+    <div class="carousel-dots" id="dots"></div>
 
     <script>
-        fetch('/api/cursos')
-            .then(res => res.json())
-            .then(data => {
-                let html = "";
-                data.forEach(curso => {
-                    html += `
-                        <div class="card">
-                            <img src="${curso.image}" alt="${curso.nome}" class="card-image">
-                            <div class="card-content">
-                                <h3>${curso.nome}</h3>
-                                <span class="badge">Certificação Profissional</span>
-                                <p>Carga horária: <strong>${curso.duracao}</strong></p>
-                                <button style="margin-top: 15px; width: 100%;" onclick="alert('Funcionalidade de matrícula em breve!')">Matricular-se</button>
-                            </div>
+    let coursesData = [];
+    let track;
+    let idx = 0;
+    let timer;
+
+    function renderCarousel() {
+        let html = "";
+        const items = [...coursesData, ...coursesData, ...coursesData];
+        items.forEach(curso => {
+            html += `
+                <div class="carousel-slide">
+                    <div class="card">
+                        <img src="${curso.image}" alt="${curso.nome}" class="card-image">
+                        <div class="card-content">
+                            <h3>${curso.nome}</h3>
+                            <span class="badge">Certificação Profissional</span>
+                            <p>Carga horária: <strong>${curso.duracao}</strong></p>
+                            <button style="margin-top: 15px; width: 100%;" onclick="alert('Funcionalidade de matrícula em breve!')">Matricular-se</button>
                         </div>
-                    `;
-                });
-                document.getElementById('lista').innerHTML = html;
-            });
+                    </div>
+                </div>
+            `;
+        });
+        document.getElementById('lista').innerHTML = html;
+        track = document.getElementById('lista');
+        idx = coursesData.length;
+        slide(false);
+        updateDots();
+
+        track.addEventListener('transitionend', () => {
+            const total = coursesData.length;
+            if (idx >= total * 2) {
+                idx -= total;
+                slide(false);
+            } else if (idx < total) {
+                idx += total;
+                slide(false);
+            }
+        });
+    }
+
+    function slide(animate) {
+        if (!track || !track.children[0]) return;
+        const w = track.children[0].offsetWidth + 25;
+        track.style.transition = animate ? 'transform 0.5s ease' : 'none';
+        track.style.transform = `translateX(-${idx * w}px)`;
+    }
+
+    function updateDots() {
+        const dots = document.getElementById('dots');
+        const total = coursesData.length;
+        let html = "";
+        for (let i = 0; i < total; i++) {
+            const active = (idx % total) === i;
+            html += `<span class="carousel-dot ${active ? 'active' : ''}" onclick="goTo(${i})"></span>`;
+        }
+        dots.innerHTML = html;
+    }
+
+    function move(dir) {
+        idx += dir;
+        slide(true);
+        updateDots();
+    }
+
+    function goTo(i) {
+        const total = coursesData.length;
+        idx = total + i;
+        slide(true);
+        updateDots();
+    }
+
+    fetch('/cursos')
+        .then(res => res.json())
+        .then(data => {
+            coursesData = data;
+            renderCarousel();
+            timer = setInterval(() => move(1), 5000);
+        });
     </script>
 
 </body>

@@ -26,6 +26,8 @@
 
     <header class="hero">
         <div class="hero-overlay"></div>
+        <div class="data-lines"></div>
+        <div class="data-particles"></div>
         <div class="hero-content">
             <h1>Formando a Próxima Geração de Líderes em Infraestrutura Crítica</h1>
             <p>Excelência acadêmica, pesquisa avançada e laboratórios de ponta. Prepare-se para operar os data centers que movem o mundo digital.</p>
@@ -78,13 +80,16 @@
             <h2>Programas Acadêmicos</h2>
             <p>Nossos cursos são projetados em colaboração com líderes da indústria para atender à demanda crítica do mercado.</p>
         </div>
-        <div id="course-list" class="carousel-wrapper">
-            <button class="carousel-btn prev-btn" onclick="scrollCarousel(-1)">&#10094;</button>
-            <div class="carousel-track" id="carousel-track">
-                <!-- Renderizado via JS -->
+        <div class="home-carousel-container">
+            <button class="home-carousel-btn home-carousel-prev" onclick="homeMove(-1)">&#10094;</button>
+            <div class="home-carousel-wrapper">
+                <div id="carousel-track" class="home-carousel-track">
+                    <!-- Renderizado via JS -->
+                </div>
             </div>
-            <button class="carousel-btn next-btn" onclick="scrollCarousel(1)">&#10095;</button>
+            <button class="home-carousel-btn home-carousel-next" onclick="homeMove(1)">&#10095;</button>
         </div>
+        <div class="home-carousel-dots" id="home-dots"></div>
         <div class="section-footer">
             <a href="cursos.html" class="btn-secondary">Ver Todos os Cursos e Certificações →</a>
         </div>
@@ -144,31 +149,88 @@
     </footer>
 
     <script>
-        function scrollCarousel(direction) {
-            const track = document.getElementById('carousel-track');
-            const cardWidth = 340;
-            track.scrollBy({ left: direction * cardWidth, behavior: 'smooth' });
-        }
+    let homeCoursesData = [];
+    let homeTrack;
+    let homeIdx = 0;
+    let homeTimer;
 
-        fetch('/cursos')
-            .then(res => res.json())
-            .then(data => {
-                let html = "";
-                data.forEach(curso => {
-                    html += `
-                        <div class="program-card carousel-card">
-                            <img src="${curso.image}" alt="${curso.nome}" class="card-image">
-                            <div class="program-info">
-                                <h3>${curso.nome}</h3>
-                                <span class="badge">Certificação Profissional</span>
-                                <p>Carga horária: ${curso.duracao}</p>
-                                <a href="cursos.html" class="btn-small">Detalhes do Curso</a>
-                            </div>
+    function renderHomeCarousel() {
+        let html = "";
+        const items = [...homeCoursesData, ...homeCoursesData, ...homeCoursesData];
+        items.forEach(curso => {
+            html += `
+                <div class="home-carousel-slide">
+                    <div class="program-card">
+                        <img src="${curso.image}" alt="${curso.nome}" class="card-image">
+                        <div class="program-info">
+                            <h3>${curso.nome}</h3>
+                            <span class="badge">Certificação Profissional</span>
+                            <p>Carga horária: ${curso.duracao}</p>
+                            <a href="cursos.html" class="btn-small">Detalhes do Curso</a>
                         </div>
-                    `;
-                });
-                document.getElementById('carousel-track').innerHTML = html;
-            });
+                    </div>
+                </div>
+            `;
+        });
+        document.getElementById('carousel-track').innerHTML = html;
+        homeTrack = document.getElementById('carousel-track');
+        homeIdx = homeCoursesData.length;
+        homeSlide(false);
+        homeUpdateDots();
+
+        homeTrack.addEventListener('transitionend', () => {
+            const total = homeCoursesData.length;
+            if (homeIdx >= total * 2) {
+                homeIdx -= total;
+                homeSlide(false);
+            } else if (homeIdx < total) {
+                homeIdx += total;
+                homeSlide(false);
+            }
+        });
+    }
+
+    function homeSlide(animate) {
+        if (!homeTrack || !homeTrack.children[0]) return;
+        const w = homeTrack.children[0].offsetWidth + 24;
+        homeTrack.style.transition = animate ? 'transform 0.5s ease' : 'none';
+        homeTrack.style.transform = `translateX(-${homeIdx * w}px)`;
+    }
+
+    function homeUpdateDots() {
+        const dots = document.getElementById('home-dots');
+        const total = homeCoursesData.length;
+        let html = "";
+        for (let i = 0; i < total; i++) {
+            const active = (homeIdx % total) === i;
+            html += `<span class="home-carousel-dot ${active ? 'active' : ''}" onclick="homeGoTo(${i})"></span>`;
+        }
+        dots.innerHTML = html;
+    }
+
+    function homeMove(dir) {
+        homeIdx += dir;
+        homeSlide(true);
+        homeUpdateDots();
+    }
+
+    function homeGoTo(i) {
+        const total = homeCoursesData.length;
+        homeIdx = total + i;
+        homeSlide(true);
+        homeUpdateDots();
+    }
+
+    fetch('/cursos')
+        .then(res => res.json())
+        .then(data => {
+            homeCoursesData = data;
+            renderHomeCarousel();
+            homeTimer = setInterval(() => homeMove(1), 5000);
+        })
+        .catch(error => {
+            console.error("Erro ao carregar cursos:", error);
+        });
     </script>
 
 </body>

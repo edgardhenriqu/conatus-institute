@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Introdução a Sistemas de Geração para Data Centers | Conatus Institute</title>
+    <link rel="stylesheet" href="curso-geracao.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="../../cursos.html" class="back-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Voltar para Disciplina
+            </a>
+        </div>
+
+        <div class="sidebar-course-info">
+            <h2 class="course-title">INTRODUÇÃO A SISTEMAS DE GERAÇÃO PARA DATA CENTERS</h2>
+            <div class="progress-section">
+                <div class="progress-label">
+                    <span>Progresso do Curso</span>
+                    <span class="progress-value">35%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 35%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="student-support">
+            <div class="support-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </div>
+            <div class="support-text">
+                <strong>Apoio ao Estudante</strong>
+                <p>Precisa de ajuda? Entre em contato com o tutor</p>
+            </div>
+            <button class="support-btn">Chat</button>
+        </div>
+
+        <nav class="modules-nav">
+            <!-- Módulo 1 -->
+            <div class="module expanded">
+                <div class="module-header" onclick="toggleModule(this)">
+                    <div class="module-info">
+                        <span class="module-number">01</span>
+                        <span class="module-title">Fundamentos de Geração</span>
+                    </div>
+                    <svg class="module-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </div>
+                <div class="module-lessons">
+                    <div class="lesson completed" onclick="selectLesson(this, 1)">
+                        <div class="lesson-check">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">01 - Visão Geral dos Sistemas de Geração</span>
+                            <span class="lesson-duration">12 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson completed" onclick="selectLesson(this, 2)">
+                        <div class="lesson-check">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">02 - Tipos de Geradores Industriais</span>
+                            <span class="lesson-duration">15 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson active" onclick="selectLesson(this, 3)">
+                        <div class="lesson-number">03</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">03 - Componentes de um Sistema de Geração</span>
+                            <span class="lesson-duration">18 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson" onclick="selectLesson(this, 4)">
+                        <div class="lesson-number">04</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">04 - Princípios de Funcionamento</span>
+                            <span class="lesson-duration">14 min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo 2 -->
+            <div class="module">
+                <div class="module-header" onclick="toggleModule(this)">
+                    <div class="module-info">
+                        <span class="module-number">02</span>
+                        <span class="module-title">Dimensionamento e Seleção</span>
+                    </div>
+                    <svg class="module-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </div>
+                <div class="module-lessons">
+                    <div class="lesson" onclick="selectLesson(this, 5)">
+                        <div class="lesson-number">05</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">05 - Cálculo de Carga Elétrica</span>
+                            <span class="lesson-duration">20 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson" onclick="selectLesson(this, 6)">
+                        <div class="lesson-number">06</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">06 - Critérios de Seleção de Geradores</span>
+                            <span class="lesson-duration">16 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson" onclick="selectLesson(this, 7)">
+                        <div class="lesson-number">07</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">07 - Redundância e Confiabilidade</span>
+                            <span class="lesson-duration">18 min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo 3 -->
+            <div class="module">
+                <div class="module-header" onclick="toggleModule(this)">
+                    <div class="module-info">
+                        <span class="module-number">03</span>
+                        <span class="module-title">Instalação e Comissionamento</span>
+                    </div>
+                    <svg class="module-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </div>
+                <div class="module-lessons">
+                    <div class="lesson" onclick="selectLesson(this, 8)">
+                        <div class="lesson-number">08</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">08 - Requisitos de Instalação</span>
+                            <span class="lesson-duration">15 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson" onclick="selectLesson(this, 9)">
+                        <div class="lesson-number">09</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">09 - Processo de Comissionamento</span>
+                            <span class="lesson-duration">22 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson" onclick="selectLesson(this, 10)">
+                        <div class="lesson-number">10</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">10 - Testes e Validación</span>
+                            <span class="lesson-duration">18 min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo 4 -->
+            <div class="module">
+                <div class="module-header" onclick="toggleModule(this)">
+                    <div class="module-info">
+                        <span class="module-number">04</span>
+                        <span class="module-title">Operação e Manutenção</span>
+                    </div>
+                    <svg class="module-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </div>
+                <div class="module-lessons">
+                    <div class="lesson" onclick="selectLesson(this, 11)">
+                        <div class="lesson-number">11</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">11 - Procedimentos Operacionais</span>
+                            <span class="lesson-duration">20 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson" onclick="selectLesson(this, 12)">
+                        <div class="lesson-number">12</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">12 - Manutenção Preventiva</span>
+                            <span class="lesson-duration">16 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson" onclick="selectLesson(this, 13)">
+                        <div class="lesson-number">13</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">13 - Manutenção Corretiva</span>
+                            <span class="lesson-duration">14 min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo 5 -->
+            <div class="module">
+                <div class="module-header" onclick="toggleModule(this)">
+                    <div class="module-info">
+                        <span class="module-number">05</span>
+                        <span class="module-title">Normas e Segurança</span>
+                    </div>
+                    <svg class="module-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </div>
+                <div class="module-lessons">
+                    <div class="lesson" onclick="selectLesson(this, 14)">
+                        <div class="lesson-number">14</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">14 - Normas Técnicas Aplicáveis</span>
+                            <span class="lesson-duration">18 min</span>
+                        </div>
+                    </div>
+                    <div class="lesson" onclick="selectLesson(this, 15)">
+                        <div class="lesson-number">15</div>
+                        <div class="lesson-info">
+                            <span class="lesson-title">15 - Segurança em Instalações Elétricas</span>
+                            <span class="lesson-duration">15 min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Quiz na Sidebar -->
+        <div class="sidebar-quiz" id="sidebarQuiz">
+            <div class="sidebar-quiz-header">
+                <span class="sidebar-quiz-badge">Avaliação</span>
+                <h3>Avaliação do Curso</h3>
+            </div>
+            <div class="sidebar-quiz-info">
+                <p>10 perguntas | 3 tentativas | 70% mínimo</p>
+            </div>
+            <button class="btn-sidebar-quiz" id="btnSidebarStartQuiz" onclick="openMainQuiz()">
+                Iniciar Avaliação
+            </button>
+            <div class="sidebar-quiz-status" id="sidebarQuizStatus" style="display: none;">
+                <span class="sidebar-quiz-status-text" id="sidebarQuizStatusText"></span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Mobile Menu Button -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleSidebar()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+    </button>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
+                <span class="breadcrumb">Módulo 01 / Aula 03</span>
+            </div>
+            <div class="top-bar-right">
+                <button class="icon-btn" title="Anotações">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                </button>
+                <button class="icon-btn" title="Favoritos">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Banner -->
+        <section class="course-banner">
+            <div class="banner-overlay"></div>
+            <div class="banner-content">
+                <div class="banner-accent"></div>
+                <h1 class="banner-title">Introdução a Sistemas de Geração para Data Centers</h1>
+                <p class="banner-subtitle">Módulo 01 - Fundamentos de Geração | Aula 03</p>
+            </div>
+        </section>
+
+        <!-- Lesson Content -->
+        <article class="lesson-content" id="lessonContent">
+            <div class="content-header">
+                <span class="lesson-tag">Aula 03</span>
+                <h2>Componentes de um Sistema de Geração</h2>
+            </div>
+
+            <div class="intro-text">
+                <p>Os sistemas de geração de energia são compostos por diversos componentes que trabalham em conjunto para garantir a提供 contínua de energia elétrica. Nesta aula, vamos analisar cada um desses componentes em detalhes, entendendo suas funções e importância para o funcionamento adequado do sistema como um todo.</p>
+            </div>
+
+            <blockquote class="highlight-quote">
+                <div class="quote-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+                    </svg>
+                </div>
+                <p>"A confiabilidade de um sistema de geração depende diretamente da qualidade e do dimensionamento correto de cada um de seus componentes."</p>
+                <cite>— Norma ABNT NBR 15845:2010</cite>
+            </blockquote>
+
+            <section class="objectives-section">
+                <h3>Objetivos desta Aula</h3>
+                <ul class="objectives-list">
+                    <li>
+                        <span class="objective-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </span>
+                        Identificar os principais componentes de um sistema de geração
+                    </li>
+                    <li>
+                        <span class="objective-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </span>
+                        Compreender a função de cada componente no sistema
+                    </li>
+                    <li>
+                        <span class="objective-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </span>
+                        Entender a importância da integração entre componentes
+                    </li>
+                    <li>
+                        <span class="objective-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </span>
+                        Reconhecer os padrões de qualidade e especificações técnicas
+                    </li>
+                </ul>
+            </section>
+
+            <section class="topics-section">
+                <h3>Tópicos Abordados</h3>
+                <div class="topics-grid">
+                    <div class="topic-card">
+                        <div class="topic-number">01</div>
+                        <h4>Grupo Gerador</h4>
+                        <p>Motor elétrico e alternador</p>
+                    </div>
+                    <div class="topic-card">
+                        <div class="topic-number">02</div>
+                        <h4>Painel de Transferência</h4>
+                        <p>ATS e comutação automática</p>
+                    </div>
+                    <div class="topic-card">
+                        <div class="topic-number">03</div>
+                        <h4>Sistema de Combustível</h4>
+                        <p>Armazenamento e distribuição</p>
+                    </div>
+                    <div class="topic-card">
+                        <div class="topic-number">04</div>
+                        <h4>Sistema de Resfriamento</h4>
+                        <p>Refrigeração e dissipação de calor</p>
+                    </div>
+                    <div class="topic-card">
+                        <div class="topic-number">05</div>
+                        <h4>Sistema de Escape</h4>
+                        <p>Gases de exaustão e silenciadores</p>
+                    </div>
+                    <div class="topic-card">
+                        <div class="topic-number">06</div>
+                        <h4>Sistema Elétrico</h4>
+                        <p>Distribuição e proteção</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="content-section">
+                <h3>O que é um Sistema de Geração?</h3>
+                <p>Um sistema de geração de energia para data centers é um conjunto integrado de equipamentos e componentes projetados para fornecer energia elétrica de forma contínua e confiável, garantindo a operação ininterrupta dos servidores e equipamentos de TI.</p>
+                <p>Este sistema atua como uma camada de proteção redundante, entrando em operação automaticamente quando a energia da rede pública falha ou apresenta anomalias. O tempo de resposta deve ser mínimo, geralmente entre 10 e 30 segundos, para evitar desligamentos não programados dos sistemas críticos.</p>
+                
+                <div class="component-list">
+                    <h4>Principais Componentes:</h4>
+                    <div class="component-item">
+                        <span class="component-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                            </svg>
+                        </span>
+                        <div class="component-info">
+                            <strong>Grupo Gerador (Motor-Alternador)</strong>
+                            <p>Conjunto composto por um motor a combustão interna acoplado a um alternador, responsável por converter energia mecânica em energia elétrica.</p>
+                        </div>
+                    </div>
+                    <div class="component-item">
+                        <span class="component-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                <line x1="8" y1="21" x2="16" y2="21"/>
+                                <line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                        </span>
+                        <div class="component-info">
+                            <strong>Painel de Transferência Automática (ATS)</strong>
+                            <p>Dispositivo que detecta a falha na rede pública e comuta automaticamente para o sistema de geração, garantindo transição suave e segura.</p>
+                        </div>
+                    </div>
+                    <div class="component-item">
+                        <span class="component-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                <path d="M2 17l10 5 10-5"/>
+                                <path d="M2 12l10 5 10-5"/>
+                            </svg>
+                        </span>
+                        <div class="component-info">
+                            <strong>Sistema de Armazenamento de Combustível</strong>
+                            <p>Tanques e sistemas de distribuição de diesel ou gás natural, projetados para garantir autonomia mínima de operação.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="content-section">
+                <h3>Importância dos Sistemas de Geração em Data Centers</h3>
+                <p>Os sistemas de geração são componentes críticos em data centers, pois garantem a continuidade dos serviços mesmo durante longos períodos de indisponibilidade da rede elétrica pública. A perda de energia em um data center pode resultar em:</p>
+                
+                <div class="impact-grid">
+                    <div class="impact-item negative">
+                        <div class="impact-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                        </div>
+                        <h4>Perda de Dados</h4>
+                        <p>Interrupção de operações e possível perda de informações críticas armazenadas.</p>
+                    </div>
+                    <div class="impact-item negative">
+                        <div class="impact-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                        </div>
+                        <h4>Indisponibilidade de Serviços</h4>
+                        <p>Sistemas online ficam fora do ar, afetando clientes e usuários finais.</p>
+                    </div>
+                    <div class="impact-item negative">
+                        <div class="impact-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="15" y1="9" x2="9" y2="15"/>
+                                <line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                        </div>
+                        <h4>Prejuízos Financeiros</h4>
+                        <p>Perdas econômicas significativas para a organização e seus clientes.</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="tip-box">
+                <div class="tip-header">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>Dica Técnica</span>
+                </div>
+                <p>Ao dimensionar um sistema de geração, sempre considere uma margem de segurança de 20% acima da carga máxima prevista. Isso garante margem de segurança para sobrecargas temporárias e permite a operação eficiente do motor, evitando desgaste prematuro por sobrecarga constante.</p>
+            </div>
+
+            <div class="content-footer">
+                <button class="btn-prev" onclick="prevLesson()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                    Anterior
+                </button>
+                <button class="btn-next" onclick="nextLesson()">
+                    Próximo
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </button>
+            </div>
+        </article>
+
+        <!-- Quiz no Conteúdo Principal -->
+        <article class="lesson-content quiz-main-content" id="quizMainContent" style="display: none;">
+            <div class="content-header">
+                <span class="lesson-tag">Avaliação</span>
+                <h2>Avaliação do Curso</h2>
+            </div>
+
+            <!-- Quiz Start Screen -->
+            <div class="quiz-main-start" id="quizMainStart">
+                <div class="quiz-main-info">
+                    <p>Teste seus conhecimentos sobre Sistemas de Geração para Data Centers</p>
+                    <div class="quiz-main-cards">
+                        <div class="quiz-main-card">
+                            <span class="quiz-main-card-value">10</span>
+                            <span class="quiz-main-card-label">Perguntas</span>
+                        </div>
+                        <div class="quiz-main-card">
+                            <span class="quiz-main-card-value">3</span>
+                            <span class="quiz-main-card-label">Tentativas</span>
+                        </div>
+                        <div class="quiz-main-card">
+                            <span class="quiz-main-card-value">70%</span>
+                            <span class="quiz-main-card-label">Mínimo</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-quiz-main-start" onclick="startMainQuiz()">
+                    Iniciar Avaliação
+                </button>
+            </div>
+
+            <!-- Quiz Questions -->
+            <div class="quiz-main-active" id="quizMainActive" style="display: none;">
+                <div class="quiz-main-progress">
+                    <span id="quizMainCounter">Pergunta 1 de 10</span>
+                    <div class="quiz-main-bar">
+                        <div class="quiz-main-bar-fill" id="quizMainBarFill"></div>
+                    </div>
+                </div>
+                <div class="quiz-main-question" id="quizMainQuestion"></div>
+                <div class="quiz-main-options" id="quizMainOptions"></div>
+                <div class="quiz-main-nav">
+                    <button class="btn-quiz-main-prev" id="btnQuizMainPrev" onclick="mainPrevQuestion()" disabled>Anterior</button>
+                    <button class="btn-quiz-main-next" id="btnQuizMainNext" onclick="mainNextQuestion()">Próximo</button>
+                    <button class="btn-quiz-main-submit" id="btnQuizMainSubmit" onclick="mainSubmitQuiz()" style="display: none;">Finalizar Avaliação</button>
+                </div>
+            </div>
+
+            <!-- Quiz Results -->
+            <div class="quiz-main-results" id="quizMainResults" style="display: none;">
+                <div class="quiz-main-results-score" id="quizMainResultsScore">
+                    <span id="quizMainScoreValue">0%</span>
+                </div>
+                <h3 id="quizMainResultsText"></h3>
+                <div class="quiz-main-results-details">
+                    <span class="quiz-main-correct" id="quizMainCorrectCount">0 corretas</span>
+                    <span class="quiz-main-incorrect" id="quizMainIncorrectCount">0 incorretas</span>
+                </div>
+                <span class="quiz-main-attempts-info">Tentativa <strong id="quizMainCurrentAttempt">1</strong> de 3</span>
+                <div class="quiz-main-results-actions">
+                    <button class="btn-quiz-main-back" onclick="backToLesson()">Voltar para Aula</button>
+                    <button class="btn-quiz-main-retry" id="btnQuizMainRetry" onclick="mainRetryQuiz()">Tentar Novamente</button>
+                </div>
+            </div>
+        </article>
+    </main>
+
+    <!-- Sidebar Overlay for Mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <script src="curso-geracao.js"></script>
+</body>
+</html>
