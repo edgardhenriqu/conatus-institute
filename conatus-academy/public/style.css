@@ -957,21 +957,66 @@ input:focus {
     flex: 1;
 }
 
-.card button {
-    background: var(--secondary);
-    color: white;
-    border: none;
-    width: 100%;
-    padding: 12px;
-    border-radius: 4px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.3s;
-    margin-top: 15px;
-}
-
 .card button:hover {
     background: #660000;
+}
+
+.card-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    align-items: stretch;
+}
+
+.btn-card {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 10px;
+    height: 44px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    margin: 0;
+    vertical-align: middle;
+}
+
+a.btn-card {
+    line-height: 1;
+}
+
+button.btn-card {
+    line-height: 1;
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--secondary);
+    border: 2px solid var(--secondary);
+}
+
+.btn-outline:hover {
+    background: var(--secondary);
+    color: white;
+}
+
+.btn-fill {
+    background: var(--secondary);
+    color: white;
+    border: 2px solid var(--secondary);
+}
+
+.btn-fill:hover {
+    background: #660000;
+    border-color: #660000;
 }
 
 @media (max-width: 992px) {

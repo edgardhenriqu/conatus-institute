@@ -1,21 +1,36 @@
+require('dotenv').config();
 const express = require("express");
+const cors = require("cors");
 const path = require("path");
+const authRoutes = require("./src/routes/auth");
+const cursosRoutes = require("./src/routes/cursos");
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Rotas de autenticação
+app.use("/api/auth", authRoutes);
+
+// Rotas de cursos e matrículas
+app.use("/api/cursos", cursosRoutes);
 
 // Arquivos estáticos da pasta public
 app.use(express.static(path.join(__dirname, "public")));
 
-let users = [];
-
-let cursos = [
-  { id: 1, nome: "Introdução a Sistemas de Geração para Data Centers", duracao: "20h", image: "assets/img/Geradores para Data Center.png" },
-  { id: 2, nome: "Introdução a Sistemas de UPS para Data Centers", duracao: "15h", image: "assets/img/Introdução ao Data Center.png" },
-  { id: 3, nome: "Fundamentos de Procedimentos Operacionais em Data Centers", duracao: "10h", image: "assets/img/Relés de Proteção Elétrica.png" },
-];
+// Rota de cursos (compatibilidade com frontend existente)
+app.get("/cursos", async (req, res) => {
+  try {
+    const pool = require("./db/connection");
+    const resultado = await pool.query('SELECT * FROM cursos ORDER BY id');
+    res.json(resultado.rows);
+  } catch (error) {
+    console.error('Erro ao buscar cursos:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
 
 // Página inicial
 app.get("/", (req, res) => {
@@ -25,40 +40,6 @@ app.get("/", (req, res) => {
 // Dashboard
 app.get("/dashboard", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "dashboard.html"));
-});
-
-// Cadastro
-app.post("/register", (req, res) => {
-  users.push(req.body);
-  res.send({ success: true, message: "Usuário criado!" });
-});
-
-// Login
-app.post("/login", (req, res) => {
-  const user = users.find(
-    u => u.email === req.body.email && u.password === req.body.password
-  );
-
-  if (user) {
-    res.send({ success: true, user: { email: user.email } });
-    return;
-  }
-
-  if (
-    users.length === 0 &&
-    req.body.email === "admin@dc.com" &&
-    req.body.password === "123456"
-  ) {
-    res.send({ success: true, user: { email: "admin@dc.com" } });
-    return;
-  }
-
-  res.send({ success: false });
-});
-
-// Cursos
-app.get("/cursos", (req, res) => {
-  res.send(cursos);
 });
 
 // Porta para local e Vercel

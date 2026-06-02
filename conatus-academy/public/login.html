@@ -5,6 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal do Aluno | Conatus Institute</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .form-section { display: none; }
+        .form-section.active { display: block; }
+        .toggle-links { text-align: center; margin-top: 20px; }
+        .toggle-links a {
+            color: var(--primary);
+            cursor: pointer;
+            text-decoration: underline;
+            font-weight: 600;
+        }
+        .toggle-links a:hover { color: var(--primary-light); }
+        .form-row { display: flex; gap: 15px; }
+        .form-row > div { flex: 1; }
+        .form-row input { width: 100%; box-sizing: border-box; }
+        .error-message {
+            color: #dc3545;
+            font-size: 0.85rem;
+            margin-top: -15px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .error-message.visible { display: block; }
+    </style>
 </head>
 <body class="login-body">
 
@@ -15,57 +38,213 @@
         </header>
 
         <div class="container">
-            <h2>Portal do Aluno</h2>
-            <p>Acesse sua conta para gerenciar seus cursos e progresso acadêmico.</p>
+            <!-- FORMULÁRIO DE LOGIN -->
+            <div id="loginForm" class="form-section active">
+                <h2>Portal do Aluno</h2>
+                <p>Acesse sua conta para gerenciar seus cursos e progresso acadêmico.</p>
 
-            <div>
-                <label>E-mail Institucional</label>
-                <input id="email" placeholder="seu.email@conatus.edu.br" type="email">
-                
-                <label>Senha</label>
-                <input id="password" type="password" placeholder="••••••••">
+                <div>
+                    <label>E-mail Institucional</label>
+                    <input id="loginEmail" placeholder="seu.email@conatus.edu.br" type="email">
+                    
+                    <label>Senha</label>
+                    <input id="loginPassword" type="password" placeholder="••••••••">
+                </div>
+
+                <div id="loginError" class="error-message"></div>
+
+                <button class="btn-submit btn-primary" onclick="login()">Entrar no Portal</button>
+
+                <div class="toggle-links">
+                    <p>Ainda não tem conta? <a onclick="showForm('register')">Cadastre-se aqui</a></p>
+                </div>
             </div>
 
-            <button class="btn-submit btn-primary" onclick="login()">Entrar no Portal</button>
-            
-            <p class="login-hint">
-                Acesso demo: <strong>admin@dc.com</strong> / <strong>123456</strong>
-            </p>
+            <!-- FORMULÁRIO DE CADASTRO -->
+            <div id="registerForm" class="form-section">
+                <h2>Cadastro de Aluno</h2>
+                <p>Preencha seus dados para criar sua conta no portal.</p>
+
+                <div>
+                    <label>Nome Completo *</label>
+                    <input id="regNome" placeholder="Seu nome completo" type="text">
+
+                    <label>E-mail Institucional *</label>
+                    <input id="regEmail" placeholder="seu.email@conatus.edu.br" type="email">
+                    
+                    <label>Senha *</label>
+                    <input id="regSenha" type="password" placeholder="Mínimo 6 caracteres">
+
+                    <label>CPF *</label>
+                    <input id="regCpf" placeholder="000.000.000-00" type="text" maxlength="14">
+
+                    <label>Data de Nascimento *</label>
+                    <input id="regNascimento" type="date">
+
+                    <div class="form-row">
+                        <div>
+                            <label>Telefone</label>
+                            <input id="regTelefone" placeholder="(00) 00000-0000" type="tel">
+                        </div>
+                        <div>
+                            <label>Estado</label>
+                            <input id="regEstado" placeholder="UF" type="text" maxlength="2">
+                        </div>
+                    </div>
+
+                    <label>Endereço</label>
+                    <input id="regEndereco" placeholder="Rua, número, bairro" type="text">
+
+                    <label>Cidade</label>
+                    <input id="regCidade" placeholder="Sua cidade" type="text">
+                </div>
+
+                <div id="registerError" class="error-message"></div>
+
+                <button class="btn-submit btn-primary" onclick="cadastrar()">Criar Conta</button>
+
+                <div class="toggle-links">
+                    <p>Já tem conta? <a onclick="showForm('login')">Faça login</a></p>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
+        function showForm(form) {
+            document.getElementById('loginForm').classList.remove('active');
+            document.getElementById('registerForm').classList.remove('active');
+            clearErrors();
+
+            if (form === 'login') {
+                document.getElementById('loginForm').classList.add('active');
+            } else {
+                document.getElementById('registerForm').classList.add('active');
+            }
+        }
+
+        function showError(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.classList.add('visible');
+        }
+
+        function clearErrors() {
+            document.querySelectorAll('.error-message').forEach(el => {
+                el.textContent = '';
+                el.classList.remove('visible');
+            });
+        }
+
+        function formatCpf(value) {
+            return value
+                .replace(/\D/g, '')
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+                .replace(/(-\d{2})\d+?$/, '$1');
+        }
+
+        document.getElementById('regCpf').addEventListener('input', function(e) {
+            e.target.value = formatCpf(e.target.value);
+        });
+
+        function formatPhone(value) {
+            return value
+                .replace(/\D/g, '')
+                .replace(/(\d{2})(\d)/, '($1) $2')
+                .replace(/(\d{5})(\d)/, '$1-$2')
+                .replace(/(-\d{4})\d+?$/, '$1');
+        }
+
+        document.getElementById('regTelefone').addEventListener('input', function(e) {
+            e.target.value = formatPhone(e.target.value);
+        });
+
         function login() {
-            const emailVal = document.getElementById('email').value;
-            const passVal = document.getElementById('password').value;
+            const emailVal = document.getElementById('loginEmail').value;
+            const passVal = document.getElementById('loginPassword').value;
 
             if (!emailVal || !passVal) {
-                alert("Por favor, preencha todos os campos.");
+                showError('loginError', 'Por favor, preencha todos os campos.');
                 return;
             }
 
-            fetch('/api/login', {
+            fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     email: emailVal,
-                    password: passVal
+                    senha: passVal
                 })
             })
             .then(res => res.json())
             .then(data => {
-                if (data.success) {
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    window.location = "dashboard.html";
-                } else {
-                    alert("Credenciais inválidas. Tente novamente.");
+                if (data.erro) {
+                    showError('loginError', data.erro);
+                    return;
                 }
+                localStorage.setItem('user', JSON.stringify(data.aluno));
+                localStorage.setItem('token', data.token);
+                window.location = "dashboard.html";
             })
             .catch(err => {
                 console.error(err);
-                alert("Erro ao conectar com o servidor.");
+                showError('loginError', 'Erro ao conectar com o servidor.');
             });
         }
+
+        function cadastrar() {
+            clearErrors();
+
+            const nome = document.getElementById('regNome').value;
+            const email = document.getElementById('regEmail').value;
+            const senha = document.getElementById('regSenha').value;
+            const cpf = document.getElementById('regCpf').value;
+            const data_nascimento = document.getElementById('regNascimento').value;
+            const telefone = document.getElementById('regTelefone').value;
+            const endereco = document.getElementById('regEndereco').value;
+            const cidade = document.getElementById('regCidade').value;
+            const estado = document.getElementById('regEstado').value;
+
+            if (!nome || !email || !senha || !cpf || !data_nascimento) {
+                showError('registerError', 'Preencha todos os campos obrigatórios (*).');
+                return;
+            }
+
+            if (senha.length < 6) {
+                showError('registerError', 'A senha deve ter no mínimo 6 caracteres.');
+                return;
+            }
+
+            fetch('/api/auth/cadastrar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nome, email, senha, cpf, data_nascimento,
+                    telefone, endereco, cidade, estado
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.erro) {
+                    showError('registerError', data.erro);
+                    return;
+                }
+                localStorage.setItem('user', JSON.stringify(data.aluno));
+                localStorage.setItem('token', data.token);
+                alert('Cadastro realizado com sucesso!');
+                window.location = "dashboard.html";
+            })
+            .catch(err => {
+                console.error(err);
+                showError('registerError', 'Erro ao conectar com o servidor.');
+            });
+        }
+
+        document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') login();
+        });
     </script>
 
 </body>

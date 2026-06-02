@@ -89,6 +89,14 @@
             height: 100%;
             background: var(--gold);
         }
+        .course-progress-link {
+            display: block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .course-progress-link:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
         @media (max-width: 768px) {
             .stats-row { grid-template-columns: 1fr; }
             .course-progress { flex-direction: column; gap: 15px; align-items: flex-start; }
@@ -113,50 +121,144 @@
 
     <div class="dashboard-container">
         <div class="welcome-header">
-            <h1>Bem-vindo ao seu Painel Acadêmico</h1>
+            <h1>Bem-vindo, <span id="user-name">Aluno</span>!</h1>
             <p>Acompanhe seu progresso, acesse materiais e gerencie sua jornada de aprendizado.</p>
         </div>
 
         <div class="stats-row">
             <div class="stat-card">
-                <h3>0</h3>
+                <h3 id="cursos-count">0</h3>
                 <p>Cursos Matriculados</p>
             </div>
             <div class="stat-card">
-                <h3>0%</h3>
+                <h3 id="progresso-geral">0%</h3>
                 <p>Progresso Geral</p>
             </div>
             <div class="stat-card">
-                <h3>0</h3>
+                <h3 id="certificados-count">0</h3>
                 <p>Certificados Concluídos</p>
             </div>
         </div>
 
         <div class="courses-section">
             <h2>Seus Cursos em Andamento</h2>
-            <div class="course-progress">
-                <div class="course-info">
-                    <h4>Introdução ao Data Center</h4>
-                    <p>Módulo 3 de 10 • Último acesso: Hoje</p>
-                </div>
-                <div class="progress-bar"><div class="progress-fill" style="width: 30%;"></div></div>
-            </div>
-            <div class="course-progress">
-                <div class="course-info">
-                    <h4>Redes e Telecom</h4>
-                    <p>Módulo 1 de 8 • Último acesso: 2 dias atrás</p>
-                </div>
-                <div class="progress-bar"><div class="progress-fill" style="width: 12%;"></div></div>
+            <div id="cursos-lista">
+                <p style="color: var(--text-muted);">Carregando seus cursos...</p>
             </div>
         </div>
     </div>
 
     <script>
         const user = JSON.parse(localStorage.getItem('user'));
-        if (!user) {
+        const token = localStorage.getItem('token');
+
+        if (!user || !token) {
             window.location = "login.html";
         } else {
             document.getElementById('user-email').textContent = user.email;
+            document.getElementById('user-name').textContent = user.nome || 'Aluno';
+            carregarMatriculas();
+        }
+
+        function getCursoProgresso(cursoId) {
+            if (cursoId === 1) {
+                const saved = localStorage.getItem('curso-geracao-progress');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    const completed = data.completed || [];
+                    const total = 15;
+                    return Math.round((completed.length / total) * 100);
+                }
+            } else {
+                const saved = localStorage.getItem(`curso-${cursoId}-progress`);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    const completed = data.completed || [];
+                    return Math.round((completed.length / 5) * 100);
+                }
+            }
+            return 0;
+        }
+
+        function getCursoLink(cursoId) {
+            if (cursoId === 1) {
+                return 'cursos/geracao/curso-geracao.html';
+            }
+            return `curso-detalhes.html?id=${cursoId}`;
+        }
+
+        function carregarMatriculas() {
+            fetch('/api/cursos/aluno/matriculas', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                const container = document.getElementById('cursos-lista');
+                const countEl = document.getElementById('cursos-count');
+                const progressEl = document.getElementById('progresso-geral');
+                const certEl = document.getElementById('certificados-count');
+
+                if (data.erro) {
+                    container.innerHTML = '<p style="color: var(--text-muted);">Erro ao carregar cursos.</p>';
+                    return;
+                }
+
+                const matriculas = data.matriculas || [];
+                countEl.textContent = matriculas.length;
+
+                if (matriculas.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 40px; background: white; border-radius: 8px; border: 1px solid var(--border);">
+                            <p style="color: var(--text-muted); margin-bottom: 20px;">Você ainda não está matriculado em nenhum curso.</p>
+                            <a href="cursos.html" class="btn-primary" style="display: inline-block; padding: 12px 30px; text-decoration: none; border-radius: 4px;">Ver Cursos Disponíveis</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let totalProgresso = 0;
+                let certificados = 0;
+                let html = '';
+
+                matriculas.forEach(m => {
+                    const progresso = getCursoProgresso(m.curso_id);
+                    totalProgresso += progresso;
+                    if (progresso >= 100) certificados++;
+
+                    const statusLabel = m.status === 'ativa' && progresso < 100 ? 'Em andamento' : 
+                                       progresso >= 100 ? 'Concluído' : m.status;
+                    
+                    const link = getCursoLink(m.curso_id);
+                    const statusColor = progresso >= 100 ? '#28a745' : 'var(--gold)';
+                    
+                    html += `
+                        <a href="${link}" class="course-progress-link" style="text-decoration: none; color: inherit;">
+                            <div class="course-progress">
+                                <div class="course-info">
+                                    <h4>${m.nome}</h4>
+                                    <p><span style="color: ${statusColor}; font-weight: 600;">${statusLabel}</span> • Carga horária: ${m.duracao}</p>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 15px;">
+                                    <span style="font-weight: 700; color: var(--primary); min-width: 45px; text-align: right;">${progresso}%</span>
+                                    <div class="progress-bar"><div class="progress-fill" style="width: ${progresso}%;"></div></div>
+                                </div>
+                            </div>
+                        </a>
+                    `;
+                });
+
+                const progressoGeral = matriculas.length > 0 ? Math.round(totalProgresso / matriculas.length) : 0;
+                progressEl.textContent = `${progressoGeral}%`;
+                certEl.textContent = certificados;
+
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('cursos-lista').innerHTML = '<p style="color: var(--text-muted);">Erro ao carregar cursos.</p>';
+            });
         }
     </script>
 

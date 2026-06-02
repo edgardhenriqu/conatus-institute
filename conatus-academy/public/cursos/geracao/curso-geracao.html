@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Introdução a Sistemas de Geração para Data Centers | Conatus Institute</title>
     <link rel="stylesheet" href="curso-geracao.css">
+    <script>
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) {
+            window.location.href = "../../login.html";
+        } else if (!user.cursos || !user.cursos.includes(1)) {
+            alert("Você não está matriculado neste curso. Por favor, matricule-se na página de cursos.");
+            window.location.href = "../../cursos.html";
+        }
+    </script>
 </head>
 <body>
     <!-- Sidebar -->
