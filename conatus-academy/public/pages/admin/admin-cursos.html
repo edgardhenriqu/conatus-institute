@@ -282,7 +282,7 @@
 
                 container.innerHTML = data.cursos.map(curso => `
                     <div class="curso-card">
-                        <img src="/${curso.image || 'assets/img/datacenter-hero.png'}" alt="${curso.nome}">
+                        <img src="/${curso.image ? encodeURI(curso.image) : 'assets/img/datacenter-hero.png'}" alt="${curso.nome}" onerror="this.src='assets/img/datacenter-hero.png'">
                         <div class="curso-card-content">
                             <h3>${curso.nome}</h3>
                             <div class="curso-card-meta">

@@ -201,7 +201,7 @@
                 <p id="curso-descricao">Carregando informações do curso...</p>
                 <a href="#matricula" class="btn-matricular" onclick="matricular()">Matricule-se Agora</a>
             </div>
-            <img id="curso-imagem" class="curso-hero-img" src="" alt="Curso">
+            <img id="curso-imagem" class="curso-hero-img" src="" alt="Curso" onerror="this.src='assets/img/datacenter-hero.png'">
         </div>
     </div>
 
@@ -330,7 +330,7 @@
             document.getElementById('curso-nome').textContent = curso.nome;
             document.getElementById('curso-duracao').textContent = `Duração: ${curso.duracao}`;
             document.getElementById('curso-descricao').textContent = curso.descricao || '';
-            document.getElementById('curso-imagem').src = `/${curso.image}`;
+            document.getElementById('curso-imagem').src = `/${curso.image ? encodeURI(curso.image) : 'assets/img/datacenter-hero.png'}`;
             document.getElementById('curso-imagem').alt = curso.nome;
             document.getElementById('curso-aprender').textContent = curso.oque_aprender || '';
             document.getElementById('curso-mercado').textContent = curso.mercado_trabalho || '';

@@ -183,7 +183,7 @@
             html += `
                 <div class="home-carousel-slide">
                     <div class="program-card">
-                        <img src="/${curso.image}" alt="${curso.nome}" class="card-image">
+                        <img src="/${curso.image ? encodeURI(curso.image) : 'assets/img/datacenter-hero.png'}" alt="${curso.nome}" class="card-image" onerror="this.src='assets/img/datacenter-hero.png'">
                         <div class="program-info">
                             <h3>${curso.nome}</h3>
                             <span class="badge">Certificação Profissional</span>
