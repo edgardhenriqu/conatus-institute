@@ -11,12 +11,15 @@ CREATE TABLE IF NOT EXISTS alunos (
     endereco VARCHAR(255),
     cidade VARCHAR(100),
     estado VARCHAR(2),
+    role VARCHAR(20) DEFAULT 'aluno',
+    ativo BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_alunos_email ON alunos(email);
 CREATE INDEX IF NOT EXISTS idx_alunos_cpf ON alunos(cpf);
+CREATE INDEX IF NOT EXISTS idx_alunos_role ON alunos(role);
 
 CREATE TABLE IF NOT EXISTS cursos (
     id SERIAL PRIMARY KEY,
@@ -69,7 +72,7 @@ INSERT INTO cursos (id, nome, duracao, image, descricao, oque_aprender, mercado_
 • 15 anos de experiência em Data Centers
 • Membro do comitê técnico da ABNT',
  '• Carga horária total: 20 horas
-• Modalidade: Presencial
+• Modalidade: Remoto
 • Turno: Diurno e Noturno
 • Vagas: 20 alunos por turma
 • Pré-requisitos: Ensino Médio completo
@@ -180,3 +183,28 @@ CREATE TABLE IF NOT EXISTS matriculas (
 
 CREATE INDEX IF NOT EXISTS idx_matriculas_aluno ON matriculas(aluno_id);
 CREATE INDEX IF NOT EXISTS idx_matriculas_curso ON matriculas(curso_id);
+
+CREATE TABLE IF NOT EXISTS progresso_aulas (
+    aluno_id UUID NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
+    curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+    aula_titulo VARCHAR(255) NOT NULL,
+    concluida BOOLEAN DEFAULT false,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (aluno_id, curso_id, aula_titulo)
+);
+
+CREATE INDEX IF NOT EXISTS idx_progresso_aluno ON progresso_aulas(aluno_id);
+CREATE INDEX IF NOT EXISTS idx_progresso_curso ON progresso_aulas(curso_id);
+
+CREATE TABLE IF NOT EXISTS certificados (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    aluno_id UUID NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
+    curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+    nota_avaliacao INTEGER NOT NULL,
+    data_emissao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    codigo VARCHAR(20) UNIQUE NOT NULL,
+    UNIQUE(aluno_id, curso_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_certificados_aluno ON certificados(aluno_id);
+CREATE INDEX IF NOT EXISTS idx_certificados_codigo ON certificados(codigo);

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Conatus Institute | Excelência em Infraestrutura de Data Center</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/global.css">
 </head>
 <body>
 
@@ -17,10 +17,7 @@
                 <li><a href="#metodologia">Metodologia</a></li>
                 <li><a href="#pesquisa">Pesquisa</a></li>
             </ul>
-            <div class="nav-actions">
-                <a href="login.html">Portal do Aluno</a>
-                <a href="login.html" class="btn-apply">Matricule-se</a>
-            </div>
+            <div class="nav-actions" id="nav-actions"></div>
         </div>
     </nav>
 
@@ -32,7 +29,7 @@
             <h1>Formando a Próxima Geração de Líderes em Infraestrutura Crítica</h1>
             <p>Excelência acadêmica, pesquisa avançada e laboratórios de ponta. Prepare-se para operar os data centers que movem o mundo digital.</p>
             <div class="hero-buttons">
-                <a href="cursos.html" class="btn-primary">Explorar Programas Acadêmicos</a>
+                <a href="pages/aluno/cursos.html" class="btn-primary">Explorar Programas Acadêmicos</a>
                 <a href="#sobre" class="btn-secondary">Explore o Ambiente Virtual</a>
             </div>
         </div>
@@ -91,7 +88,7 @@
         </div>
         <div class="home-carousel-dots" id="home-dots"></div>
         <div class="section-footer">
-            <a href="cursos.html" class="btn-secondary">Ver Todos os Cursos e Certificações →</a>
+            <a href="pages/aluno/cursos.html" class="btn-secondary">Ver Todos os Cursos e Certificações →</a>
         </div>
     </section>
 
@@ -149,6 +146,31 @@
     </footer>
 
     <script>
+    function updateNavAuth() {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const navActions = document.getElementById('nav-actions');
+        if (user && localStorage.getItem('token')) {
+            navActions.innerHTML = `
+                <span style="color: var(--text-muted); font-size: 0.9rem;">Olá, ${user.nome || user.email}</span>
+                <a href="pages/aluno/dashboard.html">Dashboard</a>
+                <a href="#" onclick="logout()" style="color: var(--secondary); cursor: pointer;">Sair</a>
+            `;
+        } else {
+            navActions.innerHTML = `
+                <a href="pages/auth/login.html">Portal do Aluno</a>
+                <a href="pages/auth/login.html" class="btn-apply">Matricule-se</a>
+            `;
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        window.location = '/index.html';
+    }
+
+    updateNavAuth();
+
     let homeCoursesData = [];
     let homeTrack;
     let homeIdx = 0;
@@ -161,12 +183,12 @@
             html += `
                 <div class="home-carousel-slide">
                     <div class="program-card">
-                        <img src="${curso.image}" alt="${curso.nome}" class="card-image">
+                        <img src="/${curso.image}" alt="${curso.nome}" class="card-image">
                         <div class="program-info">
                             <h3>${curso.nome}</h3>
                             <span class="badge">Certificação Profissional</span>
                             <p>Carga horária: ${curso.duracao}</p>
-                            <a href="cursos.html" class="btn-small">Detalhes do Curso</a>
+                            <a href="pages/aluno/cursos.html" class="btn-small">Detalhes do Curso</a>
                         </div>
                     </div>
                 </div>

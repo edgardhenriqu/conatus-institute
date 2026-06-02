@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detalhes do Curso | Conatus Institute</title>
-    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="../../css/global.css?v=20260602195731">
     <style>
         .curso-detalhe-body {
             background: var(--bg-light);
@@ -94,7 +94,7 @@
             position: relative;
         }
         .curso-section ul li::before {
-            content: '✓';
+            content: 'âœ“';
             color: var(--gold);
             font-weight: bold;
             position: absolute;
@@ -183,19 +183,19 @@
 
     <nav class="navbar">
         <div class="nav-container">
-            <a href="../index.html" class="nav-logo"><img src="../assets/img/Logo Institute.svg" alt="Conatus Institute" class="nav-logo-img"></a>
+            <a href="../../index.html" class="nav-logo"><img src="../../assets/img/Logo Institute.svg" alt="Conatus Institute" class="nav-logo-img"></a>
             <ul class="nav-menu">
-                <li><a href="../index.html#sobre">Sobre</a></li>
-                <li><a href="../cursos.html">Cursos</a></li>
-                <li><a href="../login.html">Portal do Aluno</a></li>
+                <li><a href="../../index.html#sobre">Sobre</a></li>
+                <li><a href="cursos.html">Cursos</a></li>
             </ul>
+            <div class="nav-actions" id="nav-actions"></div>
         </div>
     </nav>
 
     <div class="curso-hero">
         <div class="curso-hero-container">
             <div class="curso-hero-info">
-                <a href="../cursos.html" class="back-link">← Voltar aos Cursos</a>
+                <a href="cursos.html" class="back-link">← Voltar aos Cursos</a>
                 <h1 id="curso-nome">Carregando...</h1>
                 <span class="badge-duracao" id="curso-duracao">--</span>
                 <p id="curso-descricao">Carregando informações do curso...</p>
@@ -250,14 +250,14 @@
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-col">
-                <img src="../assets/img/Logo Institute.svg" alt="Conatus Institute" style="height: 60px; margin-bottom: 15px; filter: brightness(0) invert(1);">
+                <img src="../../assets/img/Logo Institute.svg" alt="Conatus Institute" style="height: 60px; margin-bottom: 15px; filter: brightness(0) invert(1);">
                 <p>Capacitação técnica de alto nível para profissionais de Data Centers.</p>
             </div>
             <div class="footer-col">
-                <h4>Links Úteis</h4>
-                <a href="../index.html">Início</a>
-                <a href="../cursos.html">Cursos</a>
-                <a href="../login.html">Portal do Aluno</a>
+                <h4>Links Ñšteis</h4>
+                <a href="../../index.html">Início</a>
+                <a href="cursos.html">Cursos</a>
+                <a href="../auth/login.html">Portal do Aluno</a>
             </div>
             <div class="footer-col">
                 <h4>Contato</h4>
@@ -268,6 +268,31 @@
     </footer>
 
     <script>
+        function updateNavAuth() {
+            const user = JSON.parse(localStorage.getItem('user'));
+            const navActions = document.getElementById('nav-actions');
+            if (user && localStorage.getItem('token')) {
+                navActions.innerHTML = `
+                    <span style="color: var(--text-muted); font-size: 0.9rem;">Olá, ${user.nome || user.email}</span>
+                    <a href="dashboard.html">Dashboard</a>
+                    <a href="#" onclick="logout()" style="color: var(--secondary); cursor: pointer;">Sair</a>
+                `;
+            } else {
+                navActions.innerHTML = `
+                    <a href="../auth/login.html">Portal do Aluno</a>
+                    <a href="../auth/login.html" class="btn-apply">Matricule-se</a>
+                `;
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            window.location = '../index.html';
+        }
+
+        updateNavAuth();
+
         let cursoData = null;
 
         function getUrlParams() {
@@ -305,7 +330,7 @@
             document.getElementById('curso-nome').textContent = curso.nome;
             document.getElementById('curso-duracao').textContent = `Duração: ${curso.duracao}`;
             document.getElementById('curso-descricao').textContent = curso.descricao || '';
-            document.getElementById('curso-imagem').src = `../${curso.image}`;
+            document.getElementById('curso-imagem').src = `/${curso.image}`;
             document.getElementById('curso-imagem').alt = curso.nome;
             document.getElementById('curso-aprender').textContent = curso.oque_aprender || '';
             document.getElementById('curso-mercado').textContent = curso.mercado_trabalho || '';
@@ -371,3 +396,4 @@
 
 </body>
 </html>
+

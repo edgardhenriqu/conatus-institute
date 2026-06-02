@@ -48,13 +48,13 @@ router.post('/cadastrar', async (req, res) => {
     const resultado = await pool.query(
       `INSERT INTO alunos (nome, email, senha, cpf, data_nascimento, telefone, endereco, cidade, estado)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, created_at`,
+       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, role, created_at`,
       [nome, email, senhaHash, cpf, data_nascimento, telefone || null, endereco || null, cidade || null, estado || null]
     );
 
     const aluno = resultado.rows[0];
 
-    const token = jwt.sign({ id: aluno.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const token = jwt.sign({ id: aluno.id, role: aluno.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
     res.status(201).json({ aluno, token });
   } catch (error) {
@@ -83,7 +83,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ erro: 'Email ou senha inválidos' });
     }
 
-    const token = jwt.sign({ id: aluno.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    if (!aluno.ativo) {
+      return res.status(403).json({ erro: 'Conta desativada. Entre em contato com o administrador.' });
+    }
+
+    const token = jwt.sign({ id: aluno.id, role: aluno.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
     const { senha: _, ...alunoSemSenha } = aluno;
 

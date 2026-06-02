@@ -1,4 +1,4 @@
-// Sidebar Toggle
+﻿// Sidebar Toggle
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -38,7 +38,7 @@ function selectLesson(lessonElement, lessonNumber) {
     
     // Update breadcrumb
     const moduleNumber = lessonElement.closest('.module').querySelector('.module-number').textContent;
-    document.querySelector('.breadcrumb').textContent = `Módulo ${moduleNumber} / Aula ${String(lessonNumber).padStart(2, '0')}`;
+    document.querySelector('.breadcrumb').textContent = `MÃ³dulo ${moduleNumber} / Aula ${String(lessonNumber).padStart(2, '0')}`;
     
     // Scroll to content area
     const lessonContent = document.getElementById('lessonContent');
@@ -65,6 +65,7 @@ function selectLesson(lessonElement, lessonNumber) {
     
     // Update progress
     updateProgress();
+    saveProgress();
 }
 
 // Update Progress
@@ -83,27 +84,35 @@ function nextLesson() {
     const allLessons = Array.from(document.querySelectorAll('.lesson'));
     const currentIndex = allLessons.indexOf(currentLesson);
     
+    // Mark current as completed
+    if (!currentLesson.classList.contains('completed')) {
+        currentLesson.classList.remove('active');
+        currentLesson.classList.add('completed');
+        currentLesson.querySelector('.lesson-number')?.replaceWith(createCheckIcon());
+    }
+    
+    updateProgress();
+    
     if (currentIndex < allLessons.length - 1) {
-        const nextLesson = allLessons[currentIndex + 1];
-        
-        // Mark current as completed
-        if (!currentLesson.classList.contains('completed')) {
-            currentLesson.classList.remove('active');
-            currentLesson.classList.add('completed');
-            currentLesson.querySelector('.lesson-number')?.replaceWith(createCheckIcon());
-        }
+        saveProgress();
+        const next = allLessons[currentIndex + 1];
         
         // Activate next lesson
-        selectLesson(nextLesson, currentIndex + 2);
+        selectLesson(next, currentIndex + 2);
         
         // Expand parent module if needed
-        const parentModule = nextLesson.closest('.module');
+        const parentModule = next.closest('.module');
         if (!parentModule.classList.contains('expanded')) {
             toggleModule(parentModule.querySelector('.module-header'));
         }
         
         // Scroll to top of content
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+        // Last lesson â€” save first, then open quiz
+        saveProgress().then(() => {
+            openMainQuiz();
+        });
     }
 }
 
@@ -167,8 +176,8 @@ window.addEventListener('resize', () => {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    // Set initial state
-    updateProgress();
+    // Load progress from server
+    loadProgress();
     
     // Add smooth scroll behavior for anchor links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -192,28 +201,93 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Save progress to localStorage (simulated)
+// Save progress to server and localStorage
 function saveProgress() {
     const completedLessons = [];
-    document.querySelectorAll('.lesson.completed').forEach(lesson => {
+    const allLessons = [];
+    document.querySelectorAll('.lesson').forEach(lesson => {
         const title = lesson.querySelector('.lesson-title').textContent;
-        completedLessons.push(title);
+        const isCompleted = lesson.classList.contains('completed');
+        allLessons.push({ titulo: title, concluida: isCompleted });
+        if (isCompleted) {
+            completedLessons.push(title);
+        }
     });
     
-    localStorage.setItem('curso-geracao-progress', JSON.stringify({
+    // Save to localStorage as backup (isolated by user)
+    const user = JSON.parse(localStorage.getItem('user'));
+    const storageKey = user ? `curso-geracao-progress-${user.id}` : 'curso-geracao-progress';
+    localStorage.setItem(storageKey, JSON.stringify({
         completed: completedLessons,
         lastAccess: new Date().toISOString()
     }));
+    
+    // Save to server (send ALL lessons, not just completed)
+    const token = localStorage.getItem('token');
+    if (user && token) {
+        return fetch(`/api/cursos/${CURSO_ID}/progresso`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ aulas: allLessons })
+        }).then(res => res.json()).catch(err => {
+            console.error('Erro ao salvar progresso no servidor:', err);
+            return null;
+        });
+    }
+    return Promise.resolve(null);
 }
 
-// Load progress from localStorage (simulated)
+// Load progress from server, fallback to localStorage
 function loadProgress() {
-    const saved = localStorage.getItem('curso-geracao-progress');
+    const user = JSON.parse(localStorage.getItem('user'));
+    const token = localStorage.getItem('token');
+    
+    if (user && token) {
+        return fetch(`/api/cursos/${CURSO_ID}/progresso`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.aulas && data.aulas.length > 0) {
+                const completedTitles = data.aulas.filter(a => a.concluida).map(a => a.titulo);
+                restoreCompletedLessons(completedTitles);
+                return data.aulas;
+            } else {
+                // Fallback to localStorage
+                return loadProgressFromStorage();
+            }
+        })
+        .catch(() => loadProgressFromStorage());
+    } else {
+        return Promise.resolve(loadProgressFromStorage());
+    }
+}
+
+function loadProgressFromStorage() {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const storageKey = user ? `curso-geracao-progress-${user.id}` : 'curso-geracao-progress';
+    const saved = localStorage.getItem(storageKey);
     if (saved) {
         const data = JSON.parse(saved);
-        console.log('Progresso carregado:', data);
-        // In a real app, this would restore the lesson states
+        restoreCompletedLessons(data.completed || []);
+        return data;
     }
+    return null;
+}
+
+function restoreCompletedLessons(completedTitles) {
+    document.querySelectorAll('.lesson').forEach(lesson => {
+        const title = lesson.querySelector('.lesson-title')?.textContent;
+        if (completedTitles.includes(title) && !lesson.classList.contains('completed')) {
+            lesson.classList.add('completed');
+            const numEl = lesson.querySelector('.lesson-number');
+            if (numEl) numEl.replaceWith(createCheckIcon());
+        }
+    });
+    updateProgress();
 }
 
 // Auto-save progress every 30 seconds
@@ -228,10 +302,10 @@ window.addEventListener('beforeunload', saveProgress);
 const quizQuestions = [
     {
         id: 1,
-        question: "Qual é a função principal de um grupo gerador em um data center?",
+        question: "Qual Ã© a funÃ§Ã£o principal de um grupo gerador em um data center?",
         options: [
             "Armazenar energia para uso futuro",
-            "Fornecer energia elétrica de forma contínua durante falhas da rede pública",
+            "Fornecer energia elÃ©trica de forma contÃ­nua durante falhas da rede pÃºblica",
             "Regular a temperatura dos servidores",
             "Controlar o fluxo de dados da rede"
         ],
@@ -239,9 +313,9 @@ const quizQuestions = [
     },
     {
         id: 2,
-        question: "O que significa a sigla ATS no contexto de sistemas de geração?",
+        question: "O que significa a sigla ATS no contexto de sistemas de geraÃ§Ã£o?",
         options: [
-            "Automatic Transfer Switch (Chave de Transferência Automática)",
+            "Automatic Transfer Switch (Chave de TransferÃªncia AutomÃ¡tica)",
             "Automatic Temperature System",
             "Auxiliary Power Supply",
             "Advanced Technology Server"
@@ -250,63 +324,63 @@ const quizQuestions = [
     },
     {
         id: 3,
-        question: "Qual é o tempo de resposta ideal de um sistema de geração para data centers?",
+        question: "Qual Ã© o tempo de resposta ideal de um sistema de geraÃ§Ã£o para data centers?",
         options:
         [
             "Entre 5 e 10 minutos",
             "Entre 1 e 2 minutos",
             "Entre 10 e 30 segundos",
-            "Instantâneo (menos de 1 segundo)"
+            "InstantÃ¢neo (menos de 1 segundo)"
         ],
         correct: 2
     },
     {
         id: 4,
-        question: "Qual margem de segurança é recomendada ao dimensionar um sistema de geração?",
+        question: "Qual margem de seguranÃ§a Ã© recomendada ao dimensionar um sistema de geraÃ§Ã£o?",
         options: [
-            "5% acima da carga máxima",
-            "10% acima da carga máxima",
-            "20% acima da carga máxima",
-            "50% acima da carga máxima"
+            "5% acima da carga mÃ¡xima",
+            "10% acima da carga mÃ¡xima",
+            "20% acima da carga mÃ¡xima",
+            "50% acima da carga mÃ¡xima"
         ],
         correct: 2
     },
     {
         id: 5,
-        question: "Qual componente é responsável por converter energia mecânica em energia elétrica?",
+        question: "Qual componente Ã© responsÃ¡vel por converter energia mecÃ¢nica em energia elÃ©trica?",
         options: [
-            "O motor a combustão",
+            "O motor a combustÃ£o",
             "O alternador",
-            "O tanque de combustível",
+            "O tanque de combustÃ­vel",
             "O silenciador"
         ],
         correct: 1
     },
     {
         id: 6,
-        question: "Qual é o principal combustível utilizado em grupos geradores para data centers no Brasil?",
+        question: "Qual Ã© o principal combustÃ­vel utilizado em grupos geradores para data centers no Brasil?",
         options: [
             "Gasolina",
-            "Gás natural",
-            "Óleo diesel",
+            "GÃ¡s natural",
+            "Ã“leo diesel",
             "Energia solar"
         ],
         correct: 2
     },
     {
         id: 7,
-        question: "O que ocorre se um data center perder a energia elétrica sem sistema de geração?",
+        question: "O que ocorre se um data center perder a energia elÃ©trica sem sistema de geraÃ§Ã£o?",
         options: [
             "Apenas as luzes se apagam",
             "Os servidores continuam funcionando por 24 horas",
-            "Pode haver perda de dados e indisponibilidade de serviços",
+            "Pode haver perda de dados e indisponibilidade de serviÃ§os",
             "O sistema de ar condicionado continua funcionando"
         ],
         correct: 2
     },
     {
         id: 8,
-        question: "Qual norma técnica brasileira é referência para sistemas de energia de emergência?",
+        question: "Qual norma tÃ©cnica brasileira Ã© referÃªncia para sistemas de energia de emergÃªncia?",
         options: [
             "ABNT NBR 7190",
             "ABNT NBR 15845",
@@ -319,21 +393,21 @@ const quizQuestions = [
         id: 9,
         question: "Qual a finalidade do sistema de resfriamento em um grupo gerador?",
         options: [
-            "Aumentar a potência do motor",
+            "Aumentar a potÃªncia do motor",
             "Resfriar os servidores do data center",
-            "Dissipar o calor gerado pela combustão e manter temperatura ideal",
+            "Dissipar o calor gerado pela combustÃ£o e manter temperatura ideal",
             "Controlar a umidade do ambiente"
         ],
         correct: 2
     },
     {
         id: 10,
-        question: "Em caso de falha da rede pública, qual設備 entra em operação automaticamente?",
+        question: "Em caso de falha da rede pÃºblica, qual sistema entra em operaÃ§Ã£o automaticamente?",
         options: [
-            "O sistema de climatização",
-            "O sistema de geração (grupo gerador)",
-            "O sistema de vigilância",
-            "O sistema de iluminação de emergência"
+            "O sistema de climatizaÃ§Ã£o",
+            "O sistema de geraÃ§Ã£o (grupo gerador)",
+            "O sistema de vigilÃ¢ncia",
+            "O sistema de iluminaÃ§Ã£o de emergÃªncia"
         ],
         correct: 1
     }
@@ -347,7 +421,9 @@ let lastScore = 0;
 
 // Load saved attempts from localStorage
 function loadQuizState() {
-    const saved = localStorage.getItem('curso-geracao-quiz');
+    const user = JSON.parse(localStorage.getItem('user'));
+    const storageKey = user ? `curso-geracao-quiz-${user.id}` : 'curso-geracao-quiz';
+    const saved = localStorage.getItem(storageKey);
     if (saved) {
         const data = JSON.parse(saved);
         attempts = data.attempts || 0;
@@ -366,10 +442,10 @@ function updateSidebarStatus() {
         statusEl.style.display = 'block';
         statusText.textContent = `Aprovado! Nota: ${lastScore}%`;
         statusText.style.color = '#10b981';
-        btnStart.textContent = 'Ver Avaliação';
+        btnStart.textContent = 'Ver AvaliaÃ§Ã£o';
     } else if (attempts > 0) {
         statusEl.style.display = 'block';
-        statusText.textContent = `Tentativa ${attempts}/${maxAttempts} | Última nota: ${lastScore}%`;
+        statusText.textContent = `Tentativa ${attempts}/${maxAttempts} | Ãšltima nota: ${lastScore}%`;
         statusText.style.color = lastScore >= 70 ? '#10b981' : 'var(--gray-600)';
     }
 }
@@ -405,7 +481,7 @@ function backToLesson() {
 // Start Main Quiz
 function startMainQuiz() {
     if (attempts >= maxAttempts) {
-        alert('Você já utilizou todas as 3 tentativas disponíveis.');
+        alert('VocÃª jÃ¡ utilizou todas as 3 tentativas disponÃ­veis.');
         return;
     }
     
@@ -486,7 +562,7 @@ function mainPrevQuestion() {
 function mainSubmitQuiz() {
     const unanswered = mainUserAnswers.filter(a => a === null).length;
     if (unanswered > 0) {
-        if (!confirm(`Você tem ${unanswered} pergunta(s) sem responder. Deseja finalizar mesmo assim?`)) {
+        if (!confirm(`VocÃª tem ${unanswered} pergunta(s) sem responder. Deseja finalizar mesmo assim?`)) {
             return;
         }
     }
@@ -509,7 +585,9 @@ function mainSubmitQuiz() {
         quizCompleted = true;
     }
     
-    localStorage.setItem('curso-geracao-quiz', JSON.stringify({
+    const user = JSON.parse(localStorage.getItem('user'));
+    const storageKey = user ? `curso-geracao-quiz-${user.id}` : 'curso-geracao-quiz';
+    localStorage.setItem(storageKey, JSON.stringify({
         attempts: attempts,
         lastScore: lastScore,
         quizCompleted: quizCompleted,
@@ -529,7 +607,7 @@ function showMainResults(score, correctCount, passed) {
     document.getElementById('quizMainScoreValue').textContent = `${score}%`;
     
     document.getElementById('quizMainResultsText').textContent = passed ? 
-        'Parabéns! Você foi aprovado!' : 'Não foi desta vez...';
+        'ParabÃ©ns! VocÃª foi aprovado!' : 'NÃ£o foi desta vez...';
     
     document.getElementById('quizMainCorrectCount').textContent = `${correctCount} corretas`;
     document.getElementById('quizMainIncorrectCount').textContent = `${quizQuestions.length - correctCount} incorretas`;
@@ -555,7 +633,7 @@ function showMainResultsFinal() {
     scoreEl.className = 'quiz-main-results-score passed';
     document.getElementById('quizMainScoreValue').textContent = `${lastScore}%`;
     
-    document.getElementById('quizMainResultsText').textContent = 'Avaliação Concluída com Sucesso!';
+    document.getElementById('quizMainResultsText').textContent = 'AvaliaÃ§Ã£o ConcluÃ­da com Sucesso!';
     
     document.getElementById('quizMainCorrectCount').textContent = '';
     document.getElementById('quizMainIncorrectCount').textContent = '';
@@ -566,7 +644,7 @@ function showMainResultsFinal() {
 // Main Retry Quiz
 function mainRetryQuiz() {
     if (attempts >= maxAttempts) {
-        alert('Você já utilizou todas as 3 tentativas disponíveis.');
+        alert('VocÃª jÃ¡ utilizou todas as 3 tentativas disponÃ­veis.');
         return;
     }
     
@@ -574,9 +652,45 @@ function mainRetryQuiz() {
     document.getElementById('quizMainStart').style.display = 'block';
 }
 
+// Certificate Check
+async function checkCertificate() {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const token = localStorage.getItem('token');
+    const certBtn = document.getElementById('btnCertificado');
+    const certSection = document.getElementById('sidebarCert');
+
+    if (!user || !token || !certBtn || !certSection) return;
+
+    try {
+        const res = await fetch(`/api/cursos/${CURSO_ID}/certificado`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (data.emitido) {
+            certBtn.href = `../../pages/aluno/certificado.html?curso_id=${CURSO_ID}`;
+            certSection.style.display = 'block';
+            return;
+        }
+
+        const completedCount = document.querySelectorAll('.lesson.completed').length;
+        const totalLessons = document.querySelectorAll('.lesson').length;
+        const progresso = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+
+        if (progresso >= 100 && quizCompleted && lastScore >= 70) {
+            certBtn.href = `../../pages/aluno/certificado.html?curso_id=${CURSO_ID}`;
+            certSection.style.display = 'block';
+        }
+    } catch (err) {
+        console.error('Erro ao verificar certificado:', err);
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadQuizState();
     updateSidebarStatus();
+    setTimeout(checkCertificate, 2000);
 });
+
 

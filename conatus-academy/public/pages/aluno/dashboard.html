@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Acadêmico | Conatus Institute</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../css/global.css?v=20260602195731">
     <style>
         .dashboard-body {
             background: var(--bg-light);
@@ -107,14 +107,14 @@
 
     <nav class="navbar">
         <div class="nav-container">
-            <a href="dashboard.html" class="nav-logo"><img src="assets/img/Logo Institute.svg" alt="Conatus Institute" class="nav-logo-img"></a>
+            <a href="dashboard.html" class="nav-logo"><img src="../../assets/img/Logo Institute.svg" alt="Conatus Institute" class="nav-logo-img"></a>
             <ul class="nav-menu">
                 <li><a href="dashboard.html">Dashboard</a></li>
                 <li><a href="cursos.html">Catálogo de Cursos</a></li>
             </ul>
             <div class="nav-actions">
                 <span id="user-email" style="color: var(--text-muted); font-size: 0.9rem;"></span>
-                <a href="index.html" style="color: var(--secondary);">Sair</a>
+                <a href="../../index.html" style="color: var(--secondary);" onclick="logout()">Sair</a>
             </div>
         </div>
     </nav>
@@ -149,40 +149,25 @@
     </div>
 
     <script>
+        function logout() {
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+        }
+
         const user = JSON.parse(localStorage.getItem('user'));
         const token = localStorage.getItem('token');
 
         if (!user || !token) {
-            window.location = "login.html";
+            window.location = "../auth/login.html";
         } else {
             document.getElementById('user-email').textContent = user.email;
             document.getElementById('user-name').textContent = user.nome || 'Aluno';
             carregarMatriculas();
         }
 
-        function getCursoProgresso(cursoId) {
-            if (cursoId === 1) {
-                const saved = localStorage.getItem('curso-geracao-progress');
-                if (saved) {
-                    const data = JSON.parse(saved);
-                    const completed = data.completed || [];
-                    const total = 15;
-                    return Math.round((completed.length / total) * 100);
-                }
-            } else {
-                const saved = localStorage.getItem(`curso-${cursoId}-progress`);
-                if (saved) {
-                    const data = JSON.parse(saved);
-                    const completed = data.completed || [];
-                    return Math.round((completed.length / 5) * 100);
-                }
-            }
-            return 0;
-        }
-
         function getCursoLink(cursoId) {
             if (cursoId === 1) {
-                return 'cursos/geracao/curso-geracao.html';
+                return '../cursos/geracao/curso-geracao.html';
             }
             return `curso-detalhes.html?id=${cursoId}`;
         }
@@ -223,7 +208,7 @@
                 let html = '';
 
                 matriculas.forEach(m => {
-                    const progresso = getCursoProgresso(m.curso_id);
+                    const progresso = m.progresso || 0;
                     totalProgresso += progresso;
                     if (progresso >= 100) certificados++;
 
@@ -233,14 +218,19 @@
                     const link = getCursoLink(m.curso_id);
                     const statusColor = progresso >= 100 ? '#28a745' : 'var(--gold)';
                     
+                    const certBtn = progresso >= 100 
+                        ? `<a href="certificado.html?curso_id=${m.curso_id}" onclick="event.stopPropagation();" style="padding: 6px 16px; background: #28a745; color: white; border-radius: 4px; text-decoration: none; font-size: 0.85rem; font-weight: 500;">Certificado</a>`
+                        : '';
+                    
                     html += `
                         <a href="${link}" class="course-progress-link" style="text-decoration: none; color: inherit;">
                             <div class="course-progress">
                                 <div class="course-info">
                                     <h4>${m.nome}</h4>
-                                    <p><span style="color: ${statusColor}; font-weight: 600;">${statusLabel}</span> • Carga horária: ${m.duracao}</p>
+                                    <p><span style="color: ${statusColor}; font-weight: 600;">${statusLabel}</span> â€¢ Carga horária: ${m.duracao}</p>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 15px;">
+                                    ${certBtn}
                                     <span style="font-weight: 700; color: var(--primary); min-width: 45px; text-align: right;">${progresso}%</span>
                                     <div class="progress-bar"><div class="progress-fill" style="width: ${progresso}%;"></div></div>
                                 </div>
@@ -264,3 +254,4 @@
 
 </body>
 </html>
+

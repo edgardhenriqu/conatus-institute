@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal do Aluno | Conatus Institute</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../css/global.css?v=20260602195731">
     <style>
         .form-section { display: none; }
         .form-section.active { display: block; }
@@ -33,12 +33,12 @@
 
     <div class="login-page-wrapper">
         <header class="login-header">
-            <a href="index.html" class="back-link">← Voltar ao Site</a>
-            <img src="assets/img/Logo Institute.svg" alt="Conatus Institute" class="login-logo">
+            <a href="../../index.html" class="back-link">← Voltar ao Site</a>
+            <img src="../../assets/img/Logo Institute.svg" alt="Conatus Institute" class="login-logo">
         </header>
 
         <div class="container">
-            <!-- FORMULÁRIO DE LOGIN -->
+            <!-- FORMULÑRIO DE LOGIN -->
             <div id="loginForm" class="form-section active">
                 <h2>Portal do Aluno</h2>
                 <p>Acesse sua conta para gerenciar seus cursos e progresso acadêmico.</p>
@@ -60,7 +60,7 @@
                 </div>
             </div>
 
-            <!-- FORMULÁRIO DE CADASTRO -->
+            <!-- FORMULÑRIO DE CADASTRO -->
             <div id="registerForm" class="form-section">
                 <h2>Cadastro de Aluno</h2>
                 <p>Preencha seus dados para criar sua conta no portal.</p>
@@ -186,7 +186,13 @@
                 }
                 localStorage.setItem('user', JSON.stringify(data.aluno));
                 localStorage.setItem('token', data.token);
-                window.location = "dashboard.html";
+                
+                // Redirecionar admin para dashboard-admin
+                if (data.aluno.role === 'admin') {
+                    window.location = "../admin/dashboard-admin.html";
+                } else {
+                    window.location = "../aluno/dashboard.html";
+                }
             })
             .catch(err => {
                 console.error(err);
@@ -234,7 +240,7 @@
                 localStorage.setItem('user', JSON.stringify(data.aluno));
                 localStorage.setItem('token', data.token);
                 alert('Cadastro realizado com sucesso!');
-                window.location = "dashboard.html";
+                window.location = "../aluno/dashboard.html";
             })
             .catch(err => {
                 console.error(err);
@@ -249,3 +255,4 @@
 
 </body>
 </html>
+

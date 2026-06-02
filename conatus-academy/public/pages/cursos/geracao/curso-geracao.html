@@ -1,17 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Introdução a Sistemas de Geração para Data Centers | Conatus Institute</title>
-    <link rel="stylesheet" href="curso-geracao.css">
+    <link rel="stylesheet" href="../../../css/curso-geracao.css?v=20260602195731">
     <script>
         const user = JSON.parse(localStorage.getItem('user'));
+        const CURSO_ID = 1;
         if (!user) {
-            window.location.href = "../../login.html";
-        } else if (!user.cursos || !user.cursos.includes(1)) {
-            alert("Você não está matriculado neste curso. Por favor, matricule-se na página de cursos.");
-            window.location.href = "../../cursos.html";
+            window.location.href = "../../../pages/auth/login.html";
         }
     </script>
 </head>
@@ -19,7 +17,7 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <a href="../../cursos.html" class="back-link">
+            <a href="../../../pages/aluno/cursos.html" class="back-link">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M19 12H5M12 19l-7-7 7-7"/>
                 </svg>
@@ -28,7 +26,7 @@
         </div>
 
         <div class="sidebar-course-info">
-            <h2 class="course-title">INTRODUÇÃO A SISTEMAS DE GERAÇÃO PARA DATA CENTERS</h2>
+            <h2 class="course-title">INTRODUÇÑƒO A SISTEMAS DE GERAÇÑƒO PARA DATA CENTERS</h2>
             <div class="progress-section">
                 <div class="progress-label">
                     <span>Progresso do Curso</span>
@@ -259,6 +257,18 @@
                 <span class="sidebar-quiz-status-text" id="sidebarQuizStatusText"></span>
             </div>
         </div>
+
+        <div class="sidebar-cert" id="sidebarCert" style="display: none; padding: 16px; margin: 0 16px 16px; background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-radius: 8px; border: 1px solid #86efac;">
+            <div style="text-align: center;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" style="margin-bottom: 8px;">
+                    <circle cx="12" cy="8" r="7"/>
+                    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
+                </svg>
+                <div style="font-weight: 600; color: #16a34a; margin-bottom: 4px;">Certificado Disponível!</div>
+                <div style="font-size: 0.8rem; color: #666; margin-bottom: 10px;">Parabéns por concluir o curso</div>
+                <a id="btnCertificado" href="#" style="display: inline-block; padding: 8px 20px; background: #16a34a; color: white; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 0.9rem;">Ver Certificado</a>
+            </div>
+        </div>
     </aside>
 
     <!-- Mobile Menu Button -->
@@ -317,7 +327,7 @@
             </div>
 
             <div class="intro-text">
-                <p>Os sistemas de geração de energia são compostos por diversos componentes que trabalham em conjunto para garantir a提供 contínua de energia elétrica. Nesta aula, vamos analisar cada um desses componentes em detalhes, entendendo suas funções e importância para o funcionamento adequado do sistema como um todo.</p>
+                <p>Os sistemas de geração de energia são compostos por diversos componentes que trabalham em conjunto para garantir o funcionamento contínuo de energia elétrica. Nesta aula, vamos analisar cada um desses componentes em detalhes, entendendo suas funções e importância para o funcionamento adequado do sistema como um todo.</p>
             </div>
 
             <blockquote class="highlight-quote">
@@ -327,7 +337,7 @@
                     </svg>
                 </div>
                 <p>"A confiabilidade de um sistema de geração depende diretamente da qualidade e do dimensionamento correto de cada um de seus componentes."</p>
-                <cite>— Norma ABNT NBR 15845:2010</cite>
+                <cite>â€” Norma ABNT NBR 15845:2010</cite>
             </blockquote>
 
             <section class="objectives-section">
@@ -492,7 +502,7 @@
                             </svg>
                         </div>
                         <h4>Prejuízos Financeiros</h4>
-                        <p>Perdas econômicas significativas para a organização e seus clientes.</p>
+                        <p>Perdas econÑ´micas significativas para a organização e seus clientes.</p>
                     </div>
                 </div>
             </section>
@@ -595,6 +605,7 @@
     <!-- Sidebar Overlay for Mobile -->
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
-    <script src="curso-geracao.js"></script>
+    <script src="../../../js/cursos/curso-geracao.js?v=20260602195731"></script>
 </body>
 </html>
+

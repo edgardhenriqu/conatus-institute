@@ -1,21 +1,21 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cursos Disponíveis | Conatus Institute</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../css/global.css?v=20260602195731">
 </head>
 <body class="cursos-body">
 
     <nav class="navbar">
         <div class="nav-container">
-            <a href="index.html" class="nav-logo"><img src="assets/img/Logo Institute.svg" alt="Conatus Institute" class="nav-logo-img"></a>
+            <a href="../../index.html" class="nav-logo"><img src="../../assets/img/Logo Institute.svg" alt="Conatus Institute" class="nav-logo-img"></a>
             <ul class="nav-menu">
-                <li><a href="index.html#sobre">Sobre</a></li>
+                <li><a href="../../index.html#sobre">Sobre</a></li>
                 <li><a href="cursos.html">Cursos</a></li>
-                <li><a href="login.html">Portal do Aluno</a></li>
             </ul>
+            <div class="nav-actions" id="nav-actions"></div>
         </div>
     </nav>
 
@@ -36,6 +36,31 @@
     <div class="carousel-dots" id="dots"></div>
 
     <script>
+    function updateNavAuth() {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const navActions = document.getElementById('nav-actions');
+        if (user && localStorage.getItem('token')) {
+            navActions.innerHTML = `
+                <span style="color: var(--text-muted); font-size: 0.9rem;">Olá, ${user.nome || user.email}</span>
+                <a href="dashboard.html">Dashboard</a>
+                <a href="#" onclick="logout()" style="color: var(--secondary); cursor: pointer;">Sair</a>
+            `;
+        } else {
+            navActions.innerHTML = `
+                <a href="../auth/login.html">Portal do Aluno</a>
+                <a href="../auth/login.html" class="btn-apply">Matricule-se</a>
+            `;
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        window.location = 'index.html';
+    }
+
+    updateNavAuth();
+
     let coursesData = [];
     let track;
     let idx = 0;
@@ -49,7 +74,7 @@
                 <div class="carousel-slide">
                     <div class="card">
                         <a href="curso-detalhes.html?id=${curso.id}" style="text-decoration: none; color: inherit;">
-                            <img src="${curso.image}" alt="${curso.nome}" class="card-image" style="cursor: pointer;">
+                            <img src="/${curso.image}" alt="${curso.nome}" class="card-image" style="cursor: pointer;">
                         </a>
                         <div class="card-content">
                             <h3>${curso.nome}</h3>
@@ -119,7 +144,7 @@
         
         if (!user || !token) {
             alert("Você precisa estar logado para se matricular!");
-            window.location.href = "login.html";
+            window.location.href = "../auth/login.html";
             return;
         }
 
@@ -138,7 +163,7 @@
             }
             alert("Matrícula realizada com sucesso!");
             if (cursoId === 1) {
-                window.location.href = "cursos/geracao/curso-geracao.html";
+                window.location.href = "../cursos/geracao/curso-geracao.html";
             }
         })
         .catch(err => {
@@ -158,3 +183,4 @@
 
 </body>
 </html>
+
