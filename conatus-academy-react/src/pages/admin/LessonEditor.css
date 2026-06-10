@@ -1,0 +1,96 @@
+.lesson-editor {
+  padding: 20px;
+  background: #f9f9f9;
+}
+
+.lesson-editor h2 {
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.admin-table th,
+.admin-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.admin-table th {
+  background-color: #f0f0f0;
+}
+
+.btn-primary {
+  background-color: #4a90e2;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-right: 8px;
+}
+
+.btn-primary:hover {
+  background-color: #357ab8;
+}
+
+.btn-small {
+  background-color: #6c757d;
+  color: #fff;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  margin-right: 4px;
+  font-size: 0.85rem;
+}
+
+.btn-small:hover {
+  background-color: #5a6268;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+}
+
+.msg-success {
+  color: #155724;
+  background-color: #d4edda;
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.msg-error {
+  color: #721c24;
+  background-color: #f8d7da;
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.lesson-form {
+  margin-top: 20px;
+  background: #fff;
+  padding: 15px;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.lesson-form label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.lesson-form input,
+.lesson-form textarea {
+  width: 100%;
+  padding: 6px;
+  margin-top: 4px;
+  box-sizing: border-box;
+}

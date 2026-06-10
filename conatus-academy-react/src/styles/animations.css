@@ -1,0 +1,89 @@
+/* ============================================
+   CONATUS INSTITUTE — Animations
+   ============================================ */
+
+/* Hero slow zoom */
+@keyframes heroSlowZoom {
+    from { transform: scale(1); }
+    to { transform: scale(1.07); }
+}
+
+/* Hero light sweep */
+@keyframes heroLightSweep {
+    0%, 48% { transform: translateX(-120%); opacity: 0; }
+    58% { opacity: 0.75; }
+    100% { transform: translateX(120%); opacity: 0; }
+}
+
+/* Data flow lines */
+@keyframes dataFlow {
+    0% {
+        background-position: -65% 36%, -80% 57%, -55% 74%;
+        opacity: 0.15;
+    }
+    45% { opacity: 0.8; }
+    100% {
+        background-position: 165% 36%, 180% 57%, 155% 74%;
+        opacity: 0.15;
+    }
+}
+
+/* Particles drift */
+@keyframes particlesDrift {
+    from { background-position: 10px 20px, 70px 90px; }
+    to { background-position: 190px 20px, 330px 90px; }
+}
+
+/* Fade in up */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Fade in */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Slide in from left */
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Pulse glow */
+@keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 5px rgba(0, 200, 83, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(0, 200, 83, 0.6); }
+}
+
+/* Count up animation helper */
+@keyframes countPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

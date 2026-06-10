@@ -1,0 +1,62 @@
+/* ============================================
+   CONATUS INSTITUTE — Design System Variables
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Source+Sans+Pro:wght@300;400;600;700&display=swap');
+
+:root {
+    /* Primary Colors */
+    --primary: #003366;
+    --primary-light: #004a99;
+    --primary-dark: #002244;
+
+    /* Accent Colors */
+    --secondary: #8b0000;
+    --secondary-hover: #660000;
+    --gold: #d4af37;
+    --gold-hover: #c5a028;
+
+    /* Status Colors */
+    --success: #28a745;
+    --success-light: #d4edda;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+
+    /* Backgrounds */
+    --bg-light: #f8f9fa;
+    --bg-white: #ffffff;
+    --bg-dark: #1a1a2e;
+
+    /* Text */
+    --text-main: #1a1a1a;
+    --text-muted: #555555;
+    --text-light: rgba(255, 255, 255, 0.8);
+
+    /* Borders & Shadows */
+    --border: #e0e0e0;
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.06);
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 15px 40px rgba(0, 0, 0, 0.2);
+
+    /* Typography */
+    --font-heading: 'Merriweather', serif;
+    --font-body: 'Source Sans Pro', sans-serif;
+
+    /* Spacing */
+    --container-max: 1200px;
+    --section-padding: 80px;
+    --navbar-height: 80px;
+
+    /* Transitions */
+    --transition-fast: 0.2s ease;
+    --transition: 0.3s ease;
+    --transition-slow: 0.5s ease;
+
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --radius-round: 50%;
+}

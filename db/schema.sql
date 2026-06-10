@@ -208,3 +208,27 @@ CREATE TABLE IF NOT EXISTS certificados (
 
 CREATE INDEX IF NOT EXISTS idx_certificados_aluno ON certificados(aluno_id);
 CREATE INDEX IF NOT EXISTS idx_certificados_codigo ON certificados(codigo);
+
+CREATE TABLE IF NOT EXISTS modulos (
+    id SERIAL PRIMARY KEY,
+    curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+    titulo VARCHAR(255) NOT NULL,
+    descricao TEXT,
+    ordem INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_modulos_curso ON modulos(curso_id);
+
+CREATE TABLE IF NOT EXISTS aulas (
+    id SERIAL PRIMARY KEY,
+    modulo_id INTEGER NOT NULL REFERENCES modulos(id) ON DELETE CASCADE,
+    titulo VARCHAR(255) NOT NULL,
+    conteudo TEXT,
+    ordem INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_aulas_modulo ON aulas(modulo_id);
