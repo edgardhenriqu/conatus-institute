@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ToastProvider } from './components/ui/Toast';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { ProtectedRoute } from './components/ui/ProtectedRoute';
@@ -11,11 +13,13 @@ import { Courses } from './pages/Courses';
 import { CourseDetails } from './pages/CourseDetails';
 import { CourseViewer } from './pages/CourseViewer';
 import { CourseQuiz } from './pages/CourseQuiz';
+import { Certificate } from './pages/Certificate';
 import { Dashboard } from './pages/Dashboard';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminAlunos } from './pages/admin/AdminAlunos';
 import { AdminCursos } from './pages/admin/AdminCursos';
 import { AdminCertificados } from './pages/admin/AdminCertificados';
+import { AdminAvaliacoes } from './pages/admin/AdminAvaliacoes';
 import ModuleEditor from './pages/admin/ModuleEditor';
 import LessonEditor from './pages/admin/LessonEditor';
 import CourseEditor from './pages/admin/CourseEditor';
@@ -33,7 +37,9 @@ function MainLayout() {
 
 function App() {
   return (
+    <ErrorBoundary>
     <AuthProvider>
+      <ToastProvider>
       <Router>
         <Routes>
           {/* Main layout — header + footer */}
@@ -66,6 +72,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/cursos/:id/certificado"
+              element={
+                <ProtectedRoute>
+                  <Certificate />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Admin routes */}
             <Route
@@ -80,6 +94,7 @@ function App() {
               <Route path="alunos" element={<AdminAlunos />} />
               <Route path="cursos" element={<AdminCursos />} />
               <Route path="certificados" element={<AdminCertificados />} />
+              <Route path="avaliacoes" element={<AdminAvaliacoes />} />
               <Route path="cursos/:cursoId/editar" element={<CourseEditor />} />
               <Route path="cursos/:cursoId/modulos" element={<ModuleEditor />} />
               <Route path="cursos/:cursoId/modulos/:moduloId/aulas" element={<LessonEditor />} />
@@ -90,7 +105,9 @@ function App() {
           <Route path="/login" element={<Login />} />
         </Routes>
       </Router>
+      </ToastProvider>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

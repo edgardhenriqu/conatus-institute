@@ -1,44 +1,151 @@
 const express = require('express');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const pool = require('../../db/connection');
 const { authMiddleware } = require('../middlewares/auth');
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
+const MSG_INTERNO_NEGADO =
+  'Este curso é exclusivo para funcionários autorizados da Conatus. Solicite liberação ao administrador.';
+
+/** Auth opcional: identifica o usuário se houver token válido, sem bloquear. */
+function optionalAuth(req, _res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.alunoId = decoded.id;
+      req.userRole = decoded.role;
+    } catch { /* token inválido — segue como anônimo */ }
+  }
+  next();
+}
+
+/** Usuário pode acessar curso interno? (admin, funcionário ou autorizado manualmente) */
+const ROLES_INTERNOS = ['admin', 'superadmin', 'conatus_employee'];
+
+async function podeAcessarInterno(alunoId, role, cursoId) {
+  if (!alunoId) return false;
+  if (ROLES_INTERNOS.includes(role)) return true;
+  const r = await pool.query(
+    'SELECT 1 FROM curso_autorizacoes WHERE curso_id = $1 AND aluno_id = $2',
+    [cursoId, alunoId]
+  );
+  if (r.rows.length > 0) return true;
+  // role pode estar desatualizado no token — confere no banco
+  const aluno = await pool.query('SELECT role FROM alunos WHERE id = $1', [alunoId]);
+  return ROLES_INTERNOS.includes(aluno.rows[0]?.role);
+}
+
+/** Curso visível/acessível para este usuário? Retorna { ok, status, erro }. */
+async function checarAcessoCurso(curso, req) {
+  const isAdmin = req.userRole === 'admin' || req.userRole === 'superadmin';
+  if (curso.status !== 'publicado' && !isAdmin) {
+    return { ok: false, status: 404, erro: 'Curso não encontrado' };
+  }
+  if (curso.tipo === 'interno' && !isAdmin) {
+    const autorizado = await podeAcessarInterno(req.alunoId, req.userRole, curso.id);
+    if (!autorizado) return { ok: false, status: 403, erro: MSG_INTERNO_NEGADO };
+  }
+  return { ok: true };
+}
+
+// ── Catálogo ─────────────────────────────────────────────────────────────────
+
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    const resultado = await pool.query('SELECT * FROM cursos ORDER BY id');
-    res.json(resultado.rows);
+    const resultado = await pool.query(
+      `SELECT * FROM cursos WHERE status = 'publicado' AND visivel = true ORDER BY id`
+    );
+
+    const cursos = [];
+    for (const curso of resultado.rows) {
+      if (curso.tipo === 'interno') {
+        const autorizado = await podeAcessarInterno(req.alunoId, req.userRole, curso.id);
+        if (!autorizado) continue;
+      }
+      cursos.push(curso);
+    }
+
+    res.json(cursos);
   } catch (error) {
     console.error('Erro ao buscar cursos:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/aluno/matriculas', authMiddleware, async (req, res) => {
+  try {
+    const alunoId = req.alunoId;
+
+    const resultado = await pool.query(
+      `SELECT m.id, m.status, m.progresso, m.created_at as data_matricula,
+              c.id as curso_id, c.nome as nome_curso, c.duracao, c.image, c.nivel, c.tipo,
+              c.descricao_curta, c.descricao
+       FROM matriculas m
+       JOIN cursos c ON m.curso_id = c.id
+       WHERE m.aluno_id = $1
+       ORDER BY m.created_at DESC`,
+      [alunoId]
+    );
+
+    res.json({ matriculas: resultado.rows });
+  } catch (error) {
+    console.error('Erro ao buscar matrículas:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    if (!/^\d+$/.test(id)) {
+      return res.status(404).json({ erro: 'Curso não encontrado' });
+    }
     const resultado = await pool.query('SELECT * FROM cursos WHERE id = $1', [id]);
 
     if (resultado.rows.length === 0) {
       return res.status(404).json({ erro: 'Curso não encontrado' });
     }
 
-    res.json(resultado.rows[0]);
+    const curso = resultado.rows[0];
+    const acesso = await checarAcessoCurso(curso, req);
+    if (!acesso.ok) {
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
+    }
+
+    // total de módulos/aulas para a página de detalhes
+    const contagem = await pool.query(
+      `SELECT
+        (SELECT COUNT(*) FROM modulos WHERE curso_id = $1) as total_modulos,
+        (SELECT COUNT(*) FROM aulas a JOIN modulos m ON m.id = a.modulo_id WHERE m.curso_id = $1) as total_aulas`,
+      [id]
+    );
+
+    res.json({ ...curso, ...contagem.rows[0] });
   } catch (error) {
     console.error('Erro ao buscar curso:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
 
+// ── Matrícula ────────────────────────────────────────────────────────────────
+
 router.post('/:cursoId/matricular', authMiddleware, async (req, res) => {
   try {
     const { cursoId } = req.params;
     const alunoId = req.alunoId;
 
-    const cursoExiste = await pool.query('SELECT id FROM cursos WHERE id = $1', [cursoId]);
-    if (cursoExiste.rows.length === 0) {
+    const cursoRes = await pool.query('SELECT * FROM cursos WHERE id = $1', [cursoId]);
+    if (cursoRes.rows.length === 0) {
       return res.status(404).json({ erro: 'Curso não encontrado' });
+    }
+
+    const curso = cursoRes.rows[0];
+    const acesso = await checarAcessoCurso(curso, req);
+    if (!acesso.ok) {
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
     }
 
     const matriculaExiste = await pool.query(
@@ -64,26 +171,95 @@ router.post('/:cursoId/matricular', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/aluno/matriculas', authMiddleware, async (req, res) => {
+// ── Conteúdo do curso (player do aluno) ──────────────────────────────────────
+
+router.get('/:cursoId/conteudo', authMiddleware, async (req, res) => {
   try {
+    const { cursoId } = req.params;
     const alunoId = req.alunoId;
 
-    const resultado = await pool.query(
-      `SELECT m.id, m.status, m.progresso, m.created_at as data_matricula,
-              c.id as curso_id, c.nome as nome_curso, c.duracao, c.image
-       FROM matriculas m
-       JOIN cursos c ON m.curso_id = c.id
-       WHERE m.aluno_id = $1
-       ORDER BY m.created_at DESC`,
-      [alunoId]
+    const cursoRes = await pool.query('SELECT * FROM cursos WHERE id = $1', [cursoId]);
+    if (cursoRes.rows.length === 0) {
+      return res.status(404).json({ erro: 'Curso não encontrado' });
+    }
+
+    const curso = cursoRes.rows[0];
+    const acesso = await checarAcessoCurso(curso, req);
+    if (!acesso.ok) {
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
+    }
+
+    const modulos = await pool.query(
+      'SELECT id, titulo, descricao, ordem FROM modulos WHERE curso_id = $1 ORDER BY ordem, id',
+      [cursoId]
     );
 
-    res.json({ matriculas: resultado.rows });
+    const aulas = await pool.query(
+      `SELECT a.id, a.modulo_id, a.titulo, a.descricao, a.conteudo, a.ordem,
+              a.tipo_conteudo, a.video_url, a.material_url, a.duracao_minutos, a.obrigatoria
+       FROM aulas a
+       JOIN modulos m ON m.id = a.modulo_id
+       WHERE m.curso_id = $1
+       ORDER BY a.ordem, a.id`,
+      [cursoId]
+    );
+
+    const progresso = await pool.query(
+      `SELECT aula_titulo, concluida FROM progresso_aulas
+       WHERE aluno_id = $1 AND curso_id = $2 AND concluida = true`,
+      [alunoId, cursoId]
+    );
+
+    const concluidasSet = new Set(progresso.rows.map(r => r.aula_titulo));
+
+    const modulosComAulas = modulos.rows.map(m => ({
+      ...m,
+      aulas: aulas.rows
+        .filter(a => a.modulo_id === m.id)
+        .map(a => ({ ...a, concluida: concluidasSet.has(`aula-${a.id}`) })),
+    }));
+
+    res.json({
+      curso: {
+        id: curso.id, nome: curso.nome, duracao: curso.duracao,
+        nivel: curso.nivel, tipo: curso.tipo, requisitos_certificado: curso.requisitos_certificado,
+      },
+      modulos: modulosComAulas,
+    });
   } catch (error) {
-    console.error('Erro ao buscar matrículas:', error);
+    console.error('Erro ao buscar conteúdo do curso:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
+
+// ── Progresso ────────────────────────────────────────────────────────────────
+
+/** Recalcula o progresso da matrícula com base nas aulas obrigatórias. */
+async function recalcularProgresso(alunoId, cursoId) {
+  const totais = await pool.query(
+    `SELECT
+      (SELECT COUNT(*) FROM aulas a JOIN modulos m ON m.id = a.modulo_id
+        WHERE m.curso_id = $2 AND a.obrigatoria = true) as total,
+      (SELECT COUNT(*) FROM progresso_aulas p
+        JOIN aulas a ON ('aula-' || a.id) = p.aula_titulo
+        JOIN modulos m ON m.id = a.modulo_id
+        WHERE p.aluno_id = $1 AND p.curso_id = $2 AND p.concluida = true
+          AND m.curso_id = $2 AND a.obrigatoria = true) as concluidas`,
+    [alunoId, cursoId]
+  );
+
+  const total = parseInt(totais.rows[0].total);
+  const concluidas = parseInt(totais.rows[0].concluidas);
+  const progresso = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+
+  await pool.query(
+    `UPDATE matriculas SET progresso = $1, status = $2, updated_at = CURRENT_TIMESTAMP
+     WHERE aluno_id = $3 AND curso_id = $4`,
+    [progresso, progresso === 100 ? 'concluido' : 'ativa', alunoId, cursoId]
+  );
+
+  return { progresso, concluidas, total };
+}
 
 router.get('/:cursoId/progresso', authMiddleware, async (req, res) => {
   try {
@@ -128,34 +304,185 @@ router.post('/:cursoId/progresso', authMiddleware, async (req, res) => {
       );
     }
 
-    const totalAulas = await pool.query(
-      `SELECT COUNT(*) as total FROM progresso_aulas
-       WHERE aluno_id = $1 AND curso_id = $2`,
-      [alunoId, cursoId]
-    );
-
-    const aulasConcluidas = await pool.query(
-      `SELECT COUNT(*) as total FROM progresso_aulas
-       WHERE aluno_id = $1 AND curso_id = $2 AND concluida = true`,
-      [alunoId, cursoId]
-    );
-
-    const total = parseInt(totalAulas.rows[0].total);
-    const concluidas = parseInt(aulasConcluidas.rows[0].total);
-    const progresso = total > 0 ? Math.round((concluidas / total) * 100) : 0;
-
-    await pool.query(
-      `UPDATE matriculas SET progresso = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE aluno_id = $2 AND curso_id = $3`,
-      [progresso, alunoId, cursoId]
-    );
-
-    res.json({ progresso, concluidas, total });
+    const stats = await recalcularProgresso(alunoId, cursoId);
+    res.json(stats);
   } catch (error) {
     console.error('Erro ao salvar progresso:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
+
+// ── Avaliação final (aluno) ──────────────────────────────────────────────────
+
+/** Resumo das tentativas do aluno em um curso. */
+async function statusTentativas(alunoId, cursoId) {
+  const r = await pool.query(
+    `SELECT COUNT(*) as tentativas, COALESCE(MAX(nota), 0) as melhor, BOOL_OR(aprovado) as aprovado
+     FROM tentativas_avaliacao WHERE aluno_id = $1 AND curso_id = $2`,
+    [alunoId, cursoId]
+  );
+  return {
+    tentativas: parseInt(r.rows[0].tentativas),
+    melhor: parseInt(r.rows[0].melhor),
+    aprovado: r.rows[0].aprovado === true,
+  };
+}
+
+router.get('/:cursoId/avaliacao', authMiddleware, async (req, res) => {
+  try {
+    const { cursoId } = req.params;
+    const alunoId = req.alunoId;
+
+    const avaliacaoRes = await pool.query('SELECT * FROM avaliacoes WHERE curso_id = $1 AND ativa = true', [cursoId]);
+    if (avaliacaoRes.rows.length === 0) {
+      return res.json({ existe: false });
+    }
+    const config = avaliacaoRes.rows[0];
+
+    const questoesCount = await pool.query('SELECT COUNT(*) as total FROM questoes WHERE curso_id = $1', [cursoId]);
+    const totalQuestoes = parseInt(questoesCount.rows[0].total);
+
+    const matricula = await pool.query(
+      'SELECT progresso FROM matriculas WHERE aluno_id = $1 AND curso_id = $2',
+      [alunoId, cursoId]
+    );
+    const progresso = matricula.rows[0]?.progresso ?? 0;
+
+    const status = await statusTentativas(alunoId, cursoId);
+
+    res.json({
+      existe: totalQuestoes > 0,
+      num_questoes: Math.min(config.num_questoes, totalQuestoes),
+      nota_minima: config.nota_minima,
+      max_tentativas: config.max_tentativas,
+      total_questoes_banco: totalQuestoes,
+      progresso,
+      ...status,
+      restantes: Math.max(0, config.max_tentativas - status.tentativas),
+    });
+  } catch (error) {
+    console.error('Erro ao buscar avaliação:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+router.post('/:cursoId/avaliacao/iniciar', authMiddleware, async (req, res) => {
+  try {
+    const { cursoId } = req.params;
+    const alunoId = req.alunoId;
+
+    const avaliacaoRes = await pool.query('SELECT * FROM avaliacoes WHERE curso_id = $1 AND ativa = true', [cursoId]);
+    if (avaliacaoRes.rows.length === 0) {
+      return res.status(404).json({ erro: 'Este curso não possui avaliação final' });
+    }
+    const config = avaliacaoRes.rows[0];
+
+    const matricula = await pool.query(
+      'SELECT progresso FROM matriculas WHERE aluno_id = $1 AND curso_id = $2',
+      [alunoId, cursoId]
+    );
+    if (matricula.rows.length === 0) {
+      return res.status(403).json({ erro: 'Você não está matriculado neste curso' });
+    }
+    if ((matricula.rows[0].progresso || 0) < 100) {
+      return res.status(400).json({ erro: 'Conclua 100% das aulas para liberar a avaliação' });
+    }
+
+    const status = await statusTentativas(alunoId, cursoId);
+    if (status.aprovado) {
+      return res.status(400).json({ erro: 'Você já foi aprovado na avaliação' });
+    }
+    if (status.tentativas >= config.max_tentativas) {
+      return res.status(400).json({ erro: `Limite de ${config.max_tentativas} tentativas atingido` });
+    }
+
+    // Sorteia N questões sem expor a resposta correta
+    const questoes = await pool.query(
+      `SELECT id, enunciado, alternativas FROM questoes
+       WHERE curso_id = $1 ORDER BY RANDOM() LIMIT $2`,
+      [cursoId, config.num_questoes]
+    );
+
+    if (questoes.rows.length === 0) {
+      return res.status(404).json({ erro: 'A avaliação deste curso ainda não possui questões' });
+    }
+
+    res.json({ questoes: questoes.rows, nota_minima: config.nota_minima });
+  } catch (error) {
+    console.error('Erro ao iniciar avaliação:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+router.post('/:cursoId/avaliacao/submeter', authMiddleware, async (req, res) => {
+  try {
+    const { cursoId } = req.params;
+    const alunoId = req.alunoId;
+    const { respostas } = req.body; // { [questaoId]: indiceAlternativa }
+
+    if (!respostas || typeof respostas !== 'object') {
+      return res.status(400).json({ erro: 'Formato inválido. Envie { respostas: { questaoId: indice } }' });
+    }
+
+    const avaliacaoRes = await pool.query('SELECT * FROM avaliacoes WHERE curso_id = $1 AND ativa = true', [cursoId]);
+    if (avaliacaoRes.rows.length === 0) {
+      return res.status(404).json({ erro: 'Este curso não possui avaliação final' });
+    }
+    const config = avaliacaoRes.rows[0];
+
+    const status = await statusTentativas(alunoId, cursoId);
+    if (status.aprovado) {
+      return res.status(400).json({ erro: 'Você já foi aprovado na avaliação' });
+    }
+    if (status.tentativas >= config.max_tentativas) {
+      return res.status(400).json({ erro: `Limite de ${config.max_tentativas} tentativas atingido` });
+    }
+
+    const ids = Object.keys(respostas).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+    const questoes = ids.length > 0
+      ? await pool.query(
+          'SELECT id, correta, explicacao FROM questoes WHERE curso_id = $1 AND id = ANY($2::int[])',
+          [cursoId, ids]
+        )
+      : { rows: [] };
+
+    // Corrige no servidor — questões não respondidas contam como erradas
+    const totalProva = Math.min(config.num_questoes,
+      parseInt((await pool.query('SELECT COUNT(*) as t FROM questoes WHERE curso_id = $1', [cursoId])).rows[0].t));
+    let acertos = 0;
+    const correcao = [];
+    for (const q of questoes.rows) {
+      const certa = parseInt(respostas[q.id], 10) === q.correta;
+      if (certa) acertos++;
+      correcao.push({ id: q.id, correta: q.correta, explicacao: q.explicacao, acertou: certa });
+    }
+
+    const nota = totalProva > 0 ? Math.round((acertos / totalProva) * 100) : 0;
+    const aprovado = nota >= config.nota_minima;
+
+    await pool.query(
+      `INSERT INTO tentativas_avaliacao (aluno_id, curso_id, nota, aprovado, respostas)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [alunoId, cursoId, nota, aprovado, JSON.stringify(respostas)]
+    );
+
+    res.json({
+      nota,
+      aprovado,
+      acertos,
+      total: totalProva,
+      nota_minima: config.nota_minima,
+      tentativas: status.tentativas + 1,
+      restantes: Math.max(0, config.max_tentativas - status.tentativas - 1),
+      correcao,
+    });
+  } catch (error) {
+    console.error('Erro ao submeter avaliação:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// ── Certificado ──────────────────────────────────────────────────────────────
 
 function gerarCodigoCertificado() {
   return 'CN-' + crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -167,7 +494,11 @@ router.get('/:cursoId/certificado', authMiddleware, async (req, res) => {
     const alunoId = req.alunoId;
 
     const certExiste = await pool.query(
-      'SELECT * FROM certificados WHERE aluno_id = $1 AND curso_id = $2',
+      `SELECT cert.*, c.nome as curso_nome, c.duracao as curso_duracao,
+              c.cert_responsavel, c.cert_texto
+       FROM certificados cert
+       JOIN cursos c ON c.id = cert.curso_id
+       WHERE cert.aluno_id = $1 AND cert.curso_id = $2`,
       [alunoId, cursoId]
     );
 
@@ -186,36 +517,53 @@ router.post('/:cursoId/certificado', authMiddleware, async (req, res) => {
   try {
     const { cursoId } = req.params;
     const alunoId = req.alunoId;
-    const { nota } = req.body;
-
-    if (!nota || nota < 70) {
-      return res.status(400).json({ erro: 'Nota mínima de 70% necessária para emissão do certificado' });
-    }
 
     const certExiste = await pool.query(
       'SELECT id FROM certificados WHERE aluno_id = $1 AND curso_id = $2',
       [alunoId, cursoId]
     );
-
     if (certExiste.rows.length > 0) {
       return res.status(409).json({ erro: 'Certificado já emitido para este curso' });
+    }
+
+    const cursoRes = await pool.query('SELECT * FROM cursos WHERE id = $1', [cursoId]);
+    if (cursoRes.rows.length === 0) {
+      return res.status(404).json({ erro: 'Curso não encontrado' });
+    }
+    if (cursoRes.rows[0].status !== 'publicado') {
+      return res.status(400).json({ erro: 'O curso precisa estar publicado e ativo para emitir certificado' });
     }
 
     const matricula = await pool.query(
       'SELECT progresso FROM matriculas WHERE aluno_id = $1 AND curso_id = $2',
       [alunoId, cursoId]
     );
-
     if (matricula.rows.length === 0) {
       return res.status(404).json({ erro: 'Matrícula não encontrada' });
     }
-
     if (matricula.rows[0].progresso < 100) {
-      return res.status(400).json({ erro: 'É necessário completar 100% do curso para emitir o certificado' });
+      return res.status(400).json({ erro: 'É necessário completar 100% das aulas para emitir o certificado' });
+    }
+
+    // Se o curso tem avaliação ativa com questões, exige aprovação
+    let nota = 100;
+    const avaliacao = await pool.query(
+      `SELECT av.nota_minima,
+        (SELECT COUNT(*) FROM questoes q WHERE q.curso_id = av.curso_id) as total_questoes
+       FROM avaliacoes av WHERE av.curso_id = $1 AND av.ativa = true`,
+      [cursoId]
+    );
+    if (avaliacao.rows.length > 0 && parseInt(avaliacao.rows[0].total_questoes) > 0) {
+      const status = await statusTentativas(alunoId, cursoId);
+      if (!status.aprovado) {
+        return res.status(400).json({
+          erro: `É necessário ser aprovado na avaliação final (mínimo ${avaliacao.rows[0].nota_minima}%)`,
+        });
+      }
+      nota = status.melhor;
     }
 
     const codigo = gerarCodigoCertificado();
-
     const resultado = await pool.query(
       `INSERT INTO certificados (aluno_id, curso_id, nota_avaliacao, codigo)
        VALUES ($1, $2, $3, $4)

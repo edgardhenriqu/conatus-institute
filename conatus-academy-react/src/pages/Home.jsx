@@ -6,7 +6,7 @@ import { FreeCoursesCTA } from '../components/sections/FreeCoursesCTA';
 import { ProgramsSection } from '../components/sections/ProgramsSection';
 import { NewsSection } from '../components/sections/NewsSection';
 import { api } from '../services/api';
-import { freeCourseIds, staticCourses } from '../data/courses';
+import { staticCourses, normalizeDbCourse } from '../data/courses';
 import { canAccessInternalCourse } from '../utils/permissions';
 
 export function Home() {
@@ -19,12 +19,7 @@ export function Home() {
 
       try {
         const dbCourses = await api.getCursos();
-        const formattedDbCourses = dbCourses.map(c => ({
-          ...c,
-          gratuito: freeCourseIds.includes(c.id),
-          image: `images/courses/${c.nome}.png`
-        }));
-        setCourses([...formattedDbCourses, ...availableStatic]);
+        setCourses([...dbCourses.map(normalizeDbCourse), ...availableStatic]);
       } catch (err) {
         console.error("Erro ao carregar cursos na home:", err);
         setCourses(availableStatic);

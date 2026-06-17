@@ -1,36 +1,98 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { CourseCard } from '../components/ui/CourseCard';
+import { PageLoader } from '../components/ui/PageLoader';
 import { api } from '../services/api';
-import { freeCourseIds, staticCourses } from '../data/courses';
+import { staticCourses, normalizeDbCourse } from '../data/courses';
 import { canAccessInternalCourse } from '../utils/permissions';
+import { getStaticEnrollments, calcLessonStats, isCertEligible } from '../utils/mopProgress';
+import { mopCourseContent } from '../data/mopCourseContent';
+
+const MOP_IDS = ['mop-interno', '6', 6];
+
+function CatalogSection({ icon, title, count, children, note }) {
+  return (
+    <section className="catalog-section">
+      <div className="catalog-section-head">
+        <h2>{icon} {title}</h2>
+        <span className="catalog-count">{count} {count === 1 ? 'curso' : 'cursos'}</span>
+      </div>
+      {note}
+      <div className="free-courses-grid" style={{ padding: 0 }}>
+        {children}
+      </div>
+    </section>
+  );
+}
 
 export function Courses() {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
+  const [enrollments, setEnrollments] = useState({}); // curso_id → { progresso, status }
+  const [loading, setLoading] = useState(true);
+
+  const hasInternalAccess = canAccessInternalCourse(user);
+
+  // Progresso real do MOP (localStorage)
+  const mopPct = useMemo(() => {
+    const lessons = mopCourseContent.modules.flatMap(m => m.lessons);
+    return calcLessonStats(lessons).pct;
+  }, []);
+  const mopDone = useMemo(() => isCertEligible(mopPct), [mopPct]);
 
   useEffect(() => {
-    async function loadCourses() {
-      const availableStatic = staticCourses.filter(c => c.tipo !== 'interno' || canAccessInternalCourse(user));
+    async function loadAll() {
+      const availableStatic = staticCourses.filter(c => c.tipo !== 'interno' || hasInternalAccess);
 
+      // Catálogo — o backend já filtra publicados/visíveis e cursos internos
+      let list = availableStatic;
       try {
         const dbCourses = await api.getCursos();
-        const formattedDbCourses = dbCourses.map(c => ({
-          ...c,
-          gratuito: freeCourseIds.includes(c.id),
-          image: `images/courses/${c.nome}.png`
-        }));
-        setCourses([...formattedDbCourses, ...availableStatic]);
-      } catch (err) {
-        console.error("Erro ao carregar cursos:", err);
-        setCourses(availableStatic);
+        list = [...dbCourses.map(normalizeDbCourse), ...availableStatic];
+      } catch {
+        // servidor offline — usa apenas os cursos estáticos
       }
-    }
-    loadCourses();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      setCourses(list);
 
-  const freeCourses = courses.filter(c => c.gratuito);
-  const otherCourses = courses.filter(c => !c.gratuito);
+      // Matrículas (apenas para usuário logado)
+      const map = {};
+      if (user) {
+        try {
+          const data = await api.getMatriculas();
+          for (const m of data.matriculas || []) {
+            map[String(m.curso_id)] = { progresso: m.progresso || 0, status: m.status };
+          }
+        } catch { /* servidor offline */ }
+        for (const m of Object.values(getStaticEnrollments())) {
+          const isMop = MOP_IDS.includes(m.curso_id);
+          map[String(m.curso_id)] = {
+            progresso: isMop ? mopPct : (m.progresso || 0),
+            status: m.status,
+          };
+        }
+      }
+      setEnrollments(map);
+      setLoading(false);
+    }
+    loadAll();
+  }, [user, hasInternalAccess, mopPct]);
+
+  const getEnrollment = (curso) => enrollments[String(curso.id)] || null;
+  const isCompleted = (curso) => {
+    const e = getEnrollment(curso);
+    if (!e) return false;
+    if (MOP_IDS.includes(curso.id)) return mopDone;
+    return (e.progresso || 0) === 100;
+  };
+
+  const inProgress = courses.filter(c => getEnrollment(c) && !isCompleted(c));
+  const completed  = courses.filter(c => isCompleted(c));
+  const notEnrolled = courses.filter(c => !getEnrollment(c));
+  const freeCourses = notEnrolled.filter(c => c.gratuito);
+  const internalCourses = notEnrolled.filter(c => c.tipo === 'interno');
+  const otherCourses = notEnrolled.filter(c => !c.gratuito && c.tipo !== 'interno');
+
+  if (loading) return <PageLoader message="Carregando catálogo de cursos..." />;
 
   return (
     <div className="cursos-body">
@@ -41,7 +103,26 @@ export function Courses() {
         </div>
       </div>
 
-      {/* Seção Cursos Gratuitos */}
+      {/* Cursos em andamento */}
+      {inProgress.length > 0 && (
+        <CatalogSection icon="📖" title="Continue Aprendendo" count={inProgress.length}>
+          {inProgress.map(curso => (
+            <CourseCard key={curso.id} curso={curso} enrollment={getEnrollment(curso)} />
+          ))}
+        </CatalogSection>
+      )}
+
+      {/* Cursos concluídos */}
+      {completed.length > 0 && (
+        <CatalogSection icon="🏆" title="Cursos Concluídos" count={completed.length}>
+          {completed.map(curso => (
+            <CourseCard key={curso.id} curso={curso}
+              enrollment={{ ...getEnrollment(curso), progresso: 100 }} />
+          ))}
+        </CatalogSection>
+      )}
+
+      {/* Cursos gratuitos */}
       {freeCourses.length > 0 && (
         <section id="gratuitos" className="free-courses-section">
           <div className="container" style={{ textAlign: 'center' }}>
@@ -51,33 +132,50 @@ export function Courses() {
               Acesse nossos conteúdos introdutórios e dê o primeiro passo na sua carreira em Data Centers.
             </p>
           </div>
-          
           <div className="free-courses-grid">
             {freeCourses.map(curso => (
-              <div key={curso.id} style={{ height: '100%' }}>
-                <CourseCard curso={curso} />
-              </div>
+              <CourseCard key={curso.id} curso={curso} />
             ))}
           </div>
         </section>
       )}
 
-      {/* Outros Cursos */}
-      <section className="section">
-        <div className="container">
-          <h2 style={{ marginBottom: '30px', fontSize: '2rem', borderBottom: '2px solid var(--border)', paddingBottom: '15px' }}>
-            Programas Profissionais Avançados
-          </h2>
-          
-          <div className="free-courses-grid">
-            {otherCourses.map(curso => (
-              <div key={curso.id} style={{ height: '100%' }}>
-                <CourseCard curso={curso} />
-              </div>
-            ))}
+      {/* Cursos internos — visíveis apenas para autorizados */}
+      {internalCourses.length > 0 && (
+        <CatalogSection
+          icon="🔐" title="Cursos Internos Conatus" count={internalCourses.length}
+          note={(
+            <div className="catalog-internal-note">
+              <span>🛡️</span>
+              <span>
+                Treinamentos exclusivos para colaboradores autorizados da Conatus.
+                Seu perfil possui acesso liberado.
+              </span>
+            </div>
+          )}
+        >
+          {internalCourses.map(curso => (
+            <CourseCard key={curso.id} curso={curso} />
+          ))}
+        </CatalogSection>
+      )}
+
+      {/* Programas profissionais */}
+      {otherCourses.length > 0 && (
+        <CatalogSection icon="🎓" title="Programas Profissionais Avançados" count={otherCourses.length}>
+          {otherCourses.map(curso => (
+            <CourseCard key={curso.id} curso={curso} />
+          ))}
+        </CatalogSection>
+      )}
+
+      {courses.length === 0 && (
+        <div className="catalog-section">
+          <div className="catalog-empty">
+            Nenhum curso disponível no momento. Volte em breve!
           </div>
         </div>
-      </section>
+      )}
     </div>
   );
 }

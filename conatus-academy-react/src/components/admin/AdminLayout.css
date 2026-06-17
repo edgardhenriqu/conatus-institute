@@ -50,3 +50,10 @@
   padding: 24px 32px;
   overflow-y: auto;
 }
+
+.admin-back-site {
+  margin-top: auto;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+

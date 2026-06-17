@@ -1,124 +1,205 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { adminApi } from '../../services/adminApi';
+import { useToast } from '../../components/ui/Toast';
 import QuillEditor from '../../components/common/QuillEditor';
+import { normalizeQuillHtml } from '../../utils/quillHtml';
 import './CourseEditor.css';
+
+const NIVEIS = [
+  { value: 'basico',        label: 'Básico' },
+  { value: 'intermediario', label: 'Intermediário' },
+  { value: 'avancado',      label: 'Avançado' },
+];
+
+const TIPOS = [
+  { value: 'gratuito', label: 'Gratuito — aberto a todos' },
+  { value: 'interno',  label: 'Interno — somente funcionários autorizados' },
+  { value: 'pago',     label: 'Pago — mediante pagamento (futuro)' },
+];
+
+const STATUS_LABEL = { rascunho: 'Rascunho', publicado: 'Publicado', inativo: 'Inativo' };
+
+const TIPOS_CONTEUDO = [
+  { value: 'texto',    label: '📝 Texto',                icon: '📝' },
+  { value: 'video',    label: '🎬 Vídeo',                icon: '🎬' },
+  { value: 'pdf',      label: '📄 PDF',                  icon: '📄' },
+  { value: 'link',     label: '🔗 Link externo',         icon: '🔗' },
+  { value: 'material', label: '📎 Material complementar', icon: '📎' },
+];
+
+const contentIcon = (tipo) =>
+  TIPOS_CONTEUDO.find(t => t.value === tipo)?.icon || '📝';
+
+const EMPTY_LESSON = {
+  titulo: '', descricao: '', conteudo: '', tipo_conteudo: 'texto',
+  video_url: '', material_url: '', duracao_minutos: '', obrigatoria: true, ordem: '',
+};
+
+const EMPTY_QUESTION = { enunciado: '', alternativas: ['', '', '', ''], correta: 0, explicacao: '' };
 
 export default function CourseEditor() {
   const { cursoId } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
+
   const [curso, setCurso] = useState(null);
-  const [modules, setModules] = useState([]);
+  const [form, setForm] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
-  const [toast, setToast] = useState(null);
+
+  // Módulos & aulas
+  const [modules, setModules] = useState([]);
   const [expandedModule, setExpandedModule] = useState(null);
-
-  const [form, setForm] = useState({
-    nome: '',
-    duracao: '',
-    image: '',
-    descricao: '',
-    oque_aprender: '',
-    mercado_trabalho: '',
-    areas_atuacao: '',
-    diferenciais: '',
-    infraestrutura: '',
-    coordenacao: '',
-    informacoes_complementares: '',
-    matriz_curricular: ''
-  });
-
   const [moduleForm, setModuleForm] = useState({ titulo: '', descricao: '', ordem: '' });
   const [editingModule, setEditingModule] = useState(null);
   const [showModuleForm, setShowModuleForm] = useState(false);
-  const [lessonForm, setLessonForm] = useState({ titulo: '', conteudo: '' });
+  const [lessonForm, setLessonForm] = useState(EMPTY_LESSON);
   const [editingLesson, setEditingLesson] = useState(null);
-  const [editingLessonModuleId, setEditingLessonModuleId] = useState(null);
+  const [lessonModuleId, setLessonModuleId] = useState(null);
 
-  const showToast = (texto, tipo = 'sucesso') => {
-    setToast({ texto, tipo });
-    setTimeout(() => setToast(null), 3000);
-  };
+  // Avaliação
+  const [quizConfig, setQuizConfig] = useState({ num_questoes: 10, nota_minima: 80, max_tentativas: 3, ativa: true });
+  const [questions, setQuestions] = useState([]);
+  const [questionForm, setQuestionForm] = useState(EMPTY_QUESTION);
+  const [editingQuestion, setEditingQuestion] = useState(null);
+  const [showQuestionForm, setShowQuestionForm] = useState(false);
 
-  const loadCurso = async () => {
-    setLoading(true);
+  // Permissões
+  const [authorized, setAuthorized] = useState([]);
+  const [authEmail, setAuthEmail] = useState('');
+
+  // Alunos
+  const [students, setStudents] = useState([]);
+
+  const setField = (name, value) => setForm(f => ({ ...f, [name]: value }));
+
+  /* ── Carregamento ─────────────────────────────────────────────── */
+
+  const loadCurso = useCallback(async () => {
     try {
       const data = await api.getAdminCurso(cursoId);
       if (data.curso) {
         setCurso(data.curso);
         setForm(data.curso);
       }
-    } catch (err) {
-      console.error('Erro ao carregar curso:', err);
-      showToast('Erro ao carregar curso', 'erro');
+    } catch {
+      toast.error('Erro ao carregar curso.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [cursoId, toast]);
 
-  const loadModules = async () => {
+  const loadModules = useCallback(async () => {
     try {
       const data = await adminApi.getModules(cursoId);
       setModules(data.modulos || []);
-    } catch (err) {
-      console.error('Erro ao carregar módulos:', err);
-    }
-  };
+    } catch { /* servidor offline */ }
+  }, [cursoId]);
 
-  const loadLessons = async (moduleId) => {
+  const loadQuiz = useCallback(async () => {
     try {
-      const data = await adminApi.getLessons(moduleId);
-      return data.aulas || [];
-    } catch (err) {
-      console.error('Erro ao carregar aulas:', err);
-      return [];
-    }
-  };
+      const [cfg, qs] = await Promise.all([
+        adminApi.getQuizConfig(cursoId),
+        adminApi.getQuestions(cursoId),
+      ]);
+      if (cfg.avaliacao) setQuizConfig(cfg.avaliacao);
+      setQuestions(qs.questoes || []);
+    } catch { /* servidor offline */ }
+  }, [cursoId]);
+
+  const loadAuthorized = useCallback(async () => {
+    try {
+      const data = await adminApi.getAuthorizations(cursoId);
+      setAuthorized(data.autorizados || []);
+    } catch { /* servidor offline */ }
+  }, [cursoId]);
+
+  const loadStudents = useCallback(async () => {
+    try {
+      const data = await adminApi.getCourseStudents(cursoId);
+      setStudents(data.matriculados || []);
+    } catch { /* servidor offline */ }
+  }, [cursoId]);
 
   useEffect(() => {
     loadCurso();
     loadModules();
-  }, [cursoId]); // eslint-disable-line react-hooks/exhaustive-deps
+    loadQuiz();
+    loadAuthorized();
+    loadStudents();
+  }, [loadCurso, loadModules, loadQuiz, loadAuthorized, loadStudents]);
+
+  /* ── Curso (salvar / publicar) ────────────────────────────────── */
+
+  const validateForm = () => {
+    if (!form.nome?.trim())    return 'O título do curso é obrigatório.';
+    if (!form.duracao?.trim()) return 'A carga horária é obrigatória.';
+    return null;
+  };
 
   const handleSaveCourse = async () => {
+    const erro = validateForm();
+    if (erro) { toast.warning(erro); return; }
+
     setSaving(true);
     try {
-      const dadosParaEnviar = Object.fromEntries(
-        Object.entries(form).map(([key, value]) => [key, value === '' ? null : value])
+      const payload = Object.fromEntries(
+        Object.entries(form).map(([k, v]) => [k, v === '' ? null : v])
       );
-      const data = await api.updateAdminCurso(cursoId, dadosParaEnviar);
-      if (data.erro) {
-        showToast(data.erro, 'erro');
-        return;
-      }
+      const data = await api.updateAdminCurso(cursoId, payload);
+      if (data.erro) { toast.error(data.erro); return; }
       setCurso(data.curso);
-      showToast('Curso salvo com sucesso!');
-    } catch {
-      showToast('Erro ao salvar curso', 'erro');
+      setForm(data.curso);
+      toast.success('Curso salvo com sucesso!');
+    } catch (err) {
+      toast.error(err.message || 'Erro ao salvar curso.');
     } finally {
       setSaving(false);
     }
   };
 
+  const handlePublishToggle = async () => {
+    const novoStatus = curso.status === 'publicado' ? 'rascunho' : 'publicado';
+    if (novoStatus === 'publicado') {
+      const erro = validateForm();
+      if (erro) { toast.warning(`Antes de publicar: ${erro}`); return; }
+      if (modules.length === 0 && !window.confirm('Este curso ainda não tem módulos. Publicar mesmo assim?')) return;
+    }
+    try {
+      const data = await adminApi.setCourseStatus(cursoId, novoStatus);
+      if (data.erro) { toast.error(data.erro); return; }
+      setCurso(data.curso);
+      setForm(f => ({ ...f, status: data.curso.status }));
+      toast.success(novoStatus === 'publicado'
+        ? '🎉 Curso publicado! Ele já aparece para os alunos.'
+        : 'Curso despublicado (voltou para rascunho).');
+    } catch {
+      toast.error('Erro ao alterar status do curso.');
+    }
+  };
+
+  /* ── Módulos ──────────────────────────────────────────────────── */
+
   const handleModuleSubmit = async (e) => {
     e.preventDefault();
+    if (!moduleForm.titulo?.trim()) { toast.warning('Informe o nome do módulo.'); return; }
     try {
       if (editingModule) {
         await adminApi.updateModule(editingModule.id, moduleForm);
-        showToast('Módulo atualizado!');
+        toast.success('Módulo atualizado!');
       } else {
-        await adminApi.createModule(cursoId, { ...moduleForm, ordem: modules.length + 1 });
-        showToast('Módulo criado!');
+        await adminApi.createModule(cursoId, { ...moduleForm, ordem: moduleForm.ordem || modules.length + 1 });
+        toast.success('Módulo criado!');
       }
       setModuleForm({ titulo: '', descricao: '', ordem: '' });
       setEditingModule(null);
       setShowModuleForm(false);
       await loadModules();
     } catch {
-      showToast('Erro ao salvar módulo', 'erro');
+      toast.error('Erro ao salvar módulo.');
     }
   };
 
@@ -126,77 +207,199 @@ export default function CourseEditor() {
     if (!window.confirm('Excluir este módulo e todas as suas aulas?')) return;
     try {
       await adminApi.deleteModule(moduleId);
-      showToast('Módulo excluído!');
+      toast.success('Módulo excluído.');
       await loadModules();
     } catch {
-      showToast('Erro ao excluir módulo', 'erro');
+      toast.error('Erro ao excluir módulo.');
+    }
+  };
+
+  const moveModule = async (index, dir) => {
+    const target = index + dir;
+    if (target < 0 || target >= modules.length) return;
+    const reordered = [...modules];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setModules(reordered);
+    try {
+      await adminApi.reorderModules(cursoId, reordered.map(m => m.id));
+      await loadModules();
+    } catch {
+      toast.error('Erro ao reordenar módulos.');
+      await loadModules();
     }
   };
 
   const toggleModule = async (moduleId) => {
-    if (expandedModule === moduleId) {
-      setExpandedModule(null);
-      return;
-    }
-    
+    if (expandedModule === moduleId) { setExpandedModule(null); return; }
     setExpandedModule(moduleId);
-    
-    const moduleWithLessons = modules.find(m => m.id === moduleId);
-    if (moduleWithLessons && !moduleWithLessons.aulas) {
-      const aulas = await loadLessons(moduleId);
-      setModules(prev => prev.map(m => 
-        m.id === moduleId ? { ...m, aulas } : m
-      ));
+    const mod = modules.find(m => m.id === moduleId);
+    if (mod && !mod.aulas) {
+      try {
+        const data = await adminApi.getLessons(moduleId);
+        setModules(prev => prev.map(m => m.id === moduleId ? { ...m, aulas: data.aulas || [] } : m));
+      } catch { /* servidor offline */ }
     }
   };
 
-  const startEditModule = (mod) => {
-    setEditingModule(mod);
-    setModuleForm({ titulo: mod.titulo, descricao: mod.descricao, ordem: mod.ordem });
-    setShowModuleForm(true);
+  const reloadLessons = async (moduleId) => {
+    try {
+      const data = await adminApi.getLessons(moduleId);
+      setModules(prev => prev.map(m => m.id === moduleId ? { ...m, aulas: data.aulas || [] } : m));
+    } catch { /* servidor offline */ }
   };
+
+  /* ── Aulas ────────────────────────────────────────────────────── */
 
   const handleLessonSubmit = async (e) => {
     e.preventDefault();
+    if (!lessonForm.titulo?.trim()) { toast.warning('Informe o título da aula.'); return; }
+    if (lessonForm.tipo_conteudo === 'video' && !lessonForm.video_url?.trim()) {
+      toast.warning('Informe a URL do vídeo.');
+      return;
+    }
+    const payload = {
+      ...lessonForm,
+      conteudo: normalizeQuillHtml(lessonForm.conteudo),
+      duracao_minutos: lessonForm.duracao_minutos ? parseInt(lessonForm.duracao_minutos, 10) : null,
+      ordem: lessonForm.ordem ? parseInt(lessonForm.ordem, 10) : undefined,
+    };
     try {
       if (editingLesson) {
-        await adminApi.updateLesson(editingLesson.id, lessonForm);
-        showToast('Aula atualizada!');
+        await adminApi.updateLesson(editingLesson.id, payload);
+        toast.success('Aula atualizada!');
       } else {
-        await adminApi.createLesson(editingLessonModuleId, lessonForm);
-        showToast('Aula criada!');
+        const mod = modules.find(m => m.id === lessonModuleId);
+        await adminApi.createLesson(lessonModuleId, {
+          ...payload,
+          ordem: payload.ordem || (mod?.aulas?.length || 0) + 1,
+        });
+        toast.success('Aula criada!');
       }
-      setLessonForm({ titulo: '', conteudo: '' });
+      const modId = lessonModuleId;
+      setLessonForm(EMPTY_LESSON);
       setEditingLesson(null);
-      setEditingLessonModuleId(null);
-      await loadModules();
+      setLessonModuleId(null);
+      await reloadLessons(modId);
     } catch {
-      showToast('Erro ao salvar aula', 'erro');
+      toast.error('Erro ao salvar aula.');
     }
   };
 
-  const handleDeleteLesson = async (lessonId) => {
+  const handleDeleteLesson = async (lessonId, moduleId) => {
     if (!window.confirm('Excluir esta aula?')) return;
     try {
       await adminApi.deleteLesson(lessonId);
-      showToast('Aula excluída!');
-      await loadModules();
+      toast.success('Aula excluída.');
+      await reloadLessons(moduleId);
     } catch {
-      showToast('Erro ao excluir aula', 'erro');
+      toast.error('Erro ao excluir aula.');
     }
   };
 
-  const startEditLesson = (lesson, moduleId) => {
-    setEditingLesson(lesson);
-    setEditingLessonModuleId(moduleId);
-    setLessonForm({ titulo: lesson.titulo, conteudo: lesson.conteudo });
+  /* ── Avaliação ────────────────────────────────────────────────── */
+
+  const handleSaveQuizConfig = async (e) => {
+    e.preventDefault();
+    try {
+      const data = await adminApi.saveQuizConfig(cursoId, quizConfig);
+      if (data.erro) { toast.error(data.erro); return; }
+      setQuizConfig(data.avaliacao);
+      toast.success('Configuração da avaliação salva!');
+    } catch (err) {
+      toast.error(err.message || 'Erro ao salvar configuração.');
+    }
   };
 
-  const startCreateLesson = (moduleId) => {
-    setEditingLesson(null);
-    setEditingLessonModuleId(moduleId);
-    setLessonForm({ titulo: '', conteudo: '' });
+  const handleQuestionSubmit = async (e) => {
+    e.preventDefault();
+    const alts = questionForm.alternativas.map(a => a.trim());
+    if (!questionForm.enunciado.trim()) { toast.warning('Informe o enunciado da pergunta.'); return; }
+    if (alts.some(a => !a)) { toast.warning('Preencha todas as alternativas.'); return; }
+
+    const payload = { ...questionForm, alternativas: alts };
+    try {
+      if (editingQuestion) {
+        const data = await adminApi.updateQuestion(editingQuestion.id, payload);
+        if (data.erro) { toast.error(data.erro); return; }
+        toast.success('Pergunta atualizada!');
+      } else {
+        const data = await adminApi.createQuestion(cursoId, payload);
+        if (data.erro) { toast.error(data.erro); return; }
+        toast.success('Pergunta adicionada ao banco!');
+      }
+      setQuestionForm(EMPTY_QUESTION);
+      setEditingQuestion(null);
+      setShowQuestionForm(false);
+      await loadQuiz();
+    } catch (err) {
+      toast.error(err.message || 'Erro ao salvar pergunta.');
+    }
   };
+
+  const handleDeleteQuestion = async (id) => {
+    if (!window.confirm('Excluir esta pergunta do banco?')) return;
+    try {
+      await adminApi.deleteQuestion(id);
+      toast.success('Pergunta excluída.');
+      await loadQuiz();
+    } catch {
+      toast.error('Erro ao excluir pergunta.');
+    }
+  };
+
+  const setAlternativa = (idx, value) => {
+    setQuestionForm(f => ({
+      ...f,
+      alternativas: f.alternativas.map((a, i) => i === idx ? value : a),
+    }));
+  };
+
+  /* ── Permissões ───────────────────────────────────────────────── */
+
+  const handleAddAuthorization = async (e) => {
+    e.preventDefault();
+    if (!authEmail.trim()) return;
+    try {
+      const data = await adminApi.addAuthorization(cursoId, authEmail.trim());
+      if (data.erro) { toast.error(data.erro); return; }
+      toast.success(`Acesso liberado para ${data.autorizado.nome}.`);
+      setAuthEmail('');
+      await loadAuthorized();
+    } catch (err) {
+      toast.error(err.message || 'Erro ao autorizar usuário.');
+    }
+  };
+
+  const handleRemoveAuthorization = async (alunoId, nome) => {
+    if (!window.confirm(`Remover o acesso de ${nome} a este curso?`)) return;
+    try {
+      await adminApi.removeAuthorization(cursoId, alunoId);
+      toast.success('Autorização removida.');
+      await loadAuthorized();
+    } catch {
+      toast.error('Erro ao remover autorização.');
+    }
+  };
+
+  /* ── Alunos ───────────────────────────────────────────────────── */
+
+  const handleUnenroll = async (aluno) => {
+    if (!window.confirm(
+      `Desmatricular ${aluno.nome} deste curso?\n\n` +
+      'O progresso das aulas e as tentativas de avaliação serão apagados. ' +
+      'Certificados já emitidos são mantidos (gerencie-os na página Certificados).'
+    )) return;
+    try {
+      const data = await adminApi.unenrollStudent(cursoId, aluno.id);
+      if (data.erro) { toast.error(data.erro); return; }
+      toast.success(`${aluno.nome} foi desmatriculado do curso.`);
+      await loadStudents();
+    } catch (err) {
+      toast.error(err.message || 'Erro ao desmatricular aluno.');
+    }
+  };
+
+  /* ── Render ───────────────────────────────────────────────────── */
 
   if (loading) {
     return (
@@ -218,193 +421,186 @@ export default function CourseEditor() {
     );
   }
 
+  const status = curso.status || 'rascunho';
+  const tabs = [
+    { id: 'info',     label: 'Informações' },
+    { id: 'modules',  label: `Módulos & Aulas (${modules.length})` },
+    { id: 'quiz',     label: `Avaliação (${questions.length})` },
+    { id: 'cert',     label: 'Certificado' },
+    { id: 'perms',    label: 'Permissões' },
+    { id: 'students', label: `Alunos (${students.length})` },
+  ];
+
   return (
     <div className="course-editor">
+      {/* ── Cabeçalho ── */}
       <div className="ce-header">
         <div className="ce-header__left">
-          <button onClick={() => navigate('/admin/cursos')} className="ce-back-btn">
-            ← Voltar
-          </button>
+          <button onClick={() => navigate('/admin/cursos')} className="ce-back-btn">← Voltar</button>
           <h1 className="ce-title">{form.nome || 'Novo Curso'}</h1>
+          <span className={`ce-status-badge ce-status--${status}`}>{STATUS_LABEL[status]}</span>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <span className="ce-status-badge ce-status--publicado">Ativo</span>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Link to={`/cursos/${cursoId}`} target="_blank" className="ce-btn ce-btn--secondary">
+            👁 Visualizar como aluno
+          </Link>
+          <button onClick={handlePublishToggle} className="ce-btn ce-btn--primary"
+            style={status === 'publicado' ? { background: '#64748b' } : { background: '#10b981' }}>
+            {status === 'publicado' ? 'Despublicar' : '🚀 Publicar curso'}
+          </button>
         </div>
       </div>
 
-      <div className="ce-tabs">
-        <button
-          className={`ce-tab ${activeTab === 'info' ? 'ce-tab--active' : ''}`}
-          onClick={() => setActiveTab('info')}
-        >
-          Informações
-        </button>
-        <button
-          className={`ce-tab ${activeTab === 'modules' ? 'ce-tab--active' : ''}`}
-          onClick={() => setActiveTab('modules')}
-        >
-          Módulos & Aulas
-        </button>
+      {/* ── Abas ── */}
+      <div className="ce-tabs" style={{ overflowX: 'auto' }}>
+        {tabs.map(t => (
+          <button key={t.id}
+            className={`ce-tab ${activeTab === t.id ? 'ce-tab--active' : ''}`}
+            onClick={() => setActiveTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
+      {/* ════════ ABA: INFORMAÇÕES ════════ */}
       {activeTab === 'info' && (
         <div className="ce-form">
           <div className="ce-section">
             <h3 className="ce-section__title">Informações Básicas</h3>
             <div className="ce-grid ce-grid--2">
               <div className="ce-field ce-field--full">
-                <label>Nome do Curso *</label>
-                <input
-                  type="text"
-                  value={form.nome}
-                  onChange={e => setForm({ ...form, nome: e.target.value })}
-                  placeholder="Nome do curso"
-                />
+                <label>Título do Curso *</label>
+                <input type="text" value={form.nome || ''} required
+                  onChange={e => setField('nome', e.target.value)}
+                  placeholder="Ex.: Operação de Sistemas Elétricos em Data Centers" />
+              </div>
+              <div className="ce-field ce-field--full">
+                <label>Descrição curta (aparece nos cards do catálogo — máx. 300 caracteres)</label>
+                <input type="text" maxLength={300} value={form.descricao_curta || ''}
+                  onChange={e => setField('descricao_curta', e.target.value)}
+                  placeholder="Resumo de uma frase do curso" />
+              </div>
+              <div className="ce-field ce-field--full">
+                <label>Descrição completa</label>
+                <textarea rows={4} value={form.descricao || ''}
+                  onChange={e => setField('descricao', e.target.value)}
+                  placeholder="Descrição detalhada exibida na página do curso" />
               </div>
               <div className="ce-field">
-                <label>Duração *</label>
-                <input
-                  type="text"
-                  value={form.duracao}
-                  onChange={e => setForm({ ...form, duracao: e.target.value })}
-                  placeholder="Ex: 40h"
-                />
+                <label>Carga horária *</label>
+                <input type="text" value={form.duracao || ''} required
+                  onChange={e => setField('duracao', e.target.value)} placeholder="Ex.: 40h" />
               </div>
               <div className="ce-field">
-                <label>URL da Imagem</label>
-                <input
-                  type="text"
-                  value={form.image || ''}
-                  onChange={e => setForm({ ...form, image: e.target.value })}
-                  placeholder="https://..."
-                />
+                <label>Categoria</label>
+                <input type="text" value={form.categoria || ''}
+                  onChange={e => setField('categoria', e.target.value)}
+                  placeholder="Ex.: Energia, Refrigeração, Operações" />
+              </div>
+              <div className="ce-field">
+                <label>Nível</label>
+                <select value={form.nivel || 'basico'} onChange={e => setField('nivel', e.target.value)}>
+                  {NIVEIS.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+                </select>
+              </div>
+              <div className="ce-field">
+                <label>Imagem de capa (URL)</label>
+                <input type="text" value={form.image || ''}
+                  onChange={e => setField('image', e.target.value)}
+                  placeholder="images/courses/nome-da-imagem.png" />
                 {form.image && (
-                  <img src={form.image} alt="Preview" className="ce-img-preview" />
+                  <img src={form.image.startsWith('http') ? form.image : `/${form.image}`}
+                    alt="Preview" className="ce-img-preview"
+                    onError={e => { e.target.style.display = 'none'; }}
+                    onLoad={e => { e.target.style.display = ''; }} />
                 )}
               </div>
-              <div className="ce-field ce-field--full">
-                <label>Descrição</label>
-                <textarea
-                  value={form.descricao || ''}
-                  onChange={e => setForm({ ...form, descricao: e.target.value })}
-                  rows={3}
-                  placeholder="Descrição do curso"
-                />
-              </div>
             </div>
           </div>
 
           <div className="ce-section">
-            <h3 className="ce-section__title">Conteúdo do Curso</h3>
+            <h3 className="ce-section__title">Sobre o Curso</h3>
             <div className="ce-grid ce-grid--2">
-              <div className="ce-field ce-field--full">
+              <div className="ce-field">
+                <label>Público-alvo</label>
+                <textarea rows={3} value={form.publico_alvo || ''}
+                  onChange={e => setField('publico_alvo', e.target.value)}
+                  placeholder="Para quem é este curso?" />
+              </div>
+              <div className="ce-field">
+                <label>Objetivos do curso</label>
+                <textarea rows={3} value={form.objetivo || ''}
+                  onChange={e => setField('objetivo', e.target.value)}
+                  placeholder="O que o aluno será capaz de fazer ao concluir?" />
+              </div>
+              <div className="ce-field">
+                <label>Requisitos para participar</label>
+                <textarea rows={3} value={form.requisitos || ''}
+                  onChange={e => setField('requisitos', e.target.value)}
+                  placeholder="Pré-requisitos, conhecimentos necessários..." />
+              </div>
+              <div className="ce-field">
                 <label>O que você vai aprender</label>
-                <textarea
-                  value={form.oque_aprender || ''}
-                  onChange={e => setForm({ ...form, oque_aprender: e.target.value })}
-                  rows={4}
-                  placeholder="Lista de tópicos que o aluno vai aprender"
-                />
-              </div>
-              <div className="ce-field">
-                <label>Matriz Curricular</label>
-                <textarea
-                  value={form.matriz_curricular || ''}
-                  onChange={e => setForm({ ...form, matriz_curricular: e.target.value })}
-                  rows={4}
-                  placeholder="Módulo 1: Título - Descrição"
-                />
-              </div>
-              <div className="ce-field">
-                <label>Coordenação</label>
-                <textarea
-                  value={form.coordenacao || ''}
-                  onChange={e => setForm({ ...form, coordenacao: e.target.value })}
-                  rows={3}
-                  placeholder="Informações do coordenador"
-                />
+                <textarea rows={3} value={form.oque_aprender || ''}
+                  onChange={e => setField('oque_aprender', e.target.value)}
+                  placeholder="• Tópico 1&#10;• Tópico 2" />
               </div>
             </div>
           </div>
 
           <div className="ce-section">
-            <h3 className="ce-section__title">Informações Complementares</h3>
+            <h3 className="ce-section__title">Conteúdo Institucional (opcional)</h3>
             <div className="ce-grid ce-grid--2">
               <div className="ce-field">
                 <label>Mercado de Trabalho</label>
-                <textarea
-                  value={form.mercado_trabalho || ''}
-                  onChange={e => setForm({ ...form, mercado_trabalho: e.target.value })}
-                  rows={3}
-                  placeholder="Oportunidades profissionais"
-                />
+                <textarea rows={3} value={form.mercado_trabalho || ''}
+                  onChange={e => setField('mercado_trabalho', e.target.value)} />
               </div>
               <div className="ce-field">
                 <label>Áreas de Atuação</label>
-                <textarea
-                  value={form.areas_atuacao || ''}
-                  onChange={e => setForm({ ...form, areas_atuacao: e.target.value })}
-                  rows={3}
-                  placeholder="Áreas onde o profissional pode atuar"
-                />
+                <textarea rows={3} value={form.areas_atuacao || ''}
+                  onChange={e => setField('areas_atuacao', e.target.value)} />
               </div>
               <div className="ce-field">
                 <label>Diferenciais</label>
-                <textarea
-                  value={form.diferenciais || ''}
-                  onChange={e => setForm({ ...form, diferenciais: e.target.value })}
-                  rows={3}
-                  placeholder="O que diferencia este curso"
-                />
+                <textarea rows={3} value={form.diferenciais || ''}
+                  onChange={e => setField('diferenciais', e.target.value)} />
               </div>
               <div className="ce-field">
-                <label>Infraestrutura</label>
-                <textarea
-                  value={form.infraestrutura || ''}
-                  onChange={e => setForm({ ...form, infraestrutura: e.target.value })}
-                  rows={3}
-                  placeholder="Infraestrutura disponível"
-                />
+                <label>Coordenação</label>
+                <textarea rows={3} value={form.coordenacao || ''}
+                  onChange={e => setField('coordenacao', e.target.value)} />
               </div>
-            </div>
-          </div>
-
-          <div className="ce-section">
-            <h3 className="ce-section__title">Informações Adicionais</h3>
-            <div className="ce-grid ce-grid--2">
               <div className="ce-field ce-field--full">
                 <label>Informações Complementares</label>
-                <textarea
-                  value={form.informacoes_complementares || ''}
-                  onChange={e => setForm({ ...form, informacoes_complementares: e.target.value })}
-                  rows={3}
-                  placeholder="Outras informações relevantes"
-                />
+                <textarea rows={3} value={form.informacoes_complementares || ''}
+                  onChange={e => setField('informacoes_complementares', e.target.value)} />
               </div>
             </div>
           </div>
 
           <div className="ce-save-bar">
             <button onClick={handleSaveCourse} disabled={saving} className="ce-btn ce-btn--primary ce-btn--lg">
-              {saving ? 'Salvando...' : 'Salvar Alterações'}
+              {saving ? 'Salvando...' : '💾 Salvar Alterações'}
             </button>
           </div>
         </div>
       )}
 
+      {/* ════════ ABA: MÓDULOS & AULAS ════════ */}
       {activeTab === 'modules' && (
         <div className="ce-modules">
           <div className="ce-modules__header">
             <h2>Módulos do Curso ({modules.length})</h2>
-            <button
-              onClick={() => { setEditingModule(null); setModuleForm({ titulo: '', descricao: '', ordem: modules.length + 1 }); setShowModuleForm(true); }}
-              className="ce-btn ce-btn--primary"
-            >
+            <button className="ce-btn ce-btn--primary"
+              onClick={() => {
+                setEditingModule(null);
+                setModuleForm({ titulo: '', descricao: '', ordem: modules.length + 1 });
+                setShowModuleForm(true);
+              }}>
               + Novo Módulo
             </button>
           </div>
-
-          {editingModule !== null || (editingLessonModuleId && !editingLesson) ? null : null}
 
           {showModuleForm && (
             <div className="ce-inline-form">
@@ -412,41 +608,28 @@ export default function CourseEditor() {
               <form onSubmit={handleModuleSubmit}>
                 <div className="ce-grid ce-grid--2">
                   <div className="ce-field ce-field--full">
-                    <label>Título *</label>
-                    <input
-                      type="text"
-                      value={moduleForm.titulo}
+                    <label>Nome do módulo *</label>
+                    <input type="text" value={moduleForm.titulo} required
                       onChange={e => setModuleForm({ ...moduleForm, titulo: e.target.value })}
-                      required
-                    />
+                      placeholder="Ex.: Módulo 1 — Introdução ao curso" />
                   </div>
                   <div className="ce-field ce-field--full">
                     <label>Descrição</label>
-                    <textarea
-                      value={moduleForm.descricao || ''}
-                      onChange={e => setModuleForm({ ...moduleForm, descricao: e.target.value })}
-                      rows={2}
-                    />
+                    <textarea rows={2} value={moduleForm.descricao || ''}
+                      onChange={e => setModuleForm({ ...moduleForm, descricao: e.target.value })} />
                   </div>
                   <div className="ce-field">
-                    <label>Ordem</label>
-                    <input
-                      type="number"
-                      value={moduleForm.ordem}
-                      onChange={e => setModuleForm({ ...moduleForm, ordem: parseInt(e.target.value, 10) || 1 })}
-                      min="1"
-                    />
+                    <label>Ordem de exibição</label>
+                    <input type="number" min="1" value={moduleForm.ordem}
+                      onChange={e => setModuleForm({ ...moduleForm, ordem: parseInt(e.target.value, 10) || 1 })} />
                   </div>
                 </div>
                 <div className="ce-inline-form__actions">
                   <button type="submit" className="ce-btn ce-btn--primary">
-                    {editingModule ? 'Salvar' : 'Criar'}
+                    {editingModule ? 'Salvar' : 'Criar Módulo'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => { setEditingModule(null); setModuleForm({ titulo: '', descricao: '', ordem: '' }); setShowModuleForm(false); }}
-                    className="ce-btn ce-btn--secondary"
-                  >
+                  <button type="button" className="ce-btn ce-btn--secondary"
+                    onClick={() => { setEditingModule(null); setShowModuleForm(false); }}>
                     Cancelar
                   </button>
                 </div>
@@ -461,102 +644,111 @@ export default function CourseEditor() {
             </div>
           ) : (
             <div className="ce-accordion">
-              {modules.map((mod) => (
+              {modules.map((mod, idx) => (
                 <div key={mod.id} className="ce-accordion__item">
-                  <div
-                    className="ce-accordion__header"
-                    onClick={() => toggleModule(mod.id)}
-                  >
+                  <div className="ce-accordion__header" onClick={() => toggleModule(mod.id)}>
                     <div className="ce-accordion__left">
-                      <span className="ce-accordion__arrow">
-                        {expandedModule === mod.id ? '▼' : '▶'}
-                      </span>
+                      <span className="ce-accordion__arrow">{expandedModule === mod.id ? '▼' : '▶'}</span>
                       <span className="ce-accordion__order">{mod.ordem}</span>
                       <span className="ce-accordion__title">{mod.titulo}</span>
+                      {mod.aulas && <span className="ce-accordion__count">{mod.aulas.length} aulas</span>}
                     </div>
                     <div className="ce-accordion__actions" onClick={e => e.stopPropagation()}>
-                      <button
-                        onClick={() => startEditModule(mod)}
-                        className="ce-btn ce-btn--secondary ce-btn--sm"
-                      >
+                      <button onClick={() => moveModule(idx, -1)} disabled={idx === 0}
+                        className="ce-btn ce-btn--secondary ce-btn--sm" title="Mover para cima">↑</button>
+                      <button onClick={() => moveModule(idx, +1)} disabled={idx === modules.length - 1}
+                        className="ce-btn ce-btn--secondary ce-btn--sm" title="Mover para baixo">↓</button>
+                      <button className="ce-btn ce-btn--secondary ce-btn--sm"
+                        onClick={() => {
+                          setEditingModule(mod);
+                          setModuleForm({ titulo: mod.titulo, descricao: mod.descricao, ordem: mod.ordem });
+                          setShowModuleForm(true);
+                        }}>
                         Editar
                       </button>
-                      <button
-                        onClick={() => handleDeleteModule(mod.id)}
-                        className="ce-btn ce-btn--danger ce-btn--sm"
-                      >
-                        Excluir
-                      </button>
+                      <button onClick={() => handleDeleteModule(mod.id)}
+                        className="ce-btn ce-btn--danger ce-btn--sm">Excluir</button>
                     </div>
                   </div>
 
                   {expandedModule === mod.id && (
                     <div className="ce-accordion__body">
-                      {editingLessonModuleId === mod.id && !editingLesson && (
-                        <div className="ce-inline-form ce-inline-form--lesson">
-                          <h4>Nova Aula</h4>
-                          <form onSubmit={handleLessonSubmit}>
-                            <div className="ce-field">
-                              <label>Título *</label>
-                              <input
-                                type="text"
-                                value={lessonForm.titulo}
-                                onChange={e => setLessonForm({ ...lessonForm, titulo: e.target.value })}
-                                required
-                              />
-                            </div>
-                            <div className="ce-field">
-                              <label>Conteúdo</label>
-                              <QuillEditor
-                                value={lessonForm.conteudo || ''}
-                                onChange={content => setLessonForm({ ...lessonForm, conteudo: content })}
-                              />
-                            </div>
-                            <div className="ce-inline-form__actions">
-                              <button type="submit" className="ce-btn ce-btn--primary">
-                                Criar Aula
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { setEditingLessonModuleId(null); setLessonForm({ titulo: '', conteudo: '' }); }}
-                                className="ce-btn ce-btn--secondary"
-                              >
-                                Cancelar
-                              </button>
-                            </div>
-                          </form>
-                        </div>
+                      {mod.descricao && (
+                        <p style={{ color: '#64748b', marginBottom: '16px', fontSize: '0.92rem' }}>{mod.descricao}</p>
                       )}
 
-                      {editingLesson && editingLessonModuleId === mod.id && (
+                      {/* Formulário de aula (criar/editar) */}
+                      {lessonModuleId === mod.id && (
                         <div className="ce-inline-form ce-inline-form--lesson">
-                          <h4>Editar Aula</h4>
+                          <h4>{editingLesson ? 'Editar Aula' : 'Nova Aula'}</h4>
                           <form onSubmit={handleLessonSubmit}>
-                            <div className="ce-field">
-                              <label>Título *</label>
-                              <input
-                                type="text"
-                                value={lessonForm.titulo}
-                                onChange={e => setLessonForm({ ...lessonForm, titulo: e.target.value })}
-                                required
-                              />
+                            <div className="ce-grid ce-grid--2">
+                              <div className="ce-field ce-field--full">
+                                <label>Título da aula *</label>
+                                <input type="text" value={lessonForm.titulo} required
+                                  onChange={e => setLessonForm({ ...lessonForm, titulo: e.target.value })} />
+                              </div>
+                              <div className="ce-field ce-field--full">
+                                <label>Descrição da aula</label>
+                                <input type="text" value={lessonForm.descricao || ''}
+                                  onChange={e => setLessonForm({ ...lessonForm, descricao: e.target.value })}
+                                  placeholder="Resumo breve do que será visto" />
+                              </div>
+                              <div className="ce-field">
+                                <label>Tipo de conteúdo</label>
+                                <select value={lessonForm.tipo_conteudo}
+                                  onChange={e => setLessonForm({ ...lessonForm, tipo_conteudo: e.target.value })}>
+                                  {TIPOS_CONTEUDO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                </select>
+                              </div>
+                              <div className="ce-field">
+                                <label>Tempo estimado (minutos)</label>
+                                <input type="number" min="1" value={lessonForm.duracao_minutos || ''}
+                                  onChange={e => setLessonForm({ ...lessonForm, duracao_minutos: e.target.value })} />
+                              </div>
+                              {(lessonForm.tipo_conteudo === 'video') && (
+                                <div className="ce-field ce-field--full">
+                                  <label>URL do vídeo * (YouTube, Vimeo ou arquivo)</label>
+                                  <input type="text" value={lessonForm.video_url || ''}
+                                    onChange={e => setLessonForm({ ...lessonForm, video_url: e.target.value })}
+                                    placeholder="https://www.youtube.com/watch?v=..." />
+                                </div>
+                              )}
+                              {(lessonForm.tipo_conteudo === 'pdf' || lessonForm.tipo_conteudo === 'link' || lessonForm.tipo_conteudo === 'material') && (
+                                <div className="ce-field ce-field--full">
+                                  <label>URL do material / link externo</label>
+                                  <input type="text" value={lessonForm.material_url || ''}
+                                    onChange={e => setLessonForm({ ...lessonForm, material_url: e.target.value })}
+                                    placeholder="https://..." />
+                                </div>
+                              )}
+                              <div className="ce-field">
+                                <label>Ordem na lista</label>
+                                <input type="number" min="1" value={lessonForm.ordem || ''}
+                                  onChange={e => setLessonForm({ ...lessonForm, ordem: e.target.value })}
+                                  placeholder="automática" />
+                              </div>
+                              <div className="ce-field">
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '28px' }}>
+                                  <input type="checkbox" checked={lessonForm.obrigatoria !== false}
+                                    onChange={e => setLessonForm({ ...lessonForm, obrigatoria: e.target.checked })} />
+                                  Aula obrigatória (conta para o certificado)
+                                </label>
+                              </div>
                             </div>
-                            <div className="ce-field">
-                              <label>Conteúdo</label>
+                            <div className="ce-field" style={{ marginTop: '16px' }}>
+                              <label>Conteúdo da aula</label>
                               <QuillEditor
                                 value={lessonForm.conteudo || ''}
-                                onChange={content => setLessonForm({ ...lessonForm, conteudo: content })}
+                                onChange={content => setLessonForm(f => ({ ...f, conteudo: content }))}
                               />
                             </div>
                             <div className="ce-inline-form__actions">
                               <button type="submit" className="ce-btn ce-btn--primary">
-                                Salvar
+                                {editingLesson ? 'Salvar Aula' : 'Criar Aula'}
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => { setEditingLesson(null); setEditingLessonModuleId(null); setLessonForm({ titulo: '', conteudo: '' }); }}
-                                className="ce-btn ce-btn--secondary"
-                              >
+                              <button type="button" className="ce-btn ce-btn--secondary"
+                                onClick={() => { setEditingLesson(null); setLessonModuleId(null); setLessonForm(EMPTY_LESSON); }}>
                                 Cancelar
                               </button>
                             </div>
@@ -566,41 +758,51 @@ export default function CourseEditor() {
 
                       <div className="ce-lessons__header">
                         <h4>Aulas do Módulo</h4>
-                        {editingLessonModuleId !== mod.id && (
-                          <button
-                            onClick={() => startCreateLesson(mod.id)}
-                            className="ce-btn ce-btn--primary ce-btn--sm"
-                          >
+                        {lessonModuleId !== mod.id && (
+                          <button className="ce-btn ce-btn--primary ce-btn--sm"
+                            onClick={() => { setEditingLesson(null); setLessonModuleId(mod.id); setLessonForm(EMPTY_LESSON); }}>
                             + Nova Aula
                           </button>
                         )}
                       </div>
 
                       {!mod.aulas || mod.aulas.length === 0 ? (
-                        <div className="ce-empty-small">
-                          <p>Nenhuma aula neste módulo.</p>
-                        </div>
+                        <div className="ce-empty-small"><p>Nenhuma aula neste módulo.</p></div>
                       ) : (
                         <ul className="ce-lesson-list">
                           {mod.aulas.map((aula) => (
                             <li key={aula.id} className="ce-lesson-item">
                               <div className="ce-lesson-item__info">
-                                <span className="ce-lesson-item__type">📝</span>
-                                <span className="ce-lesson-item__title">{aula.titulo}</span>
+                                <span className="ce-lesson-item__type">{contentIcon(aula.tipo_conteudo)}</span>
+                                <div>
+                                  <span className="ce-lesson-item__title">{aula.titulo}</span>
+                                  <div className="ce-lesson-item__duration">
+                                    {aula.duracao_minutos ? `${aula.duracao_minutos} min · ` : ''}
+                                    {aula.obrigatoria === false ? 'Opcional' : 'Obrigatória'}
+                                  </div>
+                                </div>
                               </div>
                               <div className="ce-lesson-item__actions">
-                                <button
-                                  onClick={() => startEditLesson(aula, mod.id)}
-                                  className="ce-btn ce-btn--secondary ce-btn--sm"
-                                >
+                                <button className="ce-btn ce-btn--secondary ce-btn--sm"
+                                  onClick={() => {
+                                    setEditingLesson(aula);
+                                    setLessonModuleId(mod.id);
+                                    setLessonForm({
+                                      titulo: aula.titulo || '',
+                                      descricao: aula.descricao || '',
+                                      conteudo: aula.conteudo || '',
+                                      tipo_conteudo: aula.tipo_conteudo || 'texto',
+                                      video_url: aula.video_url || '',
+                                      material_url: aula.material_url || '',
+                                      duracao_minutos: aula.duracao_minutos || '',
+                                      obrigatoria: aula.obrigatoria !== false,
+                                      ordem: aula.ordem || '',
+                                    });
+                                  }}>
                                   Editar
                                 </button>
-                                <button
-                                  onClick={() => handleDeleteLesson(aula.id)}
-                                  className="ce-btn ce-btn--danger ce-btn--sm"
-                                >
-                                  Excluir
-                                </button>
+                                <button onClick={() => handleDeleteLesson(aula.id, mod.id)}
+                                  className="ce-btn ce-btn--danger ce-btn--sm">Excluir</button>
                               </div>
                             </li>
                           ))}
@@ -615,10 +817,355 @@ export default function CourseEditor() {
         </div>
       )}
 
-      {toast && (
-        <div className={`ce-toast ce-toast--${toast.tipo}`}>
-          <span>{toast.texto}</span>
-          <button onClick={() => setToast(null)} className="ce-toast__close">×</button>
+      {/* ════════ ABA: AVALIAÇÃO ════════ */}
+      {activeTab === 'quiz' && (
+        <div className="ce-form">
+          <div className="ce-section">
+            <h3 className="ce-section__title">Configuração da Avaliação Final</h3>
+            <form onSubmit={handleSaveQuizConfig}>
+              <div className="ce-grid ce-grid--2">
+                <div className="ce-field">
+                  <label>Questões por prova</label>
+                  <input type="number" min="1" value={quizConfig.num_questoes}
+                    onChange={e => setQuizConfig({ ...quizConfig, num_questoes: e.target.value })} />
+                </div>
+                <div className="ce-field">
+                  <label>Nota mínima para aprovação (%)</label>
+                  <input type="number" min="1" max="100" value={quizConfig.nota_minima}
+                    onChange={e => setQuizConfig({ ...quizConfig, nota_minima: e.target.value })} />
+                </div>
+                <div className="ce-field">
+                  <label>Máximo de tentativas</label>
+                  <input type="number" min="1" value={quizConfig.max_tentativas}
+                    onChange={e => setQuizConfig({ ...quizConfig, max_tentativas: e.target.value })} />
+                </div>
+                <div className="ce-field">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '28px' }}>
+                    <input type="checkbox" checked={quizConfig.ativa !== false}
+                      onChange={e => setQuizConfig({ ...quizConfig, ativa: e.target.checked })} />
+                    Avaliação ativa (obrigatória para o certificado)
+                  </label>
+                </div>
+              </div>
+              <div className="ce-inline-form__actions">
+                <button type="submit" className="ce-btn ce-btn--primary">Salvar Configuração</button>
+              </div>
+            </form>
+            <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '12px' }}>
+              As questões são sorteadas aleatoriamente do banco a cada tentativa.
+              O certificado só é liberado com 100% das aulas obrigatórias + aprovação (quando a avaliação está ativa).
+            </p>
+          </div>
+
+          <div className="ce-section">
+            <div className="ce-modules__header">
+              <h3 className="ce-section__title" style={{ margin: 0 }}>
+                Banco de Perguntas ({questions.length})
+              </h3>
+              <button className="ce-btn ce-btn--primary"
+                onClick={() => { setEditingQuestion(null); setQuestionForm(EMPTY_QUESTION); setShowQuestionForm(true); }}>
+                + Nova Pergunta
+              </button>
+            </div>
+
+            {showQuestionForm && (
+              <div className="ce-inline-form" style={{ marginTop: '16px' }}>
+                <h4>{editingQuestion ? 'Editar Pergunta' : 'Nova Pergunta'}</h4>
+                <form onSubmit={handleQuestionSubmit}>
+                  <div className="ce-field">
+                    <label>Enunciado *</label>
+                    <textarea rows={2} value={questionForm.enunciado} required
+                      onChange={e => setQuestionForm({ ...questionForm, enunciado: e.target.value })} />
+                  </div>
+                  <div className="ce-field" style={{ marginTop: '12px' }}>
+                    <label>Alternativas * (marque a correta)</label>
+                    {questionForm.alternativas.map((alt, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+                        <input type="radio" name="correta"
+                          checked={questionForm.correta === idx}
+                          onChange={() => setQuestionForm({ ...questionForm, correta: idx })}
+                          title="Alternativa correta" />
+                        <strong style={{ width: '20px' }}>{String.fromCharCode(65 + idx)})</strong>
+                        <input type="text" value={alt} style={{ flex: 1 }}
+                          onChange={e => setAlternativa(idx, e.target.value)}
+                          placeholder={`Alternativa ${String.fromCharCode(65 + idx)}`} />
+                        {questionForm.alternativas.length > 2 && (
+                          <button type="button" className="ce-btn ce-btn--danger ce-btn--sm"
+                            onClick={() => setQuestionForm(f => ({
+                              ...f,
+                              alternativas: f.alternativas.filter((_, i) => i !== idx),
+                              // se removeu a correta volta para a primeira; se removeu antes dela, desloca o índice
+                              correta: f.correta === idx ? 0 : f.correta > idx ? f.correta - 1 : f.correta,
+                            }))}>
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {questionForm.alternativas.length < 5 && (
+                      <button type="button" className="ce-btn ce-btn--secondary ce-btn--sm"
+                        onClick={() => setQuestionForm(f => ({ ...f, alternativas: [...f.alternativas, ''] }))}>
+                        + Adicionar alternativa
+                      </button>
+                    )}
+                  </div>
+                  <div className="ce-field" style={{ marginTop: '12px' }}>
+                    <label>Explicação (mostrada ao aluno após responder)</label>
+                    <textarea rows={2} value={questionForm.explicacao || ''}
+                      onChange={e => setQuestionForm({ ...questionForm, explicacao: e.target.value })} />
+                  </div>
+                  <div className="ce-inline-form__actions">
+                    <button type="submit" className="ce-btn ce-btn--primary">
+                      {editingQuestion ? 'Salvar Pergunta' : 'Adicionar ao Banco'}
+                    </button>
+                    <button type="button" className="ce-btn ce-btn--secondary"
+                      onClick={() => { setShowQuestionForm(false); setEditingQuestion(null); }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {questions.length === 0 ? (
+              <div className="ce-empty" style={{ marginTop: '16px' }}>
+                <p>Nenhuma pergunta cadastrada.</p>
+                <p>Adicione perguntas para habilitar a avaliação final deste curso.</p>
+              </div>
+            ) : (
+              <div className="qbank-list" style={{ marginTop: '16px' }}>
+                {questions.map((q, idx) => (
+                  <div key={q.id} className="qbank-item">
+                    <div className="qbank-item-head">
+                      <span className="qbank-number">{idx + 1}</span>
+                      <span className="qbank-question" style={{ flex: 1 }}>{q.enunciado}</span>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button className="ce-btn ce-btn--secondary ce-btn--sm"
+                          onClick={() => {
+                            setEditingQuestion(q);
+                            setQuestionForm({
+                              enunciado: q.enunciado,
+                              alternativas: Array.isArray(q.alternativas) ? q.alternativas : [],
+                              correta: q.correta,
+                              explicacao: q.explicacao || '',
+                            });
+                            setShowQuestionForm(true);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}>
+                          Editar
+                        </button>
+                        <button className="ce-btn ce-btn--danger ce-btn--sm"
+                          onClick={() => handleDeleteQuestion(q.id)}>Excluir</button>
+                      </div>
+                    </div>
+                    <div className="qbank-alternatives">
+                      {(Array.isArray(q.alternativas) ? q.alternativas : []).map((alt, i) => (
+                        <div key={i} className={`qbank-alt ${i === q.correta ? 'correct' : ''}`}>
+                          <strong>{String.fromCharCode(65 + i)})</strong>
+                          <span>{alt}</span>
+                          {i === q.correta && <span style={{ marginLeft: 'auto' }}>✓</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════ ABA: CERTIFICADO ════════ */}
+      {activeTab === 'cert' && (
+        <div className="ce-form">
+          <div className="ce-section">
+            <h3 className="ce-section__title">Configuração do Certificado</h3>
+            <div className="ce-grid ce-grid--2">
+              <div className="ce-field ce-field--full">
+                <label>Requisitos para emissão (exibido ao aluno)</label>
+                <textarea rows={2} value={form.requisitos_certificado || ''}
+                  onChange={e => setField('requisitos_certificado', e.target.value)}
+                  placeholder="Ex.: Concluir 100% das aulas e obter no mínimo 80% na avaliação final" />
+              </div>
+              <div className="ce-field">
+                <label>Responsável técnico / assinatura</label>
+                <input type="text" value={form.cert_responsavel || ''}
+                  onChange={e => setField('cert_responsavel', e.target.value)}
+                  placeholder="Ex.: Coordenação de Operações Conatus" />
+              </div>
+              <div className="ce-field ce-field--full">
+                <label>Texto padrão do certificado</label>
+                <textarea rows={3} value={form.cert_texto || ''}
+                  onChange={e => setField('cert_texto', e.target.value)}
+                  placeholder="Ex.: concluiu com aproveitamento o curso, cumprindo todos os requisitos de avaliação." />
+              </div>
+            </div>
+            <div style={{
+              background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px',
+              padding: '16px 20px', marginTop: '20px', fontSize: '0.9rem', color: '#075985',
+            }}>
+              <strong>Liberação automática:</strong> o certificado é emitido pelo próprio aluno quando
+              ele concluir 100% das aulas obrigatórias{questions.length > 0 && quizConfig.ativa !== false
+                ? ` e for aprovado na avaliação final (mínimo ${quizConfig.nota_minima}%)`
+                : ''}. O documento inclui nome da instituição, curso, aluno, carga horária,
+              data de conclusão e código de validação único.
+            </div>
+          </div>
+          <div className="ce-save-bar">
+            <button onClick={handleSaveCourse} disabled={saving} className="ce-btn ce-btn--primary ce-btn--lg">
+              {saving ? 'Salvando...' : '💾 Salvar Alterações'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ════════ ABA: PERMISSÕES ════════ */}
+      {activeTab === 'perms' && (
+        <div className="ce-form">
+          <div className="ce-section">
+            <h3 className="ce-section__title">Acesso ao Curso</h3>
+            <div className="ce-grid ce-grid--2">
+              <div className="ce-field">
+                <label>Tipo de curso</label>
+                <select value={form.tipo || 'gratuito'} onChange={e => setField('tipo', e.target.value)}>
+                  {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div className="ce-field">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '28px' }}>
+                  <input type="checkbox" checked={form.visivel !== false}
+                    onChange={e => setField('visivel', e.target.checked)} />
+                  Visível na listagem de cursos
+                </label>
+              </div>
+            </div>
+            {form.tipo === 'interno' && (
+              <div style={{
+                background: '#fff8e6', border: '1px solid #f0d98c', borderRadius: '8px',
+                padding: '14px 18px', marginTop: '16px', fontSize: '0.9rem', color: '#6b5800',
+              }}>
+                🔐 Cursos internos só aparecem para administradores, funcionários Conatus
+                (perfil definido em <strong>Alunos</strong>) e usuários autorizados manualmente abaixo.
+                Os demais verão a mensagem: <em>"Este curso é exclusivo para funcionários autorizados
+                da Conatus. Solicite liberação ao administrador."</em>
+              </div>
+            )}
+            <div className="ce-save-bar">
+              <button onClick={handleSaveCourse} disabled={saving} className="ce-btn ce-btn--primary">
+                {saving ? 'Salvando...' : '💾 Salvar Permissões'}
+              </button>
+            </div>
+          </div>
+
+          <div className="ce-section">
+            <h3 className="ce-section__title">Usuários Autorizados ({authorized.length})</h3>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '16px' }}>
+              Libere o acesso individual a este curso para usuários específicos
+              (útil para cursos internos).
+            </p>
+            <form onSubmit={handleAddAuthorization} style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              <input type="email" value={authEmail} className="admin-search"
+                onChange={e => setAuthEmail(e.target.value)}
+                placeholder="E-mail do usuário cadastrado" style={{ flex: 1, minWidth: '240px' }} />
+              <button type="submit" className="ce-btn ce-btn--primary">Liberar Acesso</button>
+            </form>
+
+            {authorized.length === 0 ? (
+              <div className="ce-empty-small"><p>Nenhum usuário autorizado manualmente.</p></div>
+            ) : (
+              <table className="admin-table">
+                <thead>
+                  <tr><th>Nome</th><th>E-mail</th><th>Autorizado em</th><th>Ações</th></tr>
+                </thead>
+                <tbody>
+                  {authorized.map(a => (
+                    <tr key={a.id}>
+                      <td>{a.nome}</td>
+                      <td>{a.email}</td>
+                      <td>{new Date(a.autorizado_em).toLocaleDateString('pt-BR')}</td>
+                      <td>
+                        <button className="ce-btn ce-btn--danger ce-btn--sm"
+                          onClick={() => handleRemoveAuthorization(a.id, a.nome)}>
+                          Remover acesso
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════ ABA: ALUNOS ════════ */}
+      {activeTab === 'students' && (
+        <div className="ce-form">
+          <div className="ce-section">
+            <div className="ce-modules__header">
+              <h3 className="ce-section__title" style={{ margin: 0 }}>
+                Alunos Matriculados ({students.length})
+              </h3>
+              <button className="ce-btn ce-btn--secondary ce-btn--sm" onClick={loadStudents}>
+                ↻ Atualizar
+              </button>
+            </div>
+
+            {students.length === 0 ? (
+              <div className="ce-empty" style={{ marginTop: '16px' }}>
+                <p>Nenhum aluno matriculado neste curso ainda.</p>
+              </div>
+            ) : (
+              <table className="admin-table" style={{ marginTop: '16px' }}>
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>E-mail</th>
+                    <th>Progresso</th>
+                    <th>Avaliação</th>
+                    <th>Certificado</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map(s => (
+                    <tr key={s.id}>
+                      <td style={{ fontWeight: 500 }}>{s.nome}</td>
+                      <td style={{ fontSize: '0.9rem' }}>{s.email}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div className="ccard-progress-bar" style={{ width: '90px' }}>
+                            <div className="ccard-progress-fill" style={{ width: `${s.progresso || 0}%` }} />
+                          </div>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{s.progresso || 0}%</span>
+                        </div>
+                      </td>
+                      <td>
+                        {s.tentativas > 0 ? (
+                          <span style={{ color: s.aprovado ? '#166534' : '#991b1b', fontWeight: 600, fontSize: '0.88rem' }}>
+                            {s.aprovado ? `✓ Aprovado (${s.melhor_nota}%)` : `${s.melhor_nota}% (${s.tentativas} tent.)`}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '0.88rem' }}>Não realizada</span>
+                        )}
+                      </td>
+                      <td>
+                        {s.certificado_codigo
+                          ? <code style={{ fontSize: '0.8rem' }}>{s.certificado_codigo}</code>
+                          : <span style={{ color: '#94a3b8', fontSize: '0.88rem' }}>—</span>}
+                      </td>
+                      <td>
+                        <button className="ce-btn ce-btn--danger ce-btn--sm"
+                          onClick={() => handleUnenroll(s)} title="Remover matrícula deste curso">
+                          Desmatricular
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1,20 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
-import { freeCourseIds, staticCourses } from '../data/courses';
+import { staticCourses, normalizeDbCourse } from '../data/courses';
 import { useAuth } from '../contexts/AuthContext';
 import { Badge } from '../components/ui/Badge';
+import { PageLoader } from '../components/ui/PageLoader';
+import { useToast } from '../components/ui/Toast';
 import { mopCourseContent } from '../data/mopCourseContent';
 import { calcLessonStats, quizStatus, isCertEligible, getStaticEnrollments, saveStaticEnrollments } from '../utils/mopProgress';
 import { canAccessInternalCourse } from '../utils/permissions';
+
+const INTERNAL_DENIED_MSG =
+  'Este curso é exclusivo para funcionários autorizados da Conatus. Solicite liberação ao administrador.';
 
 export function CourseDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const toast = useToast();
   const [curso, setCurso] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [restricted, setRestricted] = useState(false);
 
   // MOP progress (only computed when viewing mop-interno)
   const isMopCourse = id === 'mop-interno' || id === '6';
@@ -43,21 +50,23 @@ export function CourseDetails() {
       try {
         const dbCourse = await api.getCurso(id);
         if (dbCourse.erro) {
-          alert('Curso não encontrado');
+          toast.error('Curso não encontrado.');
           navigate('/cursos');
           return;
         }
-        dbCourse.gratuito = freeCourseIds.includes(dbCourse.id);
-        dbCourse.image = `images/courses/${dbCourse.nome}.png`;
-        setCurso(dbCourse);
-      } catch {
-        navigate('/cursos');
+        setCurso(normalizeDbCourse(dbCourse));
+      } catch (err) {
+        if (err.message?.includes('exclusivo')) {
+          setRestricted(true);
+        } else {
+          navigate('/cursos');
+        }
       } finally {
         setLoading(false);
       }
     }
     loadCourse();
-  }, [id, navigate]);
+  }, [id, navigate, toast]);
 
   useEffect(() => {
     if (location.hash === '#matricular' && curso) {
@@ -67,14 +76,14 @@ export function CourseDetails() {
 
   const handleMatricular = async () => {
     if (!user) {
-      alert('Você precisa estar logado para se matricular!');
+      toast.warning('Você precisa estar logado para se matricular.');
       navigate('/login');
       return;
     }
 
     if (curso.tipo === 'interno') {
       if (!canAccessInternalCourse(user)) {
-        alert('Este curso é exclusivo para funcionários autorizados da Conatus. Caso você acredite que deveria ter acesso, entre em contato com o administrador.');
+        toast.error(INTERNAL_DENIED_MSG, 7000);
         return;
       }
       // If already enrolled — go straight to classroom
@@ -82,11 +91,6 @@ export function CourseDetails() {
         navigate(`/cursos/${id}/sala-de-aula`);
         return;
       }
-    }
-
-    if (isFree) {
-      alert('Este curso estará disponível em breve! Fique atento às novidades.');
-      return;
     }
 
     if (curso.id === 'mop-interno' || curso.id === 6) {
@@ -110,15 +114,34 @@ export function CourseDetails() {
 
     try {
       const data = await api.matricular(curso.id);
-      if (data.erro) { alert(data.erro); return; }
-      alert('Matrícula realizada com sucesso!');
-      navigate('/dashboard');
-    } catch {
-      alert('Erro ao realizar matrícula.');
+      if (data.erro) { toast.error(data.erro); return; }
+      toast.success('Matrícula realizada com sucesso! Bons estudos. 🎓');
+      navigate(`/cursos/${curso.id}/sala-de-aula`);
+    } catch (err) {
+      if (err.message?.includes('já está matriculado')) {
+        navigate(`/cursos/${curso.id}/sala-de-aula`);
+        return;
+      }
+      toast.error(err.message || 'Erro ao realizar matrícula. Tente novamente.');
     }
   };
 
-  if (loading || !curso) return <div style={{ padding: '40px', textAlign: 'center' }}>Carregando...</div>;
+  if (loading) return <PageLoader message="Carregando informações do curso..." />;
+
+  if (restricted) {
+    return (
+      <div className="cert-page">
+        <div className="cert-locked">
+          <div className="cert-locked-icon">🔒</div>
+          <h2>Acesso Restrito</h2>
+          <p>{INTERNAL_DENIED_MSG}</p>
+          <Link to="/cursos" className="btn-cert-print">← Voltar ao Catálogo</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!curso) return <PageLoader message="Carregando informações do curso..." />;
 
   const isFree = curso.gratuito;
   const isInternal = curso.tipo === 'interno';
@@ -137,12 +160,33 @@ export function CourseDetails() {
             </div>
 
             <h1>{curso.nome}</h1>
-            <span className="badge-duracao">Duração: {curso.duracao}</span>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+              <span className="badge-duracao">🕐 {curso.duracao}</span>
+              <span className="badge-duracao">📊 {curso.nivel || (isFree ? 'Introdutório' : 'Profissional')}</span>
+              {isMopCourse && (
+                <span className="badge-duracao">📚 {mopCourseContent.modules.length} módulos</span>
+              )}
+              {!isMopCourse && Number(curso.total_modulos) > 0 && (
+                <span className="badge-duracao">📚 {curso.total_modulos} módulos · {curso.total_aulas} aulas</span>
+              )}
+              {curso.categoria && (
+                <span className="badge-duracao">🏷 {curso.categoria}</span>
+              )}
+            </div>
+
             <p>{curso.descricao}</p>
 
-            {isInternal && (
+            {isInternal && canAccess && (
               <div style={{ background: 'rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', marginTop: '15px', borderLeft: '4px solid var(--secondary)' }}>
                 <strong>Acesso Restrito:</strong> {curso.regrasAcesso}
+              </div>
+            )}
+
+            {isInternal && !canAccess && (
+              <div style={{ background: 'rgba(139,0,0,0.35)', padding: '18px', borderRadius: '8px', marginTop: '15px', borderLeft: '4px solid #ffb3b3' }}>
+                <strong>🔒 Acesso Restrito</strong>
+                <p style={{ marginTop: '6px', fontSize: '0.97rem' }}>{INTERNAL_DENIED_MSG}</p>
               </div>
             )}
 
@@ -174,17 +218,23 @@ export function CourseDetails() {
               </div>
             )}
 
-            <button
-              className="btn-matricular"
-              onClick={handleMatricular}
-              style={{ marginTop: '30px' }}
-            >
-              {isMopCourse && isAlreadyEnrolled
-                ? 'Continuar Curso →'
-                : isInternal
-                  ? 'Acessar Curso →'
-                  : 'Matricule-se Agora'}
-            </button>
+            {canAccess ? (
+              <button
+                className="btn-matricular"
+                onClick={handleMatricular}
+                style={{ marginTop: '30px' }}
+              >
+                {isMopCourse && isAlreadyEnrolled
+                  ? 'Continuar Curso →'
+                  : isInternal
+                    ? 'Acessar Curso →'
+                    : 'Matricule-se Agora'}
+              </button>
+            ) : (
+              <Link to="/cursos" className="btn-matricular" style={{ marginTop: '30px', opacity: 0.9 }}>
+                ← Voltar ao Catálogo
+              </Link>
+            )}
           </div>
 
           <img
@@ -197,6 +247,13 @@ export function CourseDetails() {
       </div>
 
       <div className="curso-conteudo">
+        {curso.objetivo && (
+          <div className="curso-section">
+            <h2>Objetivo do Curso</h2>
+            <p>{curso.objetivo}</p>
+          </div>
+        )}
+
         {curso.oque_aprender && (
           <div className="curso-section">
             <h2>O que você vai aprender?</h2>
@@ -204,10 +261,24 @@ export function CourseDetails() {
           </div>
         )}
 
-        {curso.publicoAlvo && (
+        {(curso.publicoAlvo || curso.publico_alvo) && (
           <div className="curso-section">
             <h2>Público-alvo</h2>
-            <p>{curso.publicoAlvo}</p>
+            <p>{curso.publicoAlvo || curso.publico_alvo}</p>
+          </div>
+        )}
+
+        {curso.requisitos && (
+          <div className="curso-section">
+            <h2>Requisitos para Participar</h2>
+            <div style={{ whiteSpace: 'pre-line' }}>{curso.requisitos}</div>
+          </div>
+        )}
+
+        {curso.requisitos_certificado && (
+          <div className="curso-section">
+            <h2>Requisitos para o Certificado</h2>
+            <div style={{ whiteSpace: 'pre-line' }}>{curso.requisitos_certificado}</div>
           </div>
         )}
 

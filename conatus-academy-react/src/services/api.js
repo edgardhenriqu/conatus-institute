@@ -29,6 +29,36 @@ export const api = {
 
   getPerfil: async () => request(`${API_URL}/auth/perfil`),
 
+  // Conteúdo do curso (player)
+  getCursoConteudo: async (cursoId) =>
+    request(`${API_URL}/cursos/${cursoId}/conteudo`),
+
+  salvarProgresso: async (cursoId, aulas) =>
+    request(`${API_URL}/cursos/${cursoId}/progresso`, {
+      method: 'POST',
+      body: JSON.stringify({ aulas }),
+    }),
+
+  // Avaliação final (aluno)
+  getAvaliacaoStatus: async (cursoId) =>
+    request(`${API_URL}/cursos/${cursoId}/avaliacao`),
+
+  iniciarAvaliacao: async (cursoId) =>
+    request(`${API_URL}/cursos/${cursoId}/avaliacao/iniciar`, { method: 'POST' }),
+
+  submeterAvaliacao: async (cursoId, respostas) =>
+    request(`${API_URL}/cursos/${cursoId}/avaliacao/submeter`, {
+      method: 'POST',
+      body: JSON.stringify({ respostas }),
+    }),
+
+  // Certificado (aluno)
+  getCertificado: async (cursoId) =>
+    request(`${API_URL}/cursos/${cursoId}/certificado`),
+
+  emitirCertificado: async (cursoId) =>
+    request(`${API_URL}/cursos/${cursoId}/certificado`, { method: 'POST' }),
+
   // Admin
   getAdminDashboard: async () => request(`${API_URL}/admin/dashboard`),
 

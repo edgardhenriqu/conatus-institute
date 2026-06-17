@@ -21,8 +21,16 @@ app.use("/api/admin", adminRoutes);
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Backend rodando na porta ${PORT}`);
-});
+const ensureSchema = require('./db/ensureSchema');
+const seedMopCourse = require('./db/seedMopCourse');
+
+ensureSchema()
+  .then(() => seedMopCourse())
+  .catch(err => console.error('Aviso: não foi possível atualizar o schema/seed automaticamente:', err.message))
+  .finally(() => {
+    app.listen(PORT, () => {
+      console.log(`Backend rodando na porta ${PORT}`);
+    });
+  });
 
 module.exports = app;

@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
+import { PageLoader } from '../components/ui/PageLoader';
 import { mopQuestions } from '../data/mopQuestions';
 import {
   canTakeQuiz, saveAttempt, quizStatus,
@@ -20,6 +22,319 @@ function shuffle(arr) {
 }
 
 export function CourseQuiz() {
+  const { id } = useParams();
+  const isMop = id === 'mop-interno' || id === '6';
+  return isMop ? <MopQuiz /> : <DbQuiz cursoId={id} />;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   AVALIAÇÃO DE CURSOS DO BANCO (corrigida no servidor)
+   ════════════════════════════════════════════════════════════════ */
+
+function DbQuiz({ cursoId }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [phase, setPhase]       = useState('loading'); // loading | intro | running | result
+  const [status, setStatus]     = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [current, setCurrent]   = useState(0);
+  const [answers, setAnswers]   = useState({});  // questaoId → índice
+  const [result, setResult]     = useState(null);
+  const [error, setError]       = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!user) { navigate('/login'); return; }
+    async function load() {
+      try {
+        const data = await api.getAvaliacaoStatus(cursoId);
+        setStatus(data);
+        setPhase('intro');
+      } catch (err) {
+        setError(err.message || 'Não foi possível carregar a avaliação.');
+        setPhase('intro');
+      }
+    }
+    load();
+  }, [cursoId, user, navigate]);
+
+  async function startQuiz() {
+    try {
+      const data = await api.iniciarAvaliacao(cursoId);
+      if (data.erro) { setError(data.erro); return; }
+      setQuestions(data.questoes || []);
+      setAnswers({});
+      setCurrent(0);
+      setError('');
+      setPhase('running');
+    } catch (err) {
+      setError(err.message || 'Erro ao iniciar a avaliação.');
+    }
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    try {
+      const data = await api.submeterAvaliacao(cursoId, answers);
+      if (data.erro) { setError(data.erro); setPhase('intro'); return; }
+      setResult(data);
+      setPhase('result');
+    } catch (err) {
+      setError(err.message || 'Erro ao enviar respostas.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (phase === 'loading') return <PageLoader message="Carregando avaliação..." />;
+
+  /* ── INTRO ── */
+  if (phase === 'intro') {
+    const semAvaliacao = !status?.existe;
+    const bloqueadaAulas = status?.existe && (status.progresso ?? 0) < 100;
+    const semTentativas = status?.existe && status.restantes === 0 && !status.aprovado;
+
+    return (
+      <div className="quiz-page">
+        <div className="quiz-card">
+          <div className="quiz-header">
+            <Link to={`/cursos/${cursoId}/sala-de-aula`} className="quiz-back">← Voltar ao Curso</Link>
+            <h1>Avaliação Final</h1>
+          </div>
+
+          {error && (
+            <div className="quiz-blocked danger">
+              <span className="blocked-icon">⚠️</span>
+              <div><strong>Não foi possível continuar</strong><p>{error}</p></div>
+            </div>
+          )}
+
+          {semAvaliacao && !error && (
+            <div className="quiz-blocked">
+              <span className="blocked-icon">ℹ️</span>
+              <div>
+                <strong>Este curso não possui avaliação final</strong>
+                <p>O certificado é liberado ao concluir 100% das aulas obrigatórias.</p>
+                <Link to={`/cursos/${cursoId}/sala-de-aula`} className="btn-quiz-secondary">Voltar às aulas</Link>
+              </div>
+            </div>
+          )}
+
+          {status?.existe && (
+            <>
+              {status.tentativas > 0 && (
+                <div className="quiz-history">
+                  <h3>Seu histórico</h3>
+                  <div className="quiz-history-grid">
+                    <div className="quiz-hist-item">
+                      <span className="hist-label">Tentativas realizadas</span>
+                      <span className="hist-value">{status.tentativas} / {status.max_tentativas}</span>
+                    </div>
+                    <div className="quiz-hist-item">
+                      <span className="hist-label">Melhor pontuação</span>
+                      <span className={`hist-value ${status.melhor >= status.nota_minima ? 'pass' : 'fail'}`}>
+                        {status.melhor}%
+                      </span>
+                    </div>
+                    <div className="quiz-hist-item">
+                      <span className="hist-label">Status</span>
+                      <span className={`hist-value ${status.aprovado ? 'pass' : 'fail'}`}>
+                        {status.aprovado ? 'Aprovado' : 'Reprovado'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="quiz-rules">
+                <h3>Regras da Avaliação</h3>
+                <ul>
+                  <li><span className="rule-icon">📋</span><span><strong>{status.num_questoes} perguntas</strong> selecionadas aleatoriamente de um banco com {status.total_questoes_banco} questões</span></li>
+                  <li><span className="rule-icon">✅</span><span>Nota mínima para aprovação: <strong>{status.nota_minima}%</strong></span></li>
+                  <li><span className="rule-icon">🔄</span><span>Máximo de <strong>{status.max_tentativas} tentativas</strong></span></li>
+                  <li><span className="rule-icon">🎓</span><span>Certificado liberado após <strong>100% das aulas</strong> e <strong>aprovação na avaliação</strong></span></li>
+                  <li><span className="rule-icon">🛡️</span><span>A correção é feita pelo servidor — o resultado aparece ao enviar a prova</span></li>
+                </ul>
+              </div>
+
+              {bloqueadaAulas && (
+                <div className="quiz-blocked">
+                  <span className="blocked-icon">🔒</span>
+                  <div>
+                    <strong>Avaliação bloqueada</strong>
+                    <p>Conclua 100% das aulas para liberar. Progresso atual: <strong>{status.progresso}%</strong></p>
+                    <Link to={`/cursos/${cursoId}/sala-de-aula`} className="btn-quiz-secondary">Continuar aulas</Link>
+                  </div>
+                </div>
+              )}
+
+              {semTentativas && (
+                <div className="quiz-blocked danger">
+                  <span className="blocked-icon">⛔</span>
+                  <div>
+                    <strong>Limite de tentativas atingido</strong>
+                    <p>Você esgotou as {status.max_tentativas} tentativas. Entre em contato com o administrador.</p>
+                  </div>
+                </div>
+              )}
+
+              {status.aprovado && (
+                <div className="quiz-blocked success">
+                  <span className="blocked-icon">🏆</span>
+                  <div>
+                    <strong>Você já foi aprovado!</strong>
+                    <p>Pontuação: <strong>{status.melhor}%</strong>.</p>
+                    <Link to={`/cursos/${cursoId}/certificado`} className="btn-quiz-primary">🏆 Ver Certificado</Link>
+                  </div>
+                </div>
+              )}
+
+              {!bloqueadaAulas && !semTentativas && !status.aprovado && (
+                <button className="btn-quiz-start" onClick={startQuiz}>
+                  {status.tentativas === 0
+                    ? 'Iniciar Avaliação'
+                    : `Tentar Novamente (${status.restantes} restantes)`}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── RUNNING ── */
+  if (phase === 'running') {
+    const q = questions[current];
+    if (!q) return null;
+    const selected = answers[q.id];
+    const answered = Object.keys(answers).length;
+    const isLast = current === questions.length - 1;
+
+    return (
+      <div className="quiz-page">
+        <div className="quiz-card quiz-running">
+          <div className="quiz-progress-header">
+            <span className="quiz-counter">Questão {current + 1} de {questions.length}</span>
+            <div className="quiz-progress-bar">
+              <div className="quiz-progress-fill" style={{ width: `${(answered / questions.length) * 100}%` }} />
+            </div>
+          </div>
+
+          <h2 className="quiz-question">{q.enunciado}</h2>
+
+          <div className="quiz-options">
+            {(Array.isArray(q.alternativas) ? q.alternativas : []).map((alt, idx) => (
+              <button key={idx}
+                className={`quiz-option ${selected === idx ? 'correct' : ''}`}
+                onClick={() => setAnswers(a => ({ ...a, [q.id]: idx }))}>
+                <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
+                <span>{alt}</span>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <button className="btn-quiz-secondary" disabled={current === 0}
+              onClick={() => setCurrent(c => c - 1)} style={{ opacity: current === 0 ? 0.4 : 1 }}>
+              ← Anterior
+            </button>
+            {!isLast ? (
+              <button className="btn-quiz-primary" disabled={selected === undefined}
+                onClick={() => setCurrent(c => c + 1)}
+                style={{ opacity: selected === undefined ? 0.5 : 1 }}>
+                Próxima →
+              </button>
+            ) : (
+              <button className="btn-quiz-primary" disabled={answered < questions.length || submitting}
+                onClick={handleSubmit}
+                style={{ opacity: answered < questions.length ? 0.5 : 1, background: 'var(--success)' }}>
+                {submitting ? 'Enviando...' : '✓ Enviar Respostas'}
+              </button>
+            )}
+          </div>
+
+          {isLast && answered < questions.length && (
+            <p style={{ marginTop: '14px', color: 'var(--text-muted)', fontSize: '0.88rem', textAlign: 'center' }}>
+              Responda todas as questões antes de enviar ({answered}/{questions.length} respondidas).
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── RESULT ── */
+  if (phase === 'result' && result) {
+    return (
+      <div className="quiz-page">
+        <div className="quiz-card quiz-result">
+          <div className={`result-badge ${result.aprovado ? 'pass' : 'fail'}`}>
+            {result.aprovado ? '🏆' : '📋'}
+          </div>
+          <h2>{result.aprovado ? 'Parabéns! Você foi aprovado!' : 'Não foi dessa vez.'}</h2>
+          <div className="result-score">
+            <span className={`score-number ${result.aprovado ? 'pass' : 'fail'}`}>{result.nota}%</span>
+            <span className="score-label">{result.acertos} de {result.total} questões corretas</span>
+          </div>
+
+          <div className="result-details">
+            <div className="result-detail-item">
+              <span>Tentativa</span>
+              <strong>{result.tentativas}</strong>
+            </div>
+            <div className="result-detail-item">
+              <span>Nota mínima exigida</span>
+              <strong>{result.nota_minima}%</strong>
+            </div>
+            <div className="result-detail-item">
+              <span>Tentativas restantes</span>
+              <strong>{result.restantes}</strong>
+            </div>
+          </div>
+
+          {result.aprovado && (
+            <div className="result-success-msg">
+              Você concluiu o curso! Seu certificado já pode ser emitido.
+            </div>
+          )}
+          {!result.aprovado && result.restantes > 0 && (
+            <div className="result-fail-msg">
+              Você precisa de pelo menos {result.nota_minima}% para passar. Revise o conteúdo e tente novamente.
+            </div>
+          )}
+          {!result.aprovado && result.restantes === 0 && (
+            <div className="result-fail-msg danger">
+              Você atingiu o limite de tentativas. Entre em contato com o administrador.
+            </div>
+          )}
+
+          <div className="result-actions">
+            {result.aprovado && (
+              <Link to={`/cursos/${cursoId}/certificado`} className="btn-quiz-primary">🏆 Emitir Certificado</Link>
+            )}
+            {!result.aprovado && result.restantes > 0 && (
+              <button className="btn-quiz-start" onClick={startQuiz}>
+                Tentar Novamente ({result.restantes} restantes)
+              </button>
+            )}
+            <Link to="/dashboard" className="btn-quiz-secondary">Ir para o Dashboard</Link>
+            <Link to={`/cursos/${cursoId}/sala-de-aula`} className="btn-quiz-secondary">Revisar Aulas</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   AVALIAÇÃO DO CURSO MOP (estática, localStorage)
+   ════════════════════════════════════════════════════════════════ */
+
+function MopQuiz() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -161,7 +476,7 @@ export function CourseQuiz() {
               <div>
                 <strong>Você já foi aprovado!</strong>
                 <p>Pontuação: <strong>{qs.best}%</strong>. Seu certificado já está disponível.</p>
-                <Link to="/dashboard" className="btn-quiz-primary">Ver Certificado no Dashboard</Link>
+                <Link to="/cursos/mop-interno/certificado" className="btn-quiz-primary">🏆 Ver Certificado</Link>
               </div>
             </div>
           )}
@@ -261,7 +576,7 @@ export function CourseQuiz() {
 
           {result.passed && (
             <div className="result-success-msg">
-              Você concluiu o curso! Acesse o dashboard para emitir seu certificado.
+              Você concluiu o curso! Seu certificado já pode ser emitido.
             </div>
           )}
 
@@ -278,6 +593,11 @@ export function CourseQuiz() {
           )}
 
           <div className="result-actions">
+            {result.passed && (
+              <Link to="/cursos/mop-interno/certificado" className="btn-quiz-primary">
+                🏆 Emitir Certificado
+              </Link>
+            )}
             {!result.passed && newQs.remaining > 0 && (
               <button className="btn-quiz-start" onClick={startQuiz}>
                 Tentar Novamente ({newQs.remaining} restantes)

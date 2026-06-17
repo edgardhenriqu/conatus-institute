@@ -181,7 +181,7 @@ export function Login() {
       const data = await api.login(email, senha);
       if (data.erro) { setError(data.erro); return; }
       login(data.aluno, data.token);
-      navigate(data.aluno.role === 'admin' ? '/admin/dashboard' : '/dashboard');
+      navigate(['admin', 'superadmin'].includes(data.aluno.role) ? '/admin/dashboard' : '/dashboard');
     } catch {
       setError('Não foi possível conectar ao servidor. Tente novamente.');
     } finally {

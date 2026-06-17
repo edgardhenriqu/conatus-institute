@@ -1,9 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
+import { PageLoader } from '../../components/ui/PageLoader';
+
+const EMPTY_STATS = {
+  totalAlunos: 0, totalCursos: 0, totalMatriculas: 0, totalCertificados: 0,
+  cursosPublicados: 0, cursosRascunho: 0, alunosEmAndamento: 0, alunosAprovados: 0,
+};
+
+const SHORTCUTS = [
+  { to: '/admin/cursos',       icon: '➕', title: 'Criar novo curso',   desc: 'Monte um curso completo com módulos, aulas e avaliação' },
+  { to: '/admin/cursos',       icon: '📚', title: 'Gerenciar cursos',   desc: 'Edite, publique, duplique ou desative cursos' },
+  { to: '/admin/alunos',       icon: '👥', title: 'Ver alunos',         desc: 'Gerencie usuários, perfis e permissões de acesso' },
+  { to: '/admin/certificados', icon: '🏆', title: 'Certificados',       desc: 'Consulte e valide certificados emitidos' },
+];
 
 export function AdminDashboard() {
-  const [stats, setStats] = useState({ totalAlunos: 0, totalCursos: 0, totalMatriculas: 0, totalCertificados: 0 });
+  const [stats, setStats] = useState(EMPTY_STATS);
   const [alunos, setAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -16,7 +29,7 @@ export function AdminDashboard() {
         ]);
 
         if (dashboardData && !dashboardData.erro) {
-          setStats(dashboardData);
+          setStats({ ...EMPTY_STATS, ...dashboardData });
         }
 
         if (alunosData && alunosData.alunos) {
@@ -31,48 +44,62 @@ export function AdminDashboard() {
     loadData();
   }, []);
 
-  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Carregando...</div>;
+  if (loading) return <PageLoader message="Carregando painel administrativo..." />;
+
+  const cards = [
+    { value: stats.totalCursos,       label: 'Cursos Cadastrados' },
+    { value: stats.cursosPublicados,  label: 'Cursos Publicados',  color: 'var(--success)' },
+    { value: stats.cursosRascunho,    label: 'Em Rascunho',        color: '#b45309' },
+    { value: stats.totalAlunos,       label: 'Alunos Cadastrados' },
+    { value: stats.totalMatriculas,   label: 'Matrículas' },
+    { value: stats.alunosEmAndamento, label: 'Alunos em Andamento', color: 'var(--info)' },
+    { value: stats.alunosAprovados,   label: 'Alunos Aprovados',   color: 'var(--success)' },
+    { value: stats.totalCertificados, label: 'Certificados Emitidos', color: 'var(--gold)' },
+  ];
 
   return (
     <div className="admin-body">
       <div className="admin-container">
-        
+
         <header className="admin-header">
           <h1>Painel Administrativo</h1>
           <p>Visão geral da plataforma Conatus Institute</p>
         </header>
 
-        <nav className="admin-nav">
-          <Link to="/admin/dashboard" className="active">Dashboard</Link>
-          <Link to="/admin/alunos">Alunos</Link>
-          <Link to="/admin/cursos">Cursos</Link>
-          <Link to="/admin/certificados">Certificados</Link>
-        </nav>
-
         <div className="admin-stats">
-          <div className="admin-stat-card">
-            <h3>{stats.totalAlunos}</h3>
-            <p>Alunos Ativos</p>
-          </div>
-          <div className="admin-stat-card">
-            <h3>{stats.totalCursos}</h3>
-            <p>Cursos Publicados</p>
-          </div>
-          <div className="admin-stat-card">
-            <h3>{stats.totalMatriculas}</h3>
-            <p>Matrículas Realizadas</p>
-          </div>
-          <div className="admin-stat-card">
-            <h3 style={{ color: 'var(--success)' }}>{stats.totalCertificados}</h3>
-            <p>Certificados Emitidos</p>
+          {cards.map((c, i) => (
+            <div className="admin-stat-card" key={i}>
+              <h3 style={c.color ? { color: c.color } : undefined}>{c.value}</h3>
+              <p>{c.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Atalhos */}
+        <div className="next-steps" style={{ marginBottom: '30px' }}>
+          <h2>⚡ Atalhos</h2>
+          <div className="next-steps-list">
+            {SHORTCUTS.map((s, i) => (
+              <Link key={i} to={s.to} className="next-step-item">
+                <span className="next-step-icon">{s.icon}</span>
+                <span>
+                  <strong>{s.title}</strong>
+                  <p>{s.desc}</p>
+                </span>
+                <span className="next-step-arrow">→</span>
+              </Link>
+            ))}
           </div>
         </div>
 
         <div className="admin-table-container">
           <div className="admin-table-header">
             <h2>Alunos Recentes</h2>
+            <Link to="/admin/alunos" style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '0.9rem' }}>
+              Ver todos →
+            </Link>
           </div>
-          
+
           <table className="admin-table">
             <thead>
               <tr>

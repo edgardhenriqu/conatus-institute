@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
+import { adminApi } from '../../services/adminApi';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import { ROLE_LABELS, ROLE_COLORS } from '../../utils/permissions';
 
 const ROLE_OPTIONS = [
@@ -37,6 +40,8 @@ function emptyForm(aluno = null) {
 }
 
 export function AdminAlunos() {
+  const toast = useToast();
+  const { isSuperAdmin } = useAuth();
   const [alunos, setAlunos]                 = useState([]);
   const [loading, setLoading]               = useState(true);
   const [busca, setBusca]                   = useState('');
@@ -76,17 +81,19 @@ export function AdminAlunos() {
         setMensagem('');
       }
     } catch {
-      alert('Erro ao buscar detalhes do aluno.');
+      toast.error('Erro ao buscar detalhes do aluno.');
     }
   }
 
   async function handleSalvar(e) {
     e.preventDefault();
     try {
-      const payload = {
-        ...formData,
-        role: formData.role || 'aluno', // garante que role sempre é enviado
-      };
+      const payload = { ...formData };
+      if (isSuperAdmin) {
+        payload.role = formData.role || 'aluno';
+      } else {
+        delete payload.role; // admin comum não pode alterar cargos
+      }
       const data = await api.updateAdminAluno(alunoSelecionado.id, payload);
       if (data.erro) {
         setMensagem({ tipo: 'erro', texto: data.erro });
@@ -103,15 +110,32 @@ export function AdminAlunos() {
   }
 
   async function handleExcluir(id) {
-    if (!confirm('Tem certeza que deseja excluir este aluno?')) return;
+    if (!confirm('Tem certeza que deseja excluir este aluno? Esta ação não pode ser desfeita.')) return;
     try {
       const data = await api.deleteAdminAluno(id);
-      if (data.erro) { alert(data.erro); return; }
-      alert('Aluno excluído com sucesso!');
+      if (data.erro) { toast.error(data.erro); return; }
+      toast.success('Aluno excluído com sucesso.');
       setAlunoSelecionado(null);
       await carregarAlunos(busca);
     } catch {
-      alert('Erro ao excluir aluno.');
+      toast.error('Erro ao excluir aluno.');
+    }
+  }
+
+  async function handleDesmatricular(matricula) {
+    if (!confirm(
+      `Desmatricular ${alunoSelecionado.nome} do curso "${matricula.curso_nome}"?\n\n` +
+      'O progresso das aulas e as tentativas de avaliação serão apagados. ' +
+      'Certificados já emitidos são mantidos.'
+    )) return;
+    try {
+      const data = await adminApi.unenrollStudent(matricula.curso_id, alunoSelecionado.id);
+      if (data.erro) { toast.error(data.erro); return; }
+      toast.success('Aluno desmatriculado do curso.');
+      await handleVerDetalhes(alunoSelecionado.id, editando);
+      await carregarAlunos(busca);
+    } catch (err) {
+      toast.error(err.message || 'Erro ao desmatricular aluno.');
     }
   }
 
@@ -239,13 +263,18 @@ export function AdminAlunos() {
                   <div>
                     <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Perfil / Função</label>
                     <select value={formData.role || 'aluno'}
-                      disabled={!editando} style={inputStyle(editando)}
+                      disabled={!editando || !isSuperAdmin}
+                      style={inputStyle(editando && isSuperAdmin)}
                       onChange={e => setFormData({ ...formData, role: e.target.value })}>
                       {ROLE_OPTIONS.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
-                    {!editando && (
+                    {!isSuperAdmin ? (
+                      <p style={{ fontSize: '0.8rem', color: '#b91c1c', marginTop: '6px' }}>
+                        Apenas o Super Administrador pode alterar o cargo dos usuários.
+                      </p>
+                    ) : !editando && (
                       <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
                         Clique em "Editar" para alterar o perfil.
                       </p>
@@ -255,11 +284,11 @@ export function AdminAlunos() {
                     <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Acesso ao Curso Interno (MOP)</label>
                     <div style={{
                       padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border)',
-                      background: (formData.role === 'admin' || formData.role === 'conatus_employee') ? '#d1fae5' : '#f3f4f6',
-                      color: (formData.role === 'admin' || formData.role === 'conatus_employee') ? '#065f46' : '#9ca3af',
+                      background: ['admin', 'superadmin', 'conatus_employee'].includes(formData.role) ? '#d1fae5' : '#f3f4f6',
+                      color: ['admin', 'superadmin', 'conatus_employee'].includes(formData.role) ? '#065f46' : '#9ca3af',
                       fontWeight: 600, fontSize: '0.9rem',
                     }}>
-                      {(formData.role === 'admin' || formData.role === 'conatus_employee')
+                      {['admin', 'superadmin', 'conatus_employee'].includes(formData.role)
                         ? '✓ Autorizado'
                         : '✗ Sem acesso'}
                     </div>
@@ -285,10 +314,19 @@ export function AdminAlunos() {
                             padding: '8px 14px', background: '#f9fafb',
                             borderRadius: '6px', border: '1px solid var(--border)',
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            gap: '12px', flexWrap: 'wrap',
                           }}>
                             <span>{m.curso_nome}</span>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                              {m.progresso || 0}% concluído
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                {m.progresso || 0}% concluído
+                              </span>
+                              <button type="button" className="admin-btn admin-btn-delete"
+                                style={{ margin: 0 }}
+                                onClick={() => handleDesmatricular(m)}
+                                title="Remover matrícula deste curso">
+                                Desmatricular
+                              </button>
                             </span>
                           </div>
                         ))}

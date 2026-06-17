@@ -129,7 +129,7 @@ router.post('/login', async (req, res) => {
 router.get('/perfil', authMiddleware, async (req, res) => {
   try {
     const resultado = await pool.query(
-      'SELECT id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, created_at FROM alunos WHERE id = $1',
+      'SELECT id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, role, created_at FROM alunos WHERE id = $1',
       [req.alunoId]
     );
 

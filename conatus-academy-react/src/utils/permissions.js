@@ -4,38 +4,46 @@
  */
 
 export const ROLES = {
-  ALUNO:    'aluno',
-  EMPLOYEE: 'conatus_employee',
-  ADMIN:    'admin',
+  ALUNO:      'aluno',
+  EMPLOYEE:   'conatus_employee',
+  ADMIN:      'admin',
+  SUPERADMIN: 'superadmin',
 };
 
 export const ROLE_LABELS = {
   aluno:             'Aluno',
   conatus_employee:  'Funcionário Conatus',
   admin:             'Administrador',
+  superadmin:        'Super Administrador',
 };
 
 export const ROLE_COLORS = {
   aluno:             '#6c757d',
   conatus_employee:  '#0d6efd',
   admin:             '#7c3aed',
+  superadmin:        '#b91c1c',
 };
 
-export const VALID_ROLES = [ROLES.ALUNO, ROLES.EMPLOYEE, ROLES.ADMIN];
+export const VALID_ROLES = [ROLES.ALUNO, ROLES.EMPLOYEE, ROLES.ADMIN, ROLES.SUPERADMIN];
 
 /** Retorna true se o usuário pode acessar cursos internos (MOP). */
 export function canAccessInternalCourse(user) {
   if (!user) return false;
   return (
-    user.role === ROLES.ADMIN ||
+    isAdmin(user) ||
     user.role === ROLES.EMPLOYEE ||
     Boolean(user.email?.includes('@conatus'))  // compatibilidade retroativa
   );
 }
 
-/** True apenas para administradores. */
+/** True para administradores (inclui o superadmin). */
 export function isAdmin(user) {
-  return user?.role === ROLES.ADMIN;
+  return user?.role === ROLES.ADMIN || user?.role === ROLES.SUPERADMIN;
+}
+
+/** True apenas para o superadmin — único que pode alterar cargos e gerenciar admins. */
+export function isSuperAdmin(user) {
+  return user?.role === ROLES.SUPERADMIN;
 }
 
 /** True para funcionários Conatus (role ou email @conatus). */

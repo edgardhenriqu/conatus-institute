@@ -20,6 +20,7 @@ const LESSON_KEY     = () => `conatus_mop_lessons_${_uid}`;
 const QUIZ_KEY       = () => `conatus_mop_quiz_${_uid}`;
 const TOTAL_KEY      = () => `conatus_mop_total_${_uid}`;
 const ENROLLMENT_KEY = () => `staticEnrollments_${_uid}`;
+const CERT_KEY       = () => `conatus_mop_cert_${_uid}`;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -126,6 +127,27 @@ export function certBlockReason(lessonPct) {
   if (lessonPct < 100)       return `Conclua 100% das aulas (${lessonPct}% concluídas).`;
   if (!quizStatus().passed)  return 'Atingir mínimo de 80% na avaliação final.';
   return null;
+}
+
+/**
+ * Retorna o registro do certificado emitido { code, issuedAt, score }.
+ * Emite (gera código e data) na primeira chamada com elegibilidade válida.
+ */
+export function getOrIssueCertificate(lessonPct) {
+  if (!isCertEligible(lessonPct)) return null;
+  const existing = load(CERT_KEY(), null);
+  if (existing?.code) return existing;
+
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const cert = {
+    code: `CNT-MOP-${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}`,
+    issuedAt: new Date().toISOString(),
+    score: quizStatus().best,
+  };
+  save(CERT_KEY(), cert);
+  return cert;
 }
 
 // ── reset ────────────────────────────────────────────────────────────────────

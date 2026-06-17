@@ -58,5 +58,9 @@
     --radius-sm: 4px;
     --radius: 8px;
     --radius-lg: 12px;
+    --radius-xl: 16px;
     --radius-round: 50%;
+
+    /* Focus ring (acessibilidade) */
+    --focus-ring: 0 0 0 3px rgba(0, 74, 153, 0.25);
 }

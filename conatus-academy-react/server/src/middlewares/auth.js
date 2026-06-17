@@ -20,6 +20,8 @@ function authMiddleware(req, res, next) {
   }
 }
 
+const ADMIN_ROLES = ['admin', 'superadmin'];
+
 async function adminMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
 
@@ -31,11 +33,8 @@ async function adminMiddleware(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.alunoId = decoded.id;
 
-    if (decoded.role === 'admin') {
-      req.userRole = decoded.role;
-      return next();
-    }
-
+    // Sempre confere o role no banco: o token pode estar desatualizado
+    // (promoção a superadmin ou rebaixamento devem valer de imediato)
     const resultado = await pool.query(
       'SELECT role FROM alunos WHERE id = $1',
       [decoded.id]
@@ -45,15 +44,15 @@ async function adminMiddleware(req, res, next) {
       return res.status(404).json({ erro: 'Usuário não encontrado' });
     }
 
-    if (resultado.rows[0].role !== 'admin') {
+    if (!ADMIN_ROLES.includes(resultado.rows[0].role)) {
       return res.status(403).json({ erro: 'Acesso negado. Apenas administradores podem acessar esta rota.' });
     }
 
-    req.userRole = 'admin';
+    req.userRole = resultado.rows[0].role;
     next();
   } catch {
     return res.status(401).json({ erro: 'Token inválido ou expirado' });
   }
 }
 
-module.exports = { authMiddleware, adminMiddleware };
+module.exports = { authMiddleware, adminMiddleware, ADMIN_ROLES };

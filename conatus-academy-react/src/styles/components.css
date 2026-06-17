@@ -1,0 +1,807 @@
+/* ============================================
+   CONATUS INSTITUTE — Componentes v2
+   (toast, loader, cards, catálogo, certificado,
+   próximas etapas, banco de questões)
+   ============================================ */
+
+/* ---- Focus visible (acessibilidade) ---- */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   TOAST NOTIFICATIONS
+   ============================================ */
+
+.toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: min(420px, calc(100vw - 32px));
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--info);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 14px 16px;
+    cursor: pointer;
+    animation: toastIn 0.3s ease;
+}
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.toast-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: var(--radius-round);
+    color: white;
+    background: var(--info);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.toast-success { border-left-color: var(--success); }
+.toast-success .toast-icon { background: var(--success); }
+.toast-error { border-left-color: var(--danger); }
+.toast-error .toast-icon { background: var(--danger); }
+.toast-warning { border-left-color: var(--warning); }
+.toast-warning .toast-icon { background: var(--warning); color: #5c4500; }
+
+.toast-message {
+    flex: 1;
+    font-size: 0.92rem;
+    color: var(--text-main);
+    line-height: 1.45;
+}
+
+.toast-close {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0 2px;
+}
+
+/* ============================================
+   PAGE LOADER
+   ============================================ */
+
+.page-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 80px 20px;
+    color: var(--text-muted);
+    min-height: 40vh;
+}
+
+.page-loader-spinner {
+    width: 42px;
+    height: 42px;
+    border: 4px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: var(--radius-round);
+    animation: loaderSpin 0.8s linear infinite;
+}
+
+@keyframes loaderSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   COURSE CARD v2 (.ccard)
+   ============================================ */
+
+.ccard-image-link { display: block; }
+
+.ccard-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.ccard-badges .badge { margin-bottom: 0; }
+
+.ccard-status {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ccard-status.progress {
+    background: #e3f2fd;
+    color: #0d47a1;
+}
+
+.ccard-status.done {
+    background: var(--success-light);
+    color: #155724;
+}
+
+.ccard h3 a {
+    color: var(--primary);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+.ccard h3 a:hover { color: var(--primary-light); }
+
+.ccard-desc {
+    font-size: 0.92rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+
+.ccard-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 10px 0;
+    margin-top: auto;
+    border-top: 1px solid var(--bg-light);
+}
+
+.ccard-meta-item {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ccard-progress { margin-bottom: 4px; }
+
+.ccard-progress-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.ccard-progress-labels strong { color: var(--primary); }
+
+.ccard-progress-bar {
+    height: 7px;
+    background: var(--bg-light);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.ccard-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), var(--gold-hover));
+    border-radius: var(--radius-sm);
+    transition: width 0.8s ease;
+}
+
+/* ============================================
+   CATALOG SECTIONS (Courses page)
+   ============================================ */
+
+.catalog-section {
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.catalog-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 14px;
+    margin-bottom: 28px;
+}
+
+.catalog-section-head h2 {
+    font-size: 1.7rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.catalog-section-head .catalog-count {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.catalog-empty {
+    background: white;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.catalog-internal-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #fff8e6;
+    border: 1px solid #f0d98c;
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-size: 0.92rem;
+    color: #6b5800;
+}
+
+/* ---- Dashboard: linha de 4 stats ---- */
+.stats-row-4 { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 992px) {
+    .stats-row-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+    .stats-row-4 { grid-template-columns: 1fr; }
+}
+
+/* ============================================
+   DASHBOARD — Próximas etapas
+   ============================================ */
+
+.next-steps {
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    padding: 24px 28px;
+    margin-bottom: 30px;
+}
+
+.next-steps h2 {
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.next-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.next-step-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: var(--bg-light);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: inherit;
+    transition: all var(--transition-fast);
+}
+
+.next-step-item:hover {
+    border-color: var(--primary);
+    transform: translateX(4px);
+}
+
+.next-step-icon { font-size: 1.3rem; flex-shrink: 0; }
+
+.next-step-item strong {
+    display: block;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.next-step-item p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.next-step-arrow {
+    margin-left: auto;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+/* ============================================
+   CERTIFICATE PAGE
+   ============================================ */
+
+.cert-page {
+    background: var(--bg-light);
+    min-height: calc(100vh - var(--navbar-height));
+    padding: 40px 20px 70px;
+}
+
+.cert-toolbar {
+    max-width: 1000px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.cert-toolbar-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-cert-print {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--primary);
+    color: white;
+    padding: 12px 26px;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.btn-cert-print:hover { background: var(--primary-light); transform: translateY(-1px); }
+
+.btn-cert-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.92rem;
+    text-decoration: none;
+}
+
+.btn-cert-back:hover { color: var(--primary); }
+
+/* O certificado em si */
+.certificate {
+    max-width: 1000px;
+    margin: 0 auto;
+    background: white;
+    border: 14px double var(--gold);
+    border-radius: 6px;
+    padding: clamp(30px, 6vw, 70px);
+    box-shadow: var(--shadow-xl);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.certificate::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 12% 18%, rgba(212, 175, 55, 0.07), transparent 32%),
+        radial-gradient(circle at 88% 84%, rgba(0, 51, 102, 0.06), transparent 32%);
+    pointer-events: none;
+}
+
+.cert-brand {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: var(--primary);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.cert-brand-sub {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 36px;
+}
+
+.cert-title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+    color: var(--gold);
+    margin-bottom: 26px;
+    font-weight: 900;
+}
+
+.cert-lead {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.cert-student {
+    font-family: var(--font-heading);
+    font-size: clamp(1.6rem, 4vw, 2.3rem);
+    color: var(--primary);
+    margin: 8px 0 22px;
+    border-bottom: 2px solid var(--gold);
+    display: inline-block;
+    padding: 0 30px 8px;
+}
+
+.cert-course {
+    font-size: 1.15rem;
+    color: var(--text-main);
+    max-width: 700px;
+    margin: 0 auto 30px;
+    line-height: 1.6;
+}
+
+.cert-course strong { color: var(--primary); }
+
+.cert-details {
+    display: flex;
+    justify-content: center;
+    gap: clamp(20px, 5vw, 60px);
+    flex-wrap: wrap;
+    margin-bottom: 36px;
+}
+
+.cert-detail span {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.cert-detail strong {
+    font-size: 1.05rem;
+    color: var(--text-main);
+}
+
+.cert-signatures {
+    display: flex;
+    justify-content: center;
+    gap: clamp(40px, 9vw, 120px);
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+}
+
+.cert-signature {
+    border-top: 1px solid var(--text-main);
+    padding-top: 8px;
+    min-width: 220px;
+}
+
+.cert-signature strong {
+    display: block;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.cert-signature span {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.cert-validation {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+}
+
+.cert-validation code {
+    background: var(--bg-light);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: 1px;
+}
+
+/* Certificado bloqueado */
+.cert-locked {
+    max-width: 560px;
+    margin: 60px auto;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 48px 40px;
+    text-align: center;
+}
+
+.cert-locked-icon { font-size: 3rem; margin-bottom: 16px; }
+
+.cert-locked h2 { margin-bottom: 12px; font-size: 1.5rem; }
+
+.cert-locked p {
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+
+.cert-locked-reqs {
+    text-align: left;
+    background: var(--bg-light);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin: 20px 0 28px;
+    list-style: none;
+}
+
+.cert-locked-reqs li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 0.95rem;
+}
+
+.cert-locked-reqs li.ok { color: #155724; }
+.cert-locked-reqs li.pend { color: var(--text-muted); }
+
+/* Impressão direta (Ctrl+P): só o certificado.
+   O botão "Imprimir / Salvar em PDF" usa um iframe isolado (ver Certificate.jsx),
+   este bloco é o fallback para impressão manual da página. */
+@media print {
+    @page { size: A4 landscape; margin: 8mm; }
+
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    body * { visibility: hidden; }
+    .certificate, .certificate * { visibility: visible; }
+
+    .certificate {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        margin: 0;
+        box-shadow: none;
+        border-width: 8px;
+        max-width: 100%;
+        page-break-inside: avoid;
+    }
+
+    .navbar, .footer, .cert-toolbar, .toast-container { display: none !important; }
+}
+
+/* ============================================
+   EMPTY STATE genérico
+   ============================================ */
+
+.empty-state {
+    background: white;
+    padding: 40px;
+    text-align: center;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.empty-state p {
+    color: var(--text-muted);
+    margin-bottom: 15px;
+}
+
+/* ============================================
+   ADMIN — Banco de Questões
+   ============================================ */
+
+.qbank-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.qbank-item {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+}
+
+.qbank-item-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 10px;
+}
+
+.qbank-question {
+    font-weight: 600;
+    color: var(--text-main);
+    font-size: 0.98rem;
+    line-height: 1.5;
+}
+
+.qbank-number {
+    flex-shrink: 0;
+    background: var(--primary);
+    color: white;
+    border-radius: var(--radius-round);
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.qbank-alternatives { margin: 8px 0; }
+
+.qbank-alt {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 5px 10px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+}
+
+.qbank-alt.correct {
+    background: var(--success-light);
+    color: #155724;
+    font-weight: 600;
+}
+
+.qbank-explanation {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background: var(--bg-light);
+    border-left: 3px solid var(--gold);
+    padding: 10px 14px;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    margin-top: 8px;
+}
+
+/* ============================================
+   QUILL EDITOR (admin — conteúdo da aula)
+   ============================================ */
+
+.quill-editor {
+    background: white;
+    border-radius: var(--radius-sm);
+}
+
+.quill-editor .ql-toolbar {
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: #f8fafc;
+}
+
+/* O texto rola dentro da caixa em vez de vazar por baixo */
+.quill-editor .ql-container {
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    min-height: 220px;
+    max-height: 46vh;
+    overflow-y: auto;
+    font-size: 1rem;
+    font-family: var(--font-body);
+}
+
+.quill-editor .ql-editor {
+    min-height: 220px;
+}
+
+.quill-editor .ql-editor img {
+    max-width: 100%;
+}
+
+/* ============================================
+   PLAYER — vídeo e materiais dentro do cartão da aula
+   ============================================ */
+
+.lesson-video {
+    position: relative;
+    padding-top: 56.25%;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #000;
+    margin-bottom: 20px;
+}
+
+.lesson-video iframe,
+.lesson-video video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.lesson-material-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: white;
+    color: var(--primary);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: all var(--transition);
+    margin-bottom: 20px;
+}
+
+.lesson-material-link:hover {
+    border-color: var(--primary);
+    background: var(--bg-light);
+}
+
+/* Conteúdos largos (tabelas, iframes, imagens) não vazam do cartão */
+.lesson-content {
+    overflow-x: auto;
+    overflow-wrap: break-word;
+}
+
+.lesson-content iframe,
+.lesson-content video {
+    max-width: 100%;
+}
+
+/* ============================================
+   RESPONSIVE EXTRAS
+   ============================================ */
+
+@media (max-width: 768px) {
+    .catalog-section { padding: 28px 16px; }
+    .catalog-section-head h2 { font-size: 1.35rem; }
+    .cert-toolbar { justify-content: center; }
+    .cert-signatures { gap: 30px; }
+    .viewer-nav-footer { flex-wrap: wrap; justify-content: center; }
+    .viewer-title-row { flex-direction: column; }
+    .admin-layout { flex-direction: column; }
+    .admin-sidebar { width: 100%; flex-direction: row; align-items: center; flex-wrap: wrap; padding: 14px 16px; }
+    .admin-sidebar .admin-nav { flex-direction: row; flex-wrap: wrap; }
+    .admin-brand { margin: 0; padding: 0; border: none; }
+    .admin-main { padding: 18px 14px; }
+    .toast-container { bottom: 14px; right: 14px; left: 14px; }
+}
