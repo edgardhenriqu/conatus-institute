@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
+import { CaptchaVerification } from './CaptchaVerification';
 
 const UF_OPTIONS = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA',
@@ -114,6 +115,10 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
 
+  /* CAPTCHA step — ticket de pré-autenticação enquanto o login fica pendente.
+     Guardado apenas em memória (nunca em storage). */
+  const [pendingTicket, setPendingTicket] = useState(null);
+
   /* Register state */
   const [cep, setCep] = useState('');
   const [regData, setRegData] = useState({
@@ -168,6 +173,12 @@ export function Login() {
     setTimeout(() => enderecoRef.current?.focus(), 50);
   };
 
+  /* Conclui a sessão e redireciona conforme o papel do usuário. */
+  const finishLogin = (data) => {
+    login(data.aluno, data.token);
+    navigate(['admin', 'superadmin'].includes(data.aluno.role) ? '/admin/dashboard' : '/dashboard');
+  };
+
   /* ── Login submit ───────────────────────────────────────────── */
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -180,13 +191,27 @@ export function Login() {
     try {
       const data = await api.login(email, senha);
       if (data.erro) { setError(data.erro); return; }
-      login(data.aluno, data.token);
-      navigate(['admin', 'superadmin'].includes(data.aluno.role) ? '/admin/dashboard' : '/dashboard');
+      // Credenciais corretas: o backend NÃO libera o acesso ainda — exige a
+      // verificação antirrobô. Guardamos o ticket e mostramos a etapa do CAPTCHA.
+      if (data.captchaRequired && data.ticket) {
+        setPendingTicket(data.ticket);
+        return;
+      }
+      // Fallback (compatibilidade): caso o backend já devolva token/aluno direto.
+      if (data.token && data.aluno) finishLogin(data);
     } catch {
       setError('Não foi possível conectar ao servidor. Tente novamente.');
     } finally {
       setLoading(false);
     }
+  };
+
+  /* Volta da etapa de CAPTCHA para o login (cancelar / esgotar tentativas). */
+  const handleCaptchaCancel = (msg) => {
+    setPendingTicket(null);
+    setSenha('');
+    setLoading(false);
+    if (msg) setError(msg);
   };
 
   /* ── Register submit ────────────────────────────────────────── */
@@ -264,7 +289,16 @@ export function Login() {
 
         {/* Card */}
         <div className="auth-card">
-          {isLogin ? (
+          {pendingTicket ? (
+
+            /* ── VERIFICAÇÃO ANTIRROBÔ (CAPTCHA) ──────────────── */
+            <CaptchaVerification
+              ticket={pendingTicket}
+              onSuccess={finishLogin}
+              onCancel={handleCaptchaCancel}
+            />
+
+          ) : isLogin ? (
 
             /* ── LOGIN ────────────────────────────────────────── */
             <div className="auth-form-section">

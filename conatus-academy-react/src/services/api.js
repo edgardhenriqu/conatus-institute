@@ -16,6 +16,16 @@ export const api = {
     });
   },
 
+  // CAPTCHA — gera uma nova imagem de verificação (id opaco + SVG).
+  getCaptcha: async () => request(`${API_URL}/auth/captcha`),
+
+  // CAPTCHA — conclui o login pendente após a verificação antirrobô.
+  verifyCaptcha: async (ticket, captchaId, texto) =>
+    request(`${API_URL}/auth/verificar-captcha`, {
+      method: 'POST',
+      body: JSON.stringify({ ticket, captchaId, texto }),
+    }),
+
   // Cursos
   getCursos: async () => request(`${API_URL}/cursos`),
 

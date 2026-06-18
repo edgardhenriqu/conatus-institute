@@ -1497,6 +1497,60 @@ input, textarea, select {
     border-radius: 2px;
 }
 
+/* ── CAPTCHA (verificação antirrobô) ─────────────────── */
+.captcha-image-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 86px;
+    padding: 8px;
+    margin-bottom: 10px;
+    background: #f1f4f8;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    user-select: none;
+}
+.captcha-image { line-height: 0; }
+.captcha-image svg {
+    display: block;
+    width: 200px;
+    height: 70px;
+    max-width: 100%;
+}
+
+.captcha-refresh-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 18px;
+}
+.captcha-refresh-link {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 2px 4px;
+    transition: color var(--transition-fast);
+}
+.captcha-refresh-link:hover:not(:disabled) { color: var(--primary-light); }
+.captcha-refresh-link:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Campo do código: monoespaçado e com letras espaçadas para leitura clara. */
+.captcha-input-field {
+    text-align: center;
+    letter-spacing: 6px;
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.captcha-input-field::placeholder {
+    letter-spacing: normal;
+    font-weight: 400;
+    text-transform: none;
+}
+
 /* Footer note */
 .auth-footer-note {
     margin-top: 24px;

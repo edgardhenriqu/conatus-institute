@@ -3,11 +3,34 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../../db/connection');
 const { authMiddleware } = require('../middlewares/auth');
+const { createCaptcha } = require('../captcha/svgCaptcha');
+const captchaStore = require('../captcha/captchaStore');
 
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+
+/*
+ * Segredo do "ticket de pré-autenticação".
+ *
+ * Após validar e-mail/senha, o servidor NÃO entrega o token de acesso real:
+ * entrega um ticket de curta duração que apenas comprova que as credenciais
+ * passaram e que falta a verificação antirrobô (CAPTCHA).
+ *
+ * O ticket é assinado com um segredo DERIVADO (diferente do JWT_SECRET). Assim,
+ * o authMiddleware — que valida com JWT_SECRET — rejeita o ticket caso alguém
+ * tente usá-lo como token de acesso. O login fica pendente até o CAPTCHA passar.
+ */
+const PREAUTH_SECRET = (JWT_SECRET || '') + '::preauth';
+const PREAUTH_EXPIRES_IN = '5m'; // tempo para concluir a verificação
+
+/** Emite o token de acesso definitivo a partir do registro do aluno. */
+function emitirTokenAcesso(aluno) {
+  const token = jwt.sign({ id: aluno.id, role: aluno.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const { senha: _ignore, ...alunoSemSenha } = aluno;
+  return { aluno: alunoSemSenha, token };
+}
 
 function isValidCpf(cpf) {
   const n = cpf.replace(/\D/g, '');
@@ -117,11 +140,90 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ erro: 'Conta desativada. Entre em contato com o administrador.' });
     }
 
-    const token = jwt.sign({ id: aluno.id, role: aluno.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-    const { senha: _, ...alunoSemSenha } = aluno;
-    res.json({ aluno: alunoSemSenha, token });
+    // Credenciais OK, mas o acesso ainda NÃO é liberado: o usuário precisa passar
+    // pela verificação antirrobô (CAPTCHA). Devolvemos apenas um ticket de
+    // pré-autenticação de curta duração — sem token de acesso e sem dados sensíveis.
+    const ticket = jwt.sign(
+      { id: aluno.id, scope: 'preauth' },
+      PREAUTH_SECRET,
+      { expiresIn: PREAUTH_EXPIRES_IN }
+    );
+    res.json({ captchaRequired: true, ticket });
   } catch (error) {
     console.error('Erro ao fazer login:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+/*
+ * GET /api/auth/captcha
+ * Gera uma nova imagem de verificação (SVG) e devolve:
+ *  - captchaId: identificador opaco do desafio (a resposta fica só no servidor);
+ *  - image: o SVG da imagem para exibir ao usuário.
+ * Usado tanto na primeira exibição quanto no botão "Gerar nova imagem".
+ */
+router.get('/captcha', (req, res) => {
+  try {
+    const { text, image } = createCaptcha(5);
+    const captchaId = captchaStore.save(text); // guarda a resposta no servidor
+    res.json({ captchaId, image });
+  } catch (error) {
+    console.error('Erro ao gerar captcha:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+/*
+ * POST /api/auth/verificar-captcha
+ * Conclui o login pendente. Espera no corpo:
+ *  - ticket: ticket de pré-autenticação recebido em /login;
+ *  - captchaId: id do desafio exibido;
+ *  - texto: o que o usuário digitou.
+ *
+ * Só após o CAPTCHA correto o token de acesso definitivo é emitido. A validação
+ * acontece inteiramente no backend.
+ */
+router.post('/verificar-captcha', async (req, res) => {
+  try {
+    const { ticket, captchaId, texto } = req.body;
+
+    if (!ticket || !captchaId || texto === undefined) {
+      return res.status(400).json({ erro: 'Dados de verificação incompletos.' });
+    }
+
+    // 1) Valida o ticket de pré-autenticação (assinatura, expiração e escopo).
+    let payload;
+    try {
+      payload = jwt.verify(ticket, PREAUTH_SECRET);
+    } catch {
+      return res.status(401).json({ erro: 'Sessão de login expirada. Faça login novamente.', restart: true });
+    }
+    if (payload.scope !== 'preauth') {
+      return res.status(401).json({ erro: 'Sessão de login inválida. Faça login novamente.', restart: true });
+    }
+
+    // 2) Confere o CAPTCHA no servidor (uso único — consome o desafio).
+    const resultado = captchaStore.verifyAndConsume(captchaId, texto);
+    if (!resultado.ok) {
+      const msg = resultado.reason === 'not_found'
+        ? 'A imagem de verificação expirou. Gere uma nova imagem e tente outra vez.'
+        : 'Código incorreto. Verifique a imagem e tente novamente.';
+      return res.status(400).json({ erro: msg });
+    }
+
+    // 3) CAPTCHA correto: recarrega o aluno e libera o token de acesso definitivo.
+    const dbRes = await pool.query('SELECT * FROM alunos WHERE id = $1', [payload.id]);
+    if (dbRes.rows.length === 0) {
+      return res.status(404).json({ erro: 'Usuário não encontrado.' });
+    }
+    const aluno = dbRes.rows[0];
+    if (!aluno.ativo) {
+      return res.status(403).json({ erro: 'Conta desativada. Entre em contato com o administrador.' });
+    }
+
+    res.json(emitirTokenAcesso(aluno));
+  } catch (error) {
+    console.error('Erro ao verificar captcha:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
