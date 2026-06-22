@@ -16,6 +16,34 @@ export const api = {
     });
   },
 
+  // Confirmação de e-mail — valida o token recebido no link enviado por e-mail.
+  verificarEmail: async (token) =>
+    request(`${API_URL}/auth/verificar-email`, {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+
+  // Reenvia o link de confirmação de e-mail para um cadastro pendente.
+  reenviarVerificacao: async (email) =>
+    request(`${API_URL}/auth/reenviar-verificacao`, {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  // Esqueci a senha — solicita o e-mail com o link de redefinição.
+  esqueciSenha: async (email) =>
+    request(`${API_URL}/auth/esqueci-senha`, {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  // Redefinição de senha — define a nova senha a partir do token do link.
+  redefinirSenha: async (token, senha) =>
+    request(`${API_URL}/auth/redefinir-senha`, {
+      method: 'POST',
+      body: JSON.stringify({ token, senha }),
+    }),
+
   // CAPTCHA — gera uma nova imagem de verificação (id opaco + SVG).
   getCaptcha: async () => request(`${API_URL}/auth/captcha`),
 

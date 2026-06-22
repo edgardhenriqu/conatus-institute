@@ -73,6 +73,34 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_autorizacoes_aluno ON curso_autorizacoes(aluno_id)`,
   // admin@conatus.com é o superadmin: único perfil que pode alterar cargos
   `UPDATE alunos SET role = 'superadmin' WHERE email = 'admin@conatus.com' AND role != 'superadmin'`,
+  // verificação de e-mail no cadastro.
+  // A coluna nasce com DEFAULT true para que contas JÁ existentes não sejam
+  // bloqueadas; em seguida o default vira false, de modo que apenas novos
+  // cadastros (feitos pela aplicação) comecem como "não verificados".
+  `ALTER TABLE alunos ADD COLUMN IF NOT EXISTS email_verificado BOOLEAN NOT NULL DEFAULT true`,
+  `ALTER TABLE alunos ALTER COLUMN email_verificado SET DEFAULT false`,
+  // tokens de confirmação de e-mail (apenas o hash é armazenado)
+  `CREATE TABLE IF NOT EXISTS email_verificacoes (
+    id SERIAL PRIMARY KEY,
+    aluno_id UUID NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
+    token_hash VARCHAR(64) NOT NULL,
+    expira_em TIMESTAMP NOT NULL,
+    usado BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_email_verif_hash ON email_verificacoes(token_hash)`,
+  `CREATE INDEX IF NOT EXISTS idx_email_verif_aluno ON email_verificacoes(aluno_id)`,
+  // tokens de redefinição de senha (apenas o hash é armazenado)
+  `CREATE TABLE IF NOT EXISTS senha_resets (
+    id SERIAL PRIMARY KEY,
+    aluno_id UUID NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
+    token_hash VARCHAR(64) NOT NULL,
+    expira_em TIMESTAMP NOT NULL,
+    usado BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_senha_reset_hash ON senha_resets(token_hash)`,
+  `CREATE INDEX IF NOT EXISTS idx_senha_reset_aluno ON senha_resets(aluno_id)`,
 ];
 
 async function ensureSchema() {

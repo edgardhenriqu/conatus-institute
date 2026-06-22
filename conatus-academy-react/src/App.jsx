@@ -9,6 +9,8 @@ import { ProtectedRoute } from './components/ui/ProtectedRoute';
 // Pages
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
+import { VerifyEmail } from './pages/VerifyEmail';
+import { ResetPassword } from './pages/ResetPassword';
 import { Courses } from './pages/Courses';
 import { CourseDetails } from './pages/CourseDetails';
 import { CourseViewer } from './pages/CourseViewer';
@@ -103,6 +105,8 @@ function App() {
 
           {/* Pages without header/footer */}
           <Route path="/login" element={<Login />} />
+          <Route path="/verificar-email" element={<VerifyEmail />} />
+          <Route path="/redefinir-senha" element={<ResetPassword />} />
         </Routes>
       </Router>
       </ToastProvider>

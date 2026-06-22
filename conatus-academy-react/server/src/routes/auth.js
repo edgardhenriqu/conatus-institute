@@ -1,15 +1,81 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const pool = require('../../db/connection');
 const { authMiddleware } = require('../middlewares/auth');
 const { createCaptcha } = require('../captcha/svgCaptcha');
 const captchaStore = require('../captcha/captchaStore');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../email/mailer');
 
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+
+// Base do link de confirmação enviado por e-mail (aponta para o frontend).
+const APP_URL = (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, '');
+const EMAIL_TOKEN_TTL_HORAS = 24;
+
+/**
+ * Gera um token de verificação de e-mail, guarda apenas o hash no banco
+ * (invalidando tokens anteriores do mesmo aluno) e devolve o token em claro
+ * para montar o link enviado por e-mail.
+ */
+async function gerarTokenVerificacao(alunoId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const expiraEm = new Date(Date.now() + EMAIL_TOKEN_TTL_HORAS * 60 * 60 * 1000);
+
+  // Tokens antigos ainda válidos deixam de servir assim que um novo é emitido.
+  await pool.query('UPDATE email_verificacoes SET usado = true WHERE aluno_id = $1 AND usado = false', [alunoId]);
+  await pool.query(
+    'INSERT INTO email_verificacoes (aluno_id, token_hash, expira_em) VALUES ($1, $2, $3)',
+    [alunoId, tokenHash, expiraEm]
+  );
+  return token;
+}
+
+/** Dispara o e-mail de confirmação. Lança erro se o SMTP falhar. */
+async function enviarEmailConfirmacao(aluno, token) {
+  const link = `${APP_URL}/verificar-email?token=${token}`;
+  await sendVerificationEmail({ to: aluno.email, nome: aluno.nome, link });
+}
+
+/** Regras de senha forte (compartilhadas entre cadastro e redefinição). */
+function senhaForte(senha) {
+  return typeof senha === 'string'
+    && senha.length >= 8
+    && /[A-Z]/.test(senha)
+    && /[a-z]/.test(senha)
+    && /[0-9]/.test(senha)
+    && /[^A-Za-z0-9]/.test(senha);
+}
+
+const SENHA_TOKEN_TTL_MIN = 60; // link de redefinição válido por 1 hora
+
+/**
+ * Gera um token de redefinição de senha (guarda só o hash, invalidando os
+ * anteriores do mesmo aluno) e devolve o token em claro para o link.
+ */
+async function gerarTokenReset(alunoId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const expiraEm = new Date(Date.now() + SENHA_TOKEN_TTL_MIN * 60 * 1000);
+
+  await pool.query('UPDATE senha_resets SET usado = true WHERE aluno_id = $1 AND usado = false', [alunoId]);
+  await pool.query(
+    'INSERT INTO senha_resets (aluno_id, token_hash, expira_em) VALUES ($1, $2, $3)',
+    [alunoId, tokenHash, expiraEm]
+  );
+  return token;
+}
+
+/** Dispara o e-mail de redefinição. Lança erro se o SMTP falhar. */
+async function enviarEmailReset(aluno, token) {
+  const link = `${APP_URL}/redefinir-senha?token=${token}`;
+  await sendPasswordResetEmail({ to: aluno.email, nome: aluno.nome, link });
+}
 
 /*
  * Segredo do "ticket de pré-autenticação".
@@ -64,12 +130,7 @@ router.post('/cadastrar', async (req, res) => {
       return res.status(400).json({ erro: 'Todos os campos são obrigatórios.' });
     }
 
-    const pwdOk = senha.length >= 8
-      && /[A-Z]/.test(senha)
-      && /[a-z]/.test(senha)
-      && /[0-9]/.test(senha)
-      && /[^A-Za-z0-9]/.test(senha);
-    if (!pwdOk) {
+    if (!senhaForte(senha)) {
       return res.status(400).json({ erro: 'A senha deve ter no mínimo 8 caracteres, letra maiúscula, minúscula, número e caractere especial.' });
     }
 
@@ -103,9 +164,25 @@ router.post('/cadastrar', async (req, res) => {
 
     const aluno = resultado.rows[0];
 
-    const token = jwt.sign({ id: aluno.id, role: aluno.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    // A conta nasce NÃO verificada: o acesso só é liberado após confirmar o e-mail.
+    // Não emitimos token de acesso aqui — enviamos o link de confirmação.
+    let emailEnviado = true;
+    try {
+      const token = await gerarTokenVerificacao(aluno.id);
+      await enviarEmailConfirmacao(aluno, token);
+    } catch (mailErr) {
+      emailEnviado = false;
+      console.error('Falha ao enviar e-mail de confirmação:', mailErr.message);
+    }
 
-    res.status(201).json({ aluno, token });
+    res.status(201).json({
+      verificacaoPendente: true,
+      email: aluno.email,
+      emailEnviado,
+      mensagem: emailEnviado
+        ? 'Cadastro realizado! Enviamos um link de confirmação para o seu e-mail.'
+        : 'Cadastro realizado, mas não conseguimos enviar o e-mail de confirmação agora. Use a opção de reenviar.',
+    });
   } catch (error) {
     console.error('Erro ao cadastrar aluno:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
@@ -138,6 +215,16 @@ router.post('/login', async (req, res) => {
 
     if (!aluno.ativo) {
       return res.status(403).json({ erro: 'Conta desativada. Entre em contato com o administrador.' });
+    }
+
+    // E-mail ainda não confirmado: bloqueia o acesso e sinaliza ao frontend para
+    // oferecer o reenvio do link de confirmação.
+    if (!aluno.email_verificado) {
+      return res.status(403).json({
+        erro: 'Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada (e o spam).',
+        emailNaoVerificado: true,
+        email: aluno.email,
+      });
     }
 
     // Credenciais OK, mas o acesso ainda NÃO é liberado: o usuário precisa passar
@@ -224,6 +311,171 @@ router.post('/verificar-captcha', async (req, res) => {
     res.json(emitirTokenAcesso(aluno));
   } catch (error) {
     console.error('Erro ao verificar captcha:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+/*
+ * POST /api/auth/verificar-email
+ * Confirma o e-mail a partir do token recebido no link. Corpo: { token }.
+ * Marca a conta como verificada e consome o token (uso único).
+ */
+router.post('/verificar-email', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ erro: 'Token de confirmação ausente.' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const dbRes = await pool.query(
+      'SELECT * FROM email_verificacoes WHERE token_hash = $1',
+      [tokenHash]
+    );
+    const registro = dbRes.rows[0];
+
+    if (!registro) {
+      return res.status(400).json({ erro: 'Link de confirmação inválido.' });
+    }
+
+    // Já confirmado anteriormente com este mesmo token: trata como sucesso idempotente.
+    const alunoRes = await pool.query('SELECT id, email_verificado FROM alunos WHERE id = $1', [registro.aluno_id]);
+    const aluno = alunoRes.rows[0];
+    if (aluno && aluno.email_verificado) {
+      return res.json({ mensagem: 'E-mail já confirmado. Você já pode fazer login.', jaConfirmado: true });
+    }
+
+    if (registro.usado) {
+      return res.status(400).json({ erro: 'Este link de confirmação já foi utilizado.' });
+    }
+    if (new Date(registro.expira_em).getTime() < Date.now()) {
+      return res.status(400).json({ erro: 'Link de confirmação expirado. Solicite um novo e-mail.', expirado: true });
+    }
+
+    await pool.query('UPDATE alunos SET email_verificado = true WHERE id = $1', [registro.aluno_id]);
+    await pool.query('UPDATE email_verificacoes SET usado = true WHERE id = $1', [registro.id]);
+
+    res.json({ mensagem: 'E-mail confirmado com sucesso! Você já pode fazer login.' });
+  } catch (error) {
+    console.error('Erro ao verificar e-mail:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+/*
+ * POST /api/auth/reenviar-verificacao
+ * Reenvia o link de confirmação. Corpo: { email }.
+ * Resposta sempre genérica (não revela se o e-mail existe ou não).
+ */
+router.post('/reenviar-verificacao', async (req, res) => {
+  const respostaGenerica = {
+    mensagem: 'Se houver uma conta pendente com este e-mail, enviamos um novo link de confirmação.',
+  };
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ erro: 'Informe o e-mail.' });
+    }
+
+    const dbRes = await pool.query('SELECT * FROM alunos WHERE email = $1', [email]);
+    const aluno = dbRes.rows[0];
+
+    // Só reenvia se a conta existir e ainda não estiver verificada.
+    if (aluno && !aluno.email_verificado) {
+      try {
+        const token = await gerarTokenVerificacao(aluno.id);
+        await enviarEmailConfirmacao(aluno, token);
+      } catch (mailErr) {
+        console.error('Falha ao reenviar e-mail de confirmação:', mailErr.message);
+        return res.status(502).json({ erro: 'Não foi possível enviar o e-mail no momento. Tente novamente em instantes.' });
+      }
+    }
+
+    res.json(respostaGenerica);
+  } catch (error) {
+    console.error('Erro ao reenviar verificação:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+/*
+ * POST /api/auth/esqueci-senha
+ * Solicita o link de redefinição de senha. Corpo: { email }.
+ * Resposta sempre genérica (não revela se o e-mail existe).
+ */
+router.post('/esqueci-senha', async (req, res) => {
+  const respostaGenerica = {
+    mensagem: 'Se houver uma conta com este e-mail, enviamos um link para redefinir a senha.',
+  };
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ erro: 'Informe o e-mail.' });
+    }
+
+    const dbRes = await pool.query('SELECT * FROM alunos WHERE email = $1', [email]);
+    const aluno = dbRes.rows[0];
+
+    if (aluno && aluno.ativo) {
+      try {
+        const token = await gerarTokenReset(aluno.id);
+        await enviarEmailReset(aluno, token);
+      } catch (mailErr) {
+        console.error('Falha ao enviar e-mail de redefinição:', mailErr.message);
+        return res.status(502).json({ erro: 'Não foi possível enviar o e-mail no momento. Tente novamente em instantes.' });
+      }
+    }
+
+    res.json(respostaGenerica);
+  } catch (error) {
+    console.error('Erro em esqueci-senha:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+/*
+ * POST /api/auth/redefinir-senha
+ * Define uma nova senha a partir do token recebido por e-mail.
+ * Corpo: { token, senha }. Consome o token (uso único).
+ */
+router.post('/redefinir-senha', async (req, res) => {
+  try {
+    const { token, senha } = req.body;
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ erro: 'Token de redefinição ausente.' });
+    }
+    if (!senhaForte(senha)) {
+      return res.status(400).json({ erro: 'A senha deve ter no mínimo 8 caracteres, letra maiúscula, minúscula, número e caractere especial.' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const dbRes = await pool.query('SELECT * FROM senha_resets WHERE token_hash = $1', [tokenHash]);
+    const registro = dbRes.rows[0];
+
+    if (!registro) {
+      return res.status(400).json({ erro: 'Link de redefinição inválido.' });
+    }
+    if (registro.usado) {
+      return res.status(400).json({ erro: 'Este link de redefinição já foi utilizado.' });
+    }
+    if (new Date(registro.expira_em).getTime() < Date.now()) {
+      return res.status(400).json({ erro: 'Link de redefinição expirado. Solicite um novo.', expirado: true });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const senhaHash = await bcrypt.hash(senha, salt);
+
+    await pool.query(
+      'UPDATE alunos SET senha = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [senhaHash, registro.aluno_id]
+    );
+    await pool.query('UPDATE senha_resets SET usado = true WHERE id = $1', [registro.id]);
+    // Invalida quaisquer outros tokens de reset pendentes do mesmo aluno.
+    await pool.query('UPDATE senha_resets SET usado = true WHERE aluno_id = $1 AND usado = false', [registro.aluno_id]);
+
+    res.json({ mensagem: 'Senha redefinida com sucesso! Você já pode fazer login com a nova senha.' });
+  } catch (error) {
+    console.error('Erro ao redefinir senha:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });

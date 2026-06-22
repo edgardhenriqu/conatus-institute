@@ -111,6 +111,65 @@ export function Login() {
   const { login } = useAuth();
   const navigate  = useNavigate();
 
+  /* Confirmação de e-mail */
+  const [registeredEmail, setRegisteredEmail] = useState(null); // mostra tela pós-cadastro
+  const [unverifiedEmail, setUnverifiedEmail] = useState(null); // login bloqueado: oferece reenvio
+  const [resendMsg, setResendMsg]   = useState('');
+  const [resending, setResending]   = useState(false);
+
+  /* Esqueci a senha */
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotMsg, setForgotMsg]   = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+
+  const openForgot = () => {
+    setForgotMode(true);
+    setError('');
+    setForgotMsg('');
+    setForgotSent(false);
+  };
+  const backToLogin = () => {
+    setForgotMode(false);
+    setForgotMsg('');
+    setForgotSent(false);
+    setError('');
+  };
+
+  /* Solicita o e-mail de redefinição de senha. */
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setForgotMsg('');
+    if (!email) {
+      setForgotMsg('Informe o e-mail cadastrado.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await api.esqueciSenha(email);
+      setForgotSent(true);
+      setForgotMsg(data.mensagem || 'Se houver uma conta com este e-mail, enviamos um link.');
+    } catch (err) {
+      setForgotMsg(err.message || 'Não foi possível enviar agora. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* Reenvia o link de confirmação de e-mail. */
+  const handleResend = async (targetEmail) => {
+    if (!targetEmail) return;
+    setResendMsg('');
+    setResending(true);
+    try {
+      const data = await api.reenviarVerificacao(targetEmail);
+      setResendMsg(data.mensagem || 'Link reenviado. Verifique seu e-mail.');
+    } catch (err) {
+      setResendMsg(err.message || 'Não foi possível reenviar agora. Tente novamente.');
+    } finally {
+      setResending(false);
+    }
+  };
+
   /* Login state */
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -141,6 +200,11 @@ export function Login() {
     setCepError('');
     setCpfStatus(null);
     setPhoneStatus(null);
+    setUnverifiedEmail(null);
+    setResendMsg('');
+    setForgotMode(false);
+    setForgotMsg('');
+    setForgotSent(false);
   };
 
   /* ── CEP lookup ─────────────────────────────────────────────── */
@@ -188,17 +252,38 @@ export function Login() {
       return;
     }
     setLoading(true);
+    setUnverifiedEmail(null);
+    setResendMsg('');
     try {
-      const data = await api.login(email, senha);
-      if (data.erro) { setError(data.erro); return; }
-      // Credenciais corretas: o backend NÃO libera o acesso ainda — exige a
-      // verificação antirrobô. Guardamos o ticket e mostramos a etapa do CAPTCHA.
-      if (data.captchaRequired && data.ticket) {
-        setPendingTicket(data.ticket);
+      // fetch direto para conseguir ler o corpo da resposta em caso de erro
+      // (ex.: flag emailNaoVerificado), que o cliente HTTP padrão descartaria.
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        // Credenciais corretas: o backend NÃO libera o acesso ainda — exige a
+        // verificação antirrobô. Guardamos o ticket e mostramos a etapa do CAPTCHA.
+        if (data.captchaRequired && data.ticket) {
+          setPendingTicket(data.ticket);
+          return;
+        }
+        // Fallback (compatibilidade): caso o backend já devolva token/aluno direto.
+        if (data.token && data.aluno) finishLogin(data);
         return;
       }
-      // Fallback (compatibilidade): caso o backend já devolva token/aluno direto.
-      if (data.token && data.aluno) finishLogin(data);
+
+      // E-mail ainda não confirmado: oferece o reenvio do link.
+      if (data.emailNaoVerificado) {
+        setUnverifiedEmail(data.email || email);
+        setError(data.erro || 'Confirme seu e-mail antes de entrar.');
+        return;
+      }
+
+      setError(data.erro || 'Não foi possível entrar. Tente novamente.');
     } catch {
       setError('Não foi possível conectar ao servidor. Tente novamente.');
     } finally {
@@ -264,11 +349,12 @@ export function Login() {
     setLoading(true);
     try {
       const data = await api.register(regData);
-      if (data.erro) { setError(data.erro); return; }
-      login(data.aluno, data.token);
-      navigate('/dashboard');
-    } catch {
-      setError('Não foi possível conectar ao servidor. Tente novamente.');
+      // Não há mais login automático: a conta começa pendente de confirmação.
+      // Mostramos a tela de "confirme seu e-mail".
+      setResendMsg('');
+      setRegisteredEmail(data.email || regData.email);
+    } catch (err) {
+      setError(err.message || 'Não foi possível conectar ao servidor. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -289,7 +375,36 @@ export function Login() {
 
         {/* Card */}
         <div className="auth-card">
-          {pendingTicket ? (
+          {registeredEmail ? (
+
+            /* ── CADASTRO CONCLUÍDO — CONFIRME O E-MAIL ───────── */
+            <div className="auth-form-section" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 56, lineHeight: 1 }} aria-hidden="true">📧</div>
+              <h1 className="auth-title" style={{ marginTop: 12 }}>Confirme seu e-mail</h1>
+              <p className="auth-subtitle">
+                Enviamos um link de confirmação para <strong>{registeredEmail}</strong>.
+                Abra o e-mail e clique no link para ativar sua conta e poder fazer login.
+              </p>
+              <p className="auth-field-hint">
+                Não recebeu? Verifique a caixa de spam ou clique abaixo para reenviar.
+              </p>
+              {resendMsg && <div className="auth-hint" role="status">{resendMsg}</div>}
+              <button
+                type="button" className="auth-btn-primary" disabled={resending} aria-busy={resending}
+                onClick={() => handleResend(registeredEmail)}
+              >
+                {resending && <span className="auth-spinner" aria-hidden="true" />}
+                {resending ? 'Reenviando...' : 'Reenviar e-mail de confirmação'}
+              </button>
+              <p className="auth-switch">
+                <button type="button" className="auth-switch-link"
+                  onClick={() => { setRegisteredEmail(null); switchForm(true); }}>
+                  ← Ir para o login
+                </button>
+              </p>
+            </div>
+
+          ) : pendingTicket ? (
 
             /* ── VERIFICAÇÃO ANTIRROBÔ (CAPTCHA) ──────────────── */
             <CaptchaVerification
@@ -297,6 +412,54 @@ export function Login() {
               onSuccess={finishLogin}
               onCancel={handleCaptchaCancel}
             />
+
+          ) : forgotMode ? (
+
+            /* ── ESQUECI A SENHA ──────────────────────────────── */
+            <div className="auth-form-section">
+              <div className="auth-form-header">
+                <h1 className="auth-title">Recuperar senha</h1>
+                <p className="auth-subtitle">
+                  Informe o e-mail cadastrado e enviaremos um link para você criar uma nova senha.
+                </p>
+              </div>
+
+              {forgotSent ? (
+                <>
+                  <div className="auth-hint" role="status" style={{ textAlign: 'center' }}>
+                    📧 {forgotMsg}
+                  </div>
+                  <p className="auth-field-hint" style={{ textAlign: 'center' }}>
+                    Não recebeu? Verifique o spam ou tente novamente em alguns instantes.
+                  </p>
+                </>
+              ) : (
+                <form onSubmit={handleForgotSubmit} noValidate>
+                  <div className="auth-form-group">
+                    <label htmlFor="forgot-email" className="auth-label">E-mail</label>
+                    <input
+                      id="forgot-email" type="email" className="auth-input"
+                      placeholder="seu@email.com" value={email} autoComplete="email"
+                      required aria-required="true"
+                      onChange={e => { setForgotMsg(''); setEmail(e.target.value); }}
+                    />
+                  </div>
+
+                  {forgotMsg && <div className="auth-error" role="alert">{forgotMsg}</div>}
+
+                  <button type="submit" className="auth-btn-primary" disabled={loading} aria-busy={loading}>
+                    {loading && <span className="auth-spinner" aria-hidden="true" />}
+                    {loading ? 'Enviando...' : 'Enviar link de redefinição'}
+                  </button>
+                </form>
+              )}
+
+              <p className="auth-switch">
+                <button type="button" className="auth-switch-link" onClick={backToLogin}>
+                  ← Voltar para o login
+                </button>
+              </p>
+            </div>
 
           ) : isLogin ? (
 
@@ -342,7 +505,25 @@ export function Login() {
                   </div>
                 </div>
 
+                <div className="auth-forgot-row" style={{ textAlign: 'right', marginBottom: 12 }}>
+                  <button type="button" className="auth-switch-link" onClick={openForgot}>
+                    Esqueceu a senha?
+                  </button>
+                </div>
+
                 {error && <div className="auth-error" role="alert">{error}</div>}
+
+                {unverifiedEmail && (
+                  <div className="auth-hint" style={{ marginTop: 12 }}>
+                    <button
+                      type="button" className="auth-switch-link" disabled={resending}
+                      onClick={() => handleResend(unverifiedEmail)}
+                    >
+                      {resending ? 'Reenviando...' : 'Reenviar e-mail de confirmação'}
+                    </button>
+                    {resendMsg && <div role="status" style={{ marginTop: 8 }}>{resendMsg}</div>}
+                  </div>
+                )}
 
                 <button type="submit" className="auth-btn-primary" disabled={loading} aria-busy={loading}>
                   {loading && <span className="auth-spinner" aria-hidden="true" />}
