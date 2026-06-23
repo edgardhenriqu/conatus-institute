@@ -9,6 +9,7 @@ import { ROLE_LABELS, ROLE_COLORS } from '../../utils/permissions';
 const ROLE_OPTIONS = [
   { value: 'aluno',            label: 'Aluno' },
   { value: 'conatus_employee', label: 'Funcionário Conatus' },
+  { value: 'instrutor',        label: 'Instrutor' },
   { value: 'admin',            label: 'Administrador' },
 ];
 

@@ -196,20 +196,22 @@ textarea:focus-visible {
     margin-bottom: 4px;
 }
 
-.ccard-progress-labels strong { color: var(--primary); }
+.ccard-progress-labels strong { color: var(--dc-electric); font-weight: 700; }
 
 .ccard-progress-bar {
     height: 7px;
-    background: var(--bg-light);
-    border-radius: var(--radius-sm);
+    background: #e2e8f0;
+    border-radius: 99px;
     overflow: hidden;
 }
 
 .ccard-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--gold), var(--gold-hover));
-    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--dc-electric), var(--dc-electric-light), var(--dc-electric));
+    background-size: 200% 100%;
+    border-radius: 99px;
     transition: width 0.8s ease;
+    animation: progressShimmer 3s ease-in-out infinite;
 }
 
 /* ============================================
@@ -321,7 +323,9 @@ textarea:focus-visible {
 
 .next-step-item:hover {
     border-color: var(--primary);
+    background: linear-gradient(135deg, #f0f7ff, #fafeff);
     transform: translateX(4px);
+    box-shadow: var(--shadow-sm);
 }
 
 .next-step-icon { font-size: 1.3rem; flex-shrink: 0; }

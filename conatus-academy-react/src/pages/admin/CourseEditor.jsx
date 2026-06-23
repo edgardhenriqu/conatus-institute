@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { adminApi } from '../../services/adminApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import QuillEditor from '../../components/common/QuillEditor';
 import { normalizeQuillHtml } from '../../utils/quillHtml';
@@ -43,9 +44,11 @@ export default function CourseEditor() {
   const { cursoId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { isAdmin } = useAuth();
 
   const [curso, setCurso] = useState(null);
   const [form, setForm] = useState({});
+  const [instrutores, setInstrutores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
@@ -130,7 +133,10 @@ export default function CourseEditor() {
     loadQuiz();
     loadAuthorized();
     loadStudents();
-  }, [loadCurso, loadModules, loadQuiz, loadAuthorized, loadStudents]);
+    if (isAdmin) {
+      api.getAdminInstrutores().then(d => setInstrutores(d.instrutores || [])).catch(() => {});
+    }
+  }, [loadCurso, loadModules, loadQuiz, loadAuthorized, loadStudents, isAdmin]);
 
   /* ── Curso (salvar / publicar) ────────────────────────────────── */
 
@@ -503,6 +509,23 @@ export default function CourseEditor() {
                   {NIVEIS.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
                 </select>
               </div>
+              {isAdmin && (
+                <div className="ce-field">
+                  <label>Instrutor responsável</label>
+                  <select
+                    value={form.instrutor_id || ''}
+                    onChange={e => setField('instrutor_id', e.target.value || null)}
+                  >
+                    <option value="">— Sem instrutor atribuído —</option>
+                    {instrutores.map(i => (
+                      <option key={i.id} value={i.id}>{i.nome} ({i.email})</option>
+                    ))}
+                  </select>
+                  <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    O instrutor selecionado poderá editar módulos, aulas e questões deste curso.
+                  </small>
+                </div>
+              )}
               <div className="ce-field">
                 <label>Imagem de capa (URL)</label>
                 <input type="text" value={form.image || ''}

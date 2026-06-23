@@ -17,7 +17,7 @@ export function CourseDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const toast = useToast();
   const [curso, setCurso] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -126,7 +126,7 @@ export function CourseDetails() {
     }
   };
 
-  if (loading) return <PageLoader message="Carregando informações do curso..." />;
+  if (loading || authLoading) return <PageLoader message="Carregando informações do curso..." />;
 
   if (restricted) {
     return (
@@ -145,6 +145,11 @@ export function CourseDetails() {
 
   const isFree = curso.gratuito;
   const isInternal = curso.tipo === 'interno';
+
+  if (isInternal && !user) {
+    navigate('/login', { state: { from: `/cursos/${id}` } });
+    return null;
+  }
   const canAccess = !isInternal || canAccessInternalCourse(user);
 
   return (

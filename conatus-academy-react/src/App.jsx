@@ -17,6 +17,7 @@ import { CourseViewer } from './pages/CourseViewer';
 import { CourseQuiz } from './pages/CourseQuiz';
 import { Certificate } from './pages/Certificate';
 import { Dashboard } from './pages/Dashboard';
+import { Perfil } from './pages/Perfil';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminAlunos } from './pages/admin/AdminAlunos';
 import { AdminCursos } from './pages/admin/AdminCursos';
@@ -59,6 +60,14 @@ function App() {
               }
             />
             <Route
+              path="/perfil"
+              element={
+                <ProtectedRoute>
+                  <Perfil />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/cursos/:id/sala-de-aula"
               element={
                 <ProtectedRoute>
@@ -83,11 +92,11 @@ function App() {
               }
             />
 
-            {/* Admin routes */}
+            {/* Admin/Instrutor routes */}
             <Route
               path="/admin/*"
               element={
-                <ProtectedRoute requireAdmin={true}>
+                <ProtectedRoute requireStaff={true}>
                   <AdminLayout />
                 </ProtectedRoute>
               }

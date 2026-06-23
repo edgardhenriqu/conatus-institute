@@ -1,8 +1,8 @@
-// src/components/admin/AdminLayout.jsx
 import { Outlet, NavLink, Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import './AdminLayout.css';
 
-const links = [
+const adminLinks = [
   { to: '/admin/dashboard',    label: '📊 Dashboard' },
   { to: '/admin/alunos',       label: '👥 Alunos' },
   { to: '/admin/cursos',       label: '📚 Cursos' },
@@ -10,11 +10,21 @@ const links = [
   { to: '/admin/certificados', label: '🏆 Certificados' },
 ];
 
+const instrutorLinks = [
+  { to: '/admin/cursos',     label: '📚 Meus Cursos' },
+  { to: '/admin/avaliacoes', label: '📝 Avaliações' },
+];
+
 export default function AdminLayout() {
+  const { isAdmin, isInstrutor } = useAuth();
+
+  const links = isAdmin ? adminLinks : instrutorLinks;
+  const brandLabel = isAdmin ? 'Conatus Admin' : 'Área do Instrutor';
+
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <h2 className="admin-brand">Conatus Admin</h2>
+        <h2 className="admin-brand">{brandLabel}</h2>
         <nav className="admin-nav">
           {links.map(l => (
             <NavLink

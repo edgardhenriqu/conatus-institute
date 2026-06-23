@@ -8,8 +8,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = sessionStorage.getItem('user');
-    const token      = sessionStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    const token      = localStorage.getItem('token');
 
     if (!storedUser || !token) {
       initMopProgress(null);
@@ -23,8 +23,8 @@ export function AuthProvider({ children }) {
       initMopProgress(parsed.id);
       setUser(parsed);
     } catch {
-      sessionStorage.removeItem('user');
-      sessionStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
       initMopProgress(null);
       setLoading(false);
       return;
@@ -39,10 +39,9 @@ export function AuthProvider({ children }) {
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
         if (!data?.aluno) return;
-        // Preserva todos os campos do storage; atualiza apenas o que o backend retornou
         const refreshed = { ...parsed, ...data.aluno };
         delete refreshed.senha;
-        sessionStorage.setItem('user', JSON.stringify(refreshed));
+        localStorage.setItem('user', JSON.stringify(refreshed));
         initMopProgress(refreshed.id);
         setUser(refreshed);
       })
@@ -50,24 +49,26 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = (userData, token) => {
-    sessionStorage.setItem('user', JSON.stringify(userData));
-    sessionStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('token', token);
     initMopProgress(userData.id);
     setUser(userData);
   };
 
   const logout = () => {
-    sessionStorage.removeItem('user');
-    sessionStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
     initMopProgress(null);
     setUser(null);
   };
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const isSuperAdmin = user?.role === 'superadmin';
+  const isInstrutor = user?.role === 'instrutor';
+  const isStaff = isAdmin || isInstrutor;
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin, isSuperAdmin }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin, isSuperAdmin, isInstrutor, isStaff }}>
       {children}
     </AuthContext.Provider>
   );

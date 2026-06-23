@@ -99,12 +99,13 @@ input, textarea, select {
 
 .navbar {
     background: var(--bg-white);
-    border-bottom: 3px solid var(--gold);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+    border-top: 3px solid var(--primary);
     padding: 0;
     position: sticky;
     top: 0;
     z-index: 1000;
-    box-shadow: var(--shadow);
+    box-shadow: 0 1px 16px rgba(0, 0, 0, 0.06);
 }
 
 .nav-container {
@@ -763,11 +764,11 @@ input, textarea, select {
 .card {
     background: var(--bg-white);
     padding: 0;
-    border-radius: var(--radius);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-sm);
     overflow: hidden;
-    transition: all 0.4s;
+    transition: transform var(--transition), box-shadow var(--transition);
     text-align: left;
     height: 100%;
     display: flex;
@@ -776,7 +777,7 @@ input, textarea, select {
 }
 
 .card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-4px);
     box-shadow: var(--shadow-lg);
 }
 
@@ -1019,9 +1020,9 @@ input, textarea, select {
 /* Body */
 .auth-body {
     background:
-        radial-gradient(ellipse at 80% 0%, rgba(0, 74, 153, 0.55) 0%, transparent 55%),
-        radial-gradient(ellipse at 20% 100%, rgba(212, 175, 55, 0.12) 0%, transparent 50%),
-        linear-gradient(160deg, var(--primary-dark) 0%, var(--primary) 60%, #00396e 100%);
+        radial-gradient(ellipse at 75% 0%, rgba(14, 165, 233, 0.18) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 100%, rgba(212, 175, 55, 0.10) 0%, transparent 50%),
+        linear-gradient(160deg, var(--dc-dark) 0%, var(--primary-dark) 55%, #00396e 100%);
     min-height: 100vh;
     display: flex;
     align-items: flex-start;
@@ -1086,11 +1087,11 @@ input, textarea, select {
 .auth-card {
     background: white;
     width: 100%;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     box-shadow:
-        0 4px 6px rgba(0,0,0,0.07),
-        0 20px 50px rgba(0,0,0,0.22),
-        0 0 0 1px rgba(255,255,255,0.08);
+        0 4px 6px rgba(0,0,0,0.06),
+        0 24px 60px rgba(0,0,0,0.28),
+        0 0 0 1px rgba(255,255,255,0.06);
     overflow: hidden;
 }
 
@@ -1808,14 +1809,15 @@ input, textarea, select {
 }
 
 .welcome-header {
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    background: linear-gradient(135deg, var(--dc-dark) 0%, #0d2a4a 60%, var(--primary-dark) 100%);
     color: white;
-    padding: 40px;
-    border-radius: var(--radius);
+    padding: 44px 40px;
+    border-radius: var(--radius-lg);
     margin-bottom: 40px;
     border-bottom: 4px solid var(--gold);
     position: relative;
     overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
 }
 
 .welcome-header::after {
@@ -1831,14 +1833,18 @@ input, textarea, select {
 
 .welcome-header h1 {
     color: white;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     position: relative;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
 }
 
 .welcome-header p {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 1rem;
     position: relative;
+    font-weight: 400;
 }
 
 .stats-row {
@@ -1850,29 +1856,35 @@ input, textarea, select {
 
 .stat-card {
     background: white;
-    padding: 30px;
-    border-radius: var(--radius);
+    padding: 28px 24px;
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow);
+    border-top: 3px solid var(--primary);
+    box-shadow: var(--shadow-sm);
     text-align: center;
-    transition: transform var(--transition);
+    transition: transform var(--transition), box-shadow var(--transition);
 }
 
 .stat-card:hover {
     transform: translateY(-3px);
+    box-shadow: var(--shadow);
 }
 
 .stat-card h3 {
-    font-size: 2.5rem;
-    color: var(--secondary);
-    margin-bottom: 5px;
+    font-size: 2.8rem;
+    color: var(--primary);
+    margin-bottom: 4px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -1px;
 }
 
 .stat-card p {
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    font-size: 0.78rem;
+    font-weight: 600;
 }
 
 .courses-section h2 {
@@ -1882,14 +1894,15 @@ input, textarea, select {
 
 .course-progress {
     background: white;
-    padding: 20px 25px;
-    border-radius: var(--radius);
+    padding: 18px 24px;
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border);
-    margin-bottom: 15px;
+    border-left: 4px solid transparent;
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-left-color var(--transition-fast);
     text-decoration: none;
     color: inherit;
 }
@@ -1897,31 +1910,36 @@ input, textarea, select {
 .course-progress:hover {
     transform: translateX(5px);
     box-shadow: var(--shadow);
+    border-left-color: var(--primary);
 }
 
 .course-info h4 {
-    font-size: 1.1rem;
-    margin-bottom: 5px;
+    font-size: 1rem;
+    margin-bottom: 4px;
+    font-weight: 600;
+    color: var(--text-main);
 }
 
 .course-info p {
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
 }
 
 .progress-bar {
     width: 200px;
     height: 8px;
-    background: var(--bg-light);
-    border-radius: var(--radius-sm);
+    background: #e2e8f0;
+    border-radius: 99px;
     overflow: hidden;
 }
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--gold), var(--gold-hover));
-    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--dc-electric), var(--dc-electric-light), var(--dc-electric));
+    background-size: 200% 100%;
+    border-radius: 99px;
     transition: width 0.8s ease;
+    animation: progressShimmer 3s ease-in-out infinite;
 }
 
 .btn-certificate {
@@ -1964,8 +1982,8 @@ input, textarea, select {
 
 .viewer-sidebar-header {
     padding: 20px;
-    border-bottom: 1px solid var(--border);
-    background: var(--primary);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: var(--dc-dark);
     color: white;
 }
 
@@ -2011,17 +2029,19 @@ input, textarea, select {
 
 .viewer-progress-bar {
     height: 8px;
-    background: var(--border);
-    border-radius: var(--radius-sm);
+    background: #dde4ef;
+    border-radius: 99px;
     overflow: hidden;
     margin-bottom: 5px;
 }
 
 .viewer-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--gold), var(--gold-hover));
-    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--dc-electric), var(--dc-electric-light), var(--dc-electric));
+    background-size: 200% 100%;
+    border-radius: 99px;
     transition: width 0.6s ease;
+    animation: progressShimmer 3s ease-in-out infinite;
 }
 
 .viewer-progress-label {
@@ -2514,16 +2534,18 @@ input, textarea, select {
 .quiz-progress-bar {
     flex: 1;
     height: 8px;
-    background: var(--bg-light);
-    border-radius: var(--radius-sm);
+    background: #e2e8f0;
+    border-radius: 99px;
     overflow: hidden;
 }
 
 .quiz-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--gold), var(--gold-hover));
-    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--dc-electric), var(--dc-electric-light), var(--dc-electric));
+    background-size: 200% 100%;
+    border-radius: 99px;
     transition: width 0.4s ease;
+    animation: progressShimmer 3s ease-in-out infinite;
 }
 
 .quiz-question {
@@ -2713,8 +2735,9 @@ input, textarea, select {
 .mop-panel {
     background: white;
     border-radius: var(--radius-lg);
-    border: 2px solid var(--primary);
-    box-shadow: var(--shadow-lg);
+    border: 1px solid #cbd5e1;
+    border-top: 4px solid var(--primary);
+    box-shadow: 0 4px 24px rgba(0, 51, 102, 0.1);
     padding: 28px;
     margin-bottom: 30px;
 }
@@ -2772,21 +2795,23 @@ input, textarea, select {
     color: var(--text-muted);
     margin-bottom: 6px;
 }
-.mop-progress-labels strong { color: var(--primary); font-size: 1rem; }
+.mop-progress-labels strong { color: var(--dc-electric); font-size: 1rem; font-weight: 700; }
 
 .mop-progress-bar {
-    height: 10px;
-    background: var(--bg-light);
-    border-radius: var(--radius-sm);
+    height: 12px;
+    background: #e2e8f0;
+    border-radius: 99px;
     overflow: hidden;
     margin-bottom: 5px;
 }
 
 .mop-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--gold), var(--gold-hover));
-    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--dc-electric), var(--dc-electric-light), var(--dc-electric));
+    background-size: 200% 100%;
+    border-radius: 99px;
     transition: width 0.8s ease;
+    animation: progressShimmer 3s ease-in-out infinite;
 }
 
 .mop-progress-detail {
@@ -2917,12 +2942,13 @@ input, textarea, select {
 }
 
 .admin-header {
-    background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    background: linear-gradient(135deg, var(--dc-dark) 0%, var(--primary-dark) 100%);
     color: white;
-    padding: 30px 40px;
-    border-radius: var(--radius);
+    padding: 32px 40px;
+    border-radius: var(--radius-lg);
     margin-bottom: 30px;
     border-bottom: 4px solid var(--gold);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
 }
 
 .admin-header h1 {
@@ -2944,24 +2970,34 @@ input, textarea, select {
 
 .admin-stat-card {
     background: white;
-    padding: 25px;
-    border-radius: var(--radius);
+    padding: 22px 20px;
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border);
+    border-top: 3px solid var(--primary);
     box-shadow: var(--shadow-sm);
     text-align: center;
+    transition: box-shadow var(--transition-fast);
+}
+
+.admin-stat-card:hover {
+    box-shadow: var(--shadow);
 }
 
 .admin-stat-card h3 {
-    font-size: 2rem;
+    font-size: 2.2rem;
     color: var(--primary);
-    margin-bottom: 5px;
+    margin-bottom: 4px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -1px;
 }
 
 .admin-stat-card p {
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    font-weight: 600;
 }
 
 .admin-table-container {
@@ -3121,7 +3157,7 @@ input, textarea, select {
         padding: 20px;
         gap: 15px;
         box-shadow: var(--shadow-lg);
-        border-bottom: 3px solid var(--gold);
+        border-bottom: 1px solid var(--border);
     }
 
     .nav-menu.active {

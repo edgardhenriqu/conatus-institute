@@ -77,6 +77,12 @@
     100% { transform: scale(1); }
 }
 
+/* Progress bar shimmer — evoca gauge de utilização de rack */
+@keyframes progressShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
     *,

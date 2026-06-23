@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
 
 export function Header() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isStaff } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
@@ -32,11 +32,16 @@ export function Header() {
           {user ? (
             <>
               <span className="nav-user-greeting hidden-mobile">Olá, {user.nome?.split(' ')[0] || user.email}</span>
-              <Button variant="outline" to={isAdmin ? "/admin/dashboard" : "/dashboard"} onClick={closeMenu}>
-                Dashboard
+              <Button variant="outline" to={isAdmin ? "/admin/dashboard" : isStaff ? "/admin/cursos" : "/dashboard"} onClick={closeMenu}>
+                {isStaff && !isAdmin ? 'Meu Painel' : 'Dashboard'}
               </Button>
-              <button 
-                onClick={() => { logout(); closeMenu(); }} 
+              {!isStaff && (
+                <Link to="/perfil" onClick={closeMenu} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none', fontSize: '0.95rem' }}>
+                  Meu Perfil
+                </Link>
+              )}
+              <button
+                onClick={() => { logout(); closeMenu(); }}
                 style={{ color: 'var(--secondary)', fontWeight: 600, cursor: 'pointer', background: 'none', border: 'none', fontSize: '1rem' }}
               >
                 Sair

@@ -67,6 +67,12 @@ export const api = {
 
   getPerfil: async () => request(`${API_URL}/auth/perfil`),
 
+  updatePerfil: async (data) =>
+    request(`${API_URL}/auth/perfil`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   // Conteúdo do curso (player)
   getCursoConteudo: async (cursoId) =>
     request(`${API_URL}/cursos/${cursoId}/conteudo`),
@@ -136,6 +142,11 @@ export const api = {
 
   deleteAdminCurso: async (id) =>
     request(`${API_URL}/admin/cursos/${id}`, { method: 'DELETE' }),
+
+  getAdminCursoMatriculados: async (id) =>
+    request(`${API_URL}/admin/cursos/${id}/matriculados`),
+
+  getAdminInstrutores: async () => request(`${API_URL}/admin/instrutores`),
 
   getAdminCertificados: async (filters = {}) => {
     const params = new URLSearchParams(filters).toString();

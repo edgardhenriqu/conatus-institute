@@ -284,8 +284,10 @@ export function Login() {
       }
 
       setError(data.erro || 'Não foi possível entrar. Tente novamente.');
-    } catch {
-      setError('Não foi possível conectar ao servidor. Tente novamente.');
+    } catch (err) {
+      setError(err.message && !err.message.startsWith('Erro ') && err.message !== 'Failed to fetch'
+        ? err.message
+        : 'Não foi possível conectar ao servidor. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -354,7 +356,9 @@ export function Login() {
       setResendMsg('');
       setRegisteredEmail(data.email || regData.email);
     } catch (err) {
-      setError(err.message || 'Não foi possível conectar ao servidor. Tente novamente.');
+      setError(err.message && !err.message.startsWith('Erro ') && err.message !== 'Failed to fetch'
+        ? err.message
+        : 'Não foi possível conectar ao servidor. Tente novamente.');
     } finally {
       setLoading(false);
     }

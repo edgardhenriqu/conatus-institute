@@ -1,8 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-export function ProtectedRoute({ children, requireAdmin = false }) {
-  const { user, loading, isAdmin } = useAuth();
+export function ProtectedRoute({ children, requireAdmin = false, requireStaff = false }) {
+  const { user, loading, isAdmin, isStaff } = useAuth();
 
   if (loading) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Carregando...</div>;
@@ -13,6 +13,10 @@ export function ProtectedRoute({ children, requireAdmin = false }) {
   }
 
   if (requireAdmin && !isAdmin) {
+    return <Navigate to="/dashboard" />;
+  }
+
+  if (requireStaff && !isStaff) {
     return <Navigate to="/dashboard" />;
   }
 

@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { adminApi } from '../../services/adminApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { PageLoader } from '../../components/ui/PageLoader';
 
@@ -33,10 +34,14 @@ function Pill({ map, value }) {
 export function AdminCursos() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { isAdmin } = useAuth();
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erroCarregamento, setErroCarregamento] = useState('');
   const [busy, setBusy] = useState(false);
+  const [matriculadosAbertos, setMatriculadosAbertos] = useState(null); // cursoId
+  const [matriculados, setMatriculados] = useState([]);
+  const [loadingMatriculados, setLoadingMatriculados] = useState(false);
 
   const carregarCursos = useCallback(async () => {
     setLoading(true);
@@ -46,8 +51,8 @@ export function AdminCursos() {
       setCursos(data.cursos || []);
     } catch (err) {
       if (err.message?.includes('Token') || err.message?.includes('401') || err.message?.includes('403')) {
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         navigate('/login');
         return;
       }
@@ -75,6 +80,23 @@ export function AdminCursos() {
       toast.error(err.message || 'Erro ao criar curso.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleVerAlunos(curso) {
+    if (matriculadosAbertos === curso.id) {
+      setMatriculadosAbertos(null);
+      return;
+    }
+    setMatriculadosAbertos(curso.id);
+    setLoadingMatriculados(true);
+    try {
+      const data = await api.getAdminCursoMatriculados(curso.id);
+      setMatriculados(data.matriculados || []);
+    } catch {
+      toast.error('Erro ao carregar alunos do curso.');
+    } finally {
+      setLoadingMatriculados(false);
     }
   }
 
@@ -177,7 +199,8 @@ export function AdminCursos() {
                 </tr>
               ) : (
                 cursos.map(curso => (
-                  <tr key={curso.id}>
+                  <Fragment key={curso.id}>
+                  <tr>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <img
@@ -207,18 +230,76 @@ export function AdminCursos() {
                           style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
                           Visualizar
                         </Link>
-                        <button onClick={() => handleDuplicar(curso)}
-                          className="admin-btn admin-btn-view" title="Criar uma cópia como rascunho">Duplicar</button>
+                        {isAdmin && (
+                          <button onClick={() => handleDuplicar(curso)}
+                            className="admin-btn admin-btn-view" title="Criar uma cópia como rascunho">Duplicar</button>
+                        )}
                         <button onClick={() => handleToggleAtivo(curso)}
                           className="admin-btn" title={curso.status === 'inativo' ? 'Reativar curso' : 'Desativar curso'}
                           style={{ background: '#fff3cd', color: '#856404' }}>
                           {curso.status === 'inativo' ? 'Reativar' : 'Desativar'}
                         </button>
-                        <button onClick={() => handleExcluir(curso)}
-                          className="admin-btn admin-btn-delete" title="Excluir permanentemente">Excluir</button>
+                        {isAdmin && (
+                          <button onClick={() => handleExcluir(curso)}
+                            className="admin-btn admin-btn-delete" title="Excluir permanentemente">Excluir</button>
+                        )}
+                        <button onClick={() => handleVerAlunos(curso)}
+                          className="admin-btn admin-btn-view"
+                          title="Ver alunos matriculados"
+                          style={{ background: matriculadosAbertos === curso.id ? '#e0f2fe' : undefined }}>
+                          Alunos {matriculadosAbertos === curso.id ? '▲' : '▼'}
+                        </button>
                       </div>
                     </td>
                   </tr>
+                  {matriculadosAbertos === curso.id && (
+                    <tr key={`${curso.id}-alunos`}>
+                      <td colSpan="7" style={{ background: '#f8fafc', padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
+                        <strong style={{ display: 'block', marginBottom: '10px' }}>
+                          Alunos matriculados em "{curso.nome}"
+                        </strong>
+                        {loadingMatriculados ? (
+                          <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>
+                        ) : matriculados.length === 0 ? (
+                          <p style={{ color: 'var(--text-muted)' }}>Nenhum aluno matriculado ainda.</p>
+                        ) : (
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                <th style={{ textAlign: 'left', padding: '6px 8px' }}>Nome</th>
+                                <th style={{ textAlign: 'left', padding: '6px 8px' }}>Email</th>
+                                <th style={{ textAlign: 'center', padding: '6px 8px' }}>Progresso</th>
+                                <th style={{ textAlign: 'center', padding: '6px 8px' }}>Melhor Nota</th>
+                                <th style={{ textAlign: 'center', padding: '6px 8px' }}>Certificado</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {matriculados.map(a => (
+                                <tr key={a.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                  <td style={{ padding: '6px 8px' }}>{a.nome}</td>
+                                  <td style={{ padding: '6px 8px', color: 'var(--text-muted)' }}>{a.email}</td>
+                                  <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                    <span style={{ color: a.progresso >= 100 ? 'var(--success)' : 'inherit' }}>
+                                      {a.progresso || 0}%
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                    {a.melhor_nota != null ? `${a.melhor_nota}%` : '—'}
+                                  </td>
+                                  <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                    {a.certificado_codigo
+                                      ? <span style={{ color: 'var(--success)', fontWeight: 600 }}>Emitido</span>
+                                      : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))
               )}
             </tbody>

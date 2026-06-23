@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { api } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { PageLoader } from '../../components/ui/PageLoader';
 
 const EMPTY_STATS = {
@@ -16,9 +17,12 @@ const SHORTCUTS = [
 ];
 
 export function AdminDashboard() {
+  const { isInstrutor } = useAuth();
   const [stats, setStats] = useState(EMPTY_STATS);
   const [alunos, setAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  if (isInstrutor) return <Navigate to="/admin/cursos" replace />;
 
   useEffect(() => {
     async function loadData() {

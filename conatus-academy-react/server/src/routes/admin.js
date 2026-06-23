@@ -1,12 +1,48 @@
 const express = require('express');
 const pool = require('../../db/connection');
-const { adminMiddleware } = require('../middlewares/auth');
+const { contentMiddleware } = require('../middlewares/auth');
 
 const router = express.Router();
 
-router.use(adminMiddleware);
+router.use(contentMiddleware);
 
-router.get('/dashboard', async (req, res) => {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function onlyAdmin(req, res, next) {
+  if (!['admin', 'superadmin'].includes(req.userRole)) {
+    return res.status(403).json({ erro: 'Apenas administradores podem realizar esta ação.' });
+  }
+  next();
+}
+
+async function checkCourseAccess(req, cursoId) {
+  if (['admin', 'superadmin'].includes(req.userRole)) return true;
+  const r = await pool.query('SELECT instrutor_id FROM cursos WHERE id = $1', [cursoId]);
+  if (!r.rows.length) return false;
+  return String(r.rows[0].instrutor_id) === String(req.alunoId);
+}
+
+async function getCursoIdFromModulo(moduloId) {
+  const r = await pool.query('SELECT curso_id FROM modulos WHERE id = $1', [moduloId]);
+  return r.rows[0]?.curso_id ?? null;
+}
+
+async function getCursoIdFromAula(aulaId) {
+  const r = await pool.query(
+    'SELECT m.curso_id FROM aulas a JOIN modulos m ON m.id = a.modulo_id WHERE a.id = $1',
+    [aulaId]
+  );
+  return r.rows[0]?.curso_id ?? null;
+}
+
+async function getCursoIdFromQuestao(questaoId) {
+  const r = await pool.query('SELECT curso_id FROM questoes WHERE id = $1', [questaoId]);
+  return r.rows[0]?.curso_id ?? null;
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
+router.get('/dashboard', onlyAdmin, async (req, res) => {
   try {
     const [alunos, cursos, matriculas, certificados, publicados, rascunhos, emAndamento, aprovados] = await Promise.all([
       pool.query("SELECT COUNT(*) as total FROM alunos WHERE role NOT IN ('admin', 'superadmin')"),
@@ -40,10 +76,11 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-router.get('/alunos', async (req, res) => {
+// ── Alunos ────────────────────────────────────────────────────────────────────
+
+router.get('/alunos', onlyAdmin, async (req, res) => {
   try {
     const { busca } = req.query;
-    // Superadmin vê e gerencia os demais admins; admin comum vê apenas alunos e funcionários
     const filtroVisibilidade = req.userRole === 'superadmin'
       ? `a.role != 'superadmin'`
       : `a.role NOT IN ('admin', 'superadmin')`;
@@ -71,7 +108,7 @@ router.get('/alunos', async (req, res) => {
   }
 });
 
-router.get('/alunos/:id', async (req, res) => {
+router.get('/alunos/:id', onlyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -99,11 +136,11 @@ router.get('/alunos/:id', async (req, res) => {
     );
 
     const certificados = await pool.query(
-      `SELECT cert.*, c.nome as curso_nome
+      `SELECT cert.*, cert.created_at as data_emissao, c.nome as curso_nome
        FROM certificados cert
        JOIN cursos c ON c.id = cert.curso_id
        WHERE cert.aluno_id = $1
-       ORDER BY cert.data_emissao DESC`,
+       ORDER BY cert.created_at DESC`,
       [id]
     );
 
@@ -118,14 +155,14 @@ router.get('/alunos/:id', async (req, res) => {
   }
 });
 
-router.put('/alunos/:id', async (req, res) => {
+router.put('/alunos/:id', onlyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { nome, email, telefone, endereco, cidade, estado, ativo, role } = req.body;
 
-    const validRoles = ['aluno', 'conatus_employee', 'admin'];
+    const validRoles = ['aluno', 'conatus_employee', 'admin', 'instrutor'];
     if (role !== undefined && !validRoles.includes(role)) {
-      return res.status(400).json({ erro: 'Perfil inválido. Use: aluno, conatus_employee ou admin.' });
+      return res.status(400).json({ erro: 'Perfil inválido. Use: aluno, conatus_employee, instrutor ou admin.' });
     }
 
     const alvo = await pool.query('SELECT role FROM alunos WHERE id = $1', [id]);
@@ -142,7 +179,6 @@ router.put('/alunos/:id', async (req, res) => {
       return res.status(403).json({ erro: 'Apenas o Super Administrador pode editar perfis de administradores.' });
     }
 
-    // Apenas o superadmin pode alterar o cargo de outros usuários
     if (role !== undefined && role !== roleAlvo && req.userRole !== 'superadmin') {
       return res.status(403).json({ erro: 'Apenas o Super Administrador pode alterar o cargo de usuários.' });
     }
@@ -176,7 +212,7 @@ router.put('/alunos/:id', async (req, res) => {
   }
 });
 
-router.delete('/alunos/:id', async (req, res) => {
+router.delete('/alunos/:id', onlyAdmin, async (req, res) => {
   const client = await pool.connect();
   try {
     const { id } = req.params;
@@ -194,7 +230,6 @@ router.delete('/alunos/:id', async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Remove registros dependentes antes do aluno (garante funcionar sem CASCADE no banco legado)
     await client.query('DELETE FROM certificados WHERE aluno_id = $1', [id]);
     await client.query('DELETE FROM matriculas WHERE aluno_id = $1', [id]);
     await client.query('DELETE FROM progresso_aulas WHERE aluno_id = $1', [id]);
@@ -220,8 +255,18 @@ router.delete('/alunos/:id', async (req, res) => {
   }
 });
 
+// ── Cursos ────────────────────────────────────────────────────────────────────
+
 router.get('/cursos', async (req, res) => {
   try {
+    const params = [];
+    let whereClause = '';
+
+    if (req.userRole === 'instrutor') {
+      whereClause = 'WHERE c.instrutor_id = $1';
+      params.push(req.alunoId);
+    }
+
     const resultado = await pool.query(
       `SELECT c.*,
         (SELECT COUNT(*) FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE m.curso_id = c.id AND a.role NOT IN ('admin', 'superadmin')) as total_matriculas,
@@ -229,7 +274,9 @@ router.get('/cursos', async (req, res) => {
         (SELECT COUNT(*) FROM aulas au JOIN modulos mo ON mo.id = au.modulo_id WHERE mo.curso_id = c.id) as total_aulas,
         (SELECT COUNT(*) FROM questoes q WHERE q.curso_id = c.id) as total_questoes
        FROM cursos c
-       ORDER BY c.id`
+       ${whereClause}
+       ORDER BY c.id`,
+      params
     );
     res.json({ cursos: resultado.rows });
   } catch (error) {
@@ -238,7 +285,6 @@ router.get('/cursos', async (req, res) => {
   }
 });
 
-// Campos editáveis do curso (formulário completo do construtor)
 const CURSO_FIELDS = [
   'nome', 'duracao', 'image', 'descricao', 'descricao_curta', 'categoria',
   'nivel', 'tipo', 'status', 'visivel', 'publico_alvo', 'objetivo',
@@ -270,6 +316,10 @@ function validarCurso(body, { exigirObrigatorios = false } = {}) {
 router.get('/cursos/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
 
     const curso = await pool.query(
       `SELECT c.*,
@@ -304,6 +354,16 @@ router.post('/cursos', async (req, res) => {
       }
     }
 
+    // Instrutor é automaticamente vinculado ao curso que cria
+    if (req.userRole === 'instrutor') {
+      cols.push('instrutor_id');
+      values.push(req.alunoId);
+    } else if (req.body.instrutor_id) {
+      // Admin pode definir o instrutor ao criar o curso
+      cols.push('instrutor_id');
+      values.push(req.body.instrutor_id);
+    }
+
     const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
     const resultado = await pool.query(
       `INSERT INTO cursos (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`,
@@ -320,6 +380,11 @@ router.post('/cursos', async (req, res) => {
 router.put('/cursos/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
     const erro = validarCurso(req.body);
     if (erro) return res.status(400).json({ erro });
     if (req.body.nome === '' || req.body.duracao === '') {
@@ -333,6 +398,12 @@ router.put('/cursos/:id', async (req, res) => {
         values.push(req.body[field] === '' ? null : req.body[field]);
         sets.push(`${field} = $${values.length}`);
       }
+    }
+
+    // Apenas admins podem mudar o instrutor vinculado
+    if (['admin', 'superadmin'].includes(req.userRole) && req.body.instrutor_id !== undefined) {
+      values.push(req.body.instrutor_id || null);
+      sets.push(`instrutor_id = $${values.length}`);
     }
 
     if (sets.length === 0) {
@@ -358,11 +429,14 @@ router.put('/cursos/:id', async (req, res) => {
   }
 });
 
-// Alterar apenas o status (publicar / despublicar / desativar)
 router.put('/cursos/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
 
     if (!STATUS_VALIDOS.includes(status)) {
       return res.status(400).json({ erro: `Status inválido. Use: ${STATUS_VALIDOS.join(', ')}` });
@@ -384,8 +458,7 @@ router.put('/cursos/:id/status', async (req, res) => {
   }
 });
 
-// Duplicar curso (com módulos, aulas, avaliação e questões) como rascunho
-router.post('/cursos/:id/duplicar', async (req, res) => {
+router.post('/cursos/:id/duplicar', onlyAdmin, async (req, res) => {
   const client = await pool.connect();
   try {
     const { id } = req.params;
@@ -410,7 +483,6 @@ router.post('/cursos/:id/duplicar', async (req, res) => {
     );
     const novoId = novo.rows[0].id;
 
-    // módulos + aulas
     const modulos = await client.query('SELECT * FROM modulos WHERE curso_id = $1 ORDER BY ordem', [id]);
     for (const mod of modulos.rows) {
       const novoMod = await client.query(
@@ -428,7 +500,6 @@ router.post('/cursos/:id/duplicar', async (req, res) => {
       }
     }
 
-    // avaliação + questões
     const avaliacao = await client.query('SELECT * FROM avaliacoes WHERE curso_id = $1', [id]);
     if (avaliacao.rows.length > 0) {
       const av = avaliacao.rows[0];
@@ -458,10 +529,14 @@ router.post('/cursos/:id/duplicar', async (req, res) => {
   }
 });
 
-// Alunos matriculados em um curso (com progresso e melhor nota)
 router.get('/cursos/:id/matriculados', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
     const resultado = await pool.query(
       `SELECT a.id, a.nome, a.email, m.progresso, m.status, m.created_at as data_matricula,
         (SELECT MAX(t.nota) FROM tentativas_avaliacao t WHERE t.aluno_id = a.id AND t.curso_id = m.curso_id) as melhor_nota,
@@ -481,9 +556,7 @@ router.get('/cursos/:id/matriculados', async (req, res) => {
   }
 });
 
-// Desmatricular aluno de um curso (remove matrícula, progresso e tentativas;
-// certificados emitidos são preservados e gerenciados na página Certificados)
-router.delete('/cursos/:id/matriculados/:alunoId', async (req, res) => {
+router.delete('/cursos/:id/matriculados/:alunoId', onlyAdmin, async (req, res) => {
   const client = await pool.connect();
   try {
     const { id, alunoId } = req.params;
@@ -520,11 +593,16 @@ router.delete('/cursos/:id/matriculados/:alunoId', async (req, res) => {
   }
 });
 
-// ── Avaliação (config) ───────────────────────────────────────────────────────
+// ── Avaliação (config) ────────────────────────────────────────────────────────
 
 router.get('/cursos/:id/avaliacao', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
     const resultado = await pool.query('SELECT * FROM avaliacoes WHERE curso_id = $1', [id]);
     res.json({ avaliacao: resultado.rows[0] || null });
   } catch (error) {
@@ -536,6 +614,11 @@ router.get('/cursos/:id/avaliacao', async (req, res) => {
 router.put('/cursos/:id/avaliacao', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
     const { num_questoes, nota_minima, max_tentativas, ativa } = req.body;
 
     const nq = parseInt(num_questoes, 10);
@@ -561,7 +644,7 @@ router.put('/cursos/:id/avaliacao', async (req, res) => {
   }
 });
 
-// ── Questões ─────────────────────────────────────────────────────────────────
+// ── Questões ──────────────────────────────────────────────────────────────────
 
 function validarQuestao(body) {
   const { enunciado, alternativas, correta } = body;
@@ -576,6 +659,11 @@ function validarQuestao(body) {
 router.get('/cursos/:id/questoes', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
     const resultado = await pool.query(
       'SELECT * FROM questoes WHERE curso_id = $1 ORDER BY id',
       [id]
@@ -590,6 +678,11 @@ router.get('/cursos/:id/questoes', async (req, res) => {
 router.post('/cursos/:id/questoes', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
     const erro = validarQuestao(req.body);
     if (erro) return res.status(400).json({ erro });
 
@@ -611,6 +704,14 @@ router.post('/cursos/:id/questoes', async (req, res) => {
 router.put('/questoes/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromQuestao(id);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a esta questão.' });
+      }
+    }
+
     const erro = validarQuestao(req.body);
     if (erro) return res.status(400).json({ erro });
 
@@ -637,6 +738,14 @@ router.put('/questoes/:id', async (req, res) => {
 router.delete('/questoes/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromQuestao(id);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a esta questão.' });
+      }
+    }
+
     const resultado = await pool.query('DELETE FROM questoes WHERE id = $1 RETURNING id', [id]);
 
     if (resultado.rows.length === 0) {
@@ -650,9 +759,9 @@ router.delete('/questoes/:id', async (req, res) => {
   }
 });
 
-// ── Autorizações de acesso (cursos internos) ─────────────────────────────────
+// ── Autorizações de acesso (cursos internos) ──────────────────────────────────
 
-router.get('/cursos/:id/autorizacoes', async (req, res) => {
+router.get('/cursos/:id/autorizacoes', onlyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const resultado = await pool.query(
@@ -670,7 +779,7 @@ router.get('/cursos/:id/autorizacoes', async (req, res) => {
   }
 });
 
-router.post('/cursos/:id/autorizacoes', async (req, res) => {
+router.post('/cursos/:id/autorizacoes', onlyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { email } = req.body;
@@ -697,7 +806,7 @@ router.post('/cursos/:id/autorizacoes', async (req, res) => {
   }
 });
 
-router.delete('/cursos/:id/autorizacoes/:alunoId', async (req, res) => {
+router.delete('/cursos/:id/autorizacoes/:alunoId', onlyAdmin, async (req, res) => {
   try {
     const { id, alunoId } = req.params;
     const resultado = await pool.query(
@@ -716,7 +825,7 @@ router.delete('/cursos/:id/autorizacoes/:alunoId', async (req, res) => {
   }
 });
 
-router.delete('/cursos/:id', async (req, res) => {
+router.delete('/cursos/:id', onlyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -736,11 +845,13 @@ router.delete('/cursos/:id', async (req, res) => {
   }
 });
 
-router.get('/certificados', async (req, res) => {
+// ── Certificados ──────────────────────────────────────────────────────────────
+
+router.get('/certificados', onlyAdmin, async (req, res) => {
   try {
     const { aluno_id, curso_id, data_inicio, data_fim } = req.query;
     let query = `
-      SELECT cert.*,
+      SELECT cert.*, cert.created_at as data_emissao,
         a.nome as aluno_nome, a.email as aluno_email,
         c.nome as curso_nome, c.duracao as curso_duracao
       FROM certificados cert
@@ -764,18 +875,18 @@ router.get('/certificados', async (req, res) => {
     }
 
     if (data_inicio) {
-      query += ` AND cert.data_emissao >= $${paramIndex}`;
+      query += ` AND cert.created_at >= $${paramIndex}`;
       params.push(data_inicio);
       paramIndex++;
     }
 
     if (data_fim) {
-      query += ` AND cert.data_emissao <= $${paramIndex}`;
+      query += ` AND cert.created_at <= $${paramIndex}`;
       params.push(data_fim);
       paramIndex++;
     }
 
-    query += ' ORDER BY cert.data_emissao DESC';
+    query += ' ORDER BY cert.created_at DESC';
 
     const resultado = await pool.query(query, params);
     res.json({ certificados: resultado.rows });
@@ -785,7 +896,7 @@ router.get('/certificados', async (req, res) => {
   }
 });
 
-router.get('/certificados/validar/:codigo', async (req, res) => {
+router.get('/certificados/validar/:codigo', onlyAdmin, async (req, res) => {
   try {
     const { codigo } = req.params;
 
@@ -811,7 +922,7 @@ router.get('/certificados/validar/:codigo', async (req, res) => {
   }
 });
 
-router.delete('/certificados/:id', async (req, res) => {
+router.delete('/certificados/:id', onlyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -831,12 +942,17 @@ router.delete('/certificados/:id', async (req, res) => {
   }
 });
 
-// Rotas de Módulos
+// ── Módulos ───────────────────────────────────────────────────────────────────
+
 router.get('/modulos', async (req, res) => {
   try {
     const { cursoId } = req.query;
     if (!cursoId) {
       return res.status(400).json({ erro: 'cursoId é obrigatório' });
+    }
+
+    if (!(await checkCourseAccess(req, cursoId))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
     }
 
     const resultado = await pool.query(
@@ -853,12 +969,20 @@ router.get('/modulos', async (req, res) => {
 router.get('/modulos/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromModulo(id);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a este módulo.' });
+      }
+    }
+
     const resultado = await pool.query('SELECT * FROM modulos WHERE id = $1', [id]);
-    
+
     if (resultado.rows.length === 0) {
       return res.status(404).json({ erro: 'Módulo não encontrado' });
     }
-    
+
     res.json({ modulo: resultado.rows[0] });
   } catch (error) {
     console.error('Erro ao buscar módulo:', error);
@@ -872,6 +996,10 @@ router.post('/modulos', async (req, res) => {
 
     if (!cursoId || !titulo) {
       return res.status(400).json({ erro: 'Campos obrigatórios: cursoId, titulo' });
+    }
+
+    if (!(await checkCourseAccess(req, cursoId))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
     }
 
     const resultado = await pool.query(
@@ -893,12 +1021,18 @@ router.put('/modulos/:id', async (req, res) => {
     const { id } = req.params;
     const { titulo, descricao, ordem } = req.body;
 
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromModulo(id);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a este módulo.' });
+      }
+    }
+
     const resultado = await pool.query(
       `UPDATE modulos
        SET titulo = COALESCE($1, titulo),
            descricao = COALESCE($2, descricao),
-           ordem = COALESCE($3, ordem),
-           updated_at = CURRENT_TIMESTAMP
+           ordem = COALESCE($3, ordem)
        WHERE id = $4
        RETURNING *`,
       [titulo, descricao, ordem, id]
@@ -918,6 +1052,13 @@ router.put('/modulos/:id', async (req, res) => {
 router.delete('/modulos/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromModulo(id);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a este módulo.' });
+      }
+    }
 
     const resultado = await pool.query('DELETE FROM modulos WHERE id = $1 RETURNING id', [id]);
 
@@ -940,6 +1081,10 @@ router.post('/modulos/reorder', async (req, res) => {
       return res.status(400).json({ erro: 'cursoId e ordem (array) são obrigatórios' });
     }
 
+    if (!(await checkCourseAccess(req, cursoId))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
     for (let i = 0; i < ordem.length; i++) {
       await pool.query(
         'UPDATE modulos SET ordem = $1 WHERE id = $2 AND curso_id = $3',
@@ -954,12 +1099,20 @@ router.post('/modulos/reorder', async (req, res) => {
   }
 });
 
-// Rotas de Aulas
+// ── Aulas ─────────────────────────────────────────────────────────────────────
+
 router.get('/aulas', async (req, res) => {
   try {
     const { moduloId } = req.query;
     if (!moduloId) {
       return res.status(400).json({ erro: 'moduloId é obrigatório' });
+    }
+
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromModulo(moduloId);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a este módulo.' });
+      }
     }
 
     const resultado = await pool.query(
@@ -976,12 +1129,20 @@ router.get('/aulas', async (req, res) => {
 router.get('/aulas/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromAula(id);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a esta aula.' });
+      }
+    }
+
     const resultado = await pool.query('SELECT * FROM aulas WHERE id = $1', [id]);
-    
+
     if (resultado.rows.length === 0) {
       return res.status(404).json({ erro: 'Aula não encontrada' });
     }
-    
+
     res.json({ aula: resultado.rows[0] });
   } catch (error) {
     console.error('Erro ao buscar aula:', error);
@@ -1003,6 +1164,13 @@ router.post('/aulas', async (req, res) => {
     }
     if (tipo_conteudo && !TIPOS_CONTEUDO.includes(tipo_conteudo)) {
       return res.status(400).json({ erro: `Tipo de conteúdo inválido. Use: ${TIPOS_CONTEUDO.join(', ')}` });
+    }
+
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromModulo(moduloId);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a este módulo.' });
+      }
     }
 
     const resultado = await pool.query(
@@ -1031,6 +1199,13 @@ router.put('/aulas/:id', async (req, res) => {
 
     if (tipo_conteudo && !TIPOS_CONTEUDO.includes(tipo_conteudo)) {
       return res.status(400).json({ erro: `Tipo de conteúdo inválido. Use: ${TIPOS_CONTEUDO.join(', ')}` });
+    }
+
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromAula(id);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a esta aula.' });
+      }
     }
 
     const resultado = await pool.query(
@@ -1066,6 +1241,13 @@ router.delete('/aulas/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromAula(id);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a esta aula.' });
+      }
+    }
+
     const resultado = await pool.query('DELETE FROM aulas WHERE id = $1 RETURNING id', [id]);
 
     if (resultado.rows.length === 0) {
@@ -1087,6 +1269,13 @@ router.post('/aulas/reorder', async (req, res) => {
       return res.status(400).json({ erro: 'moduloId e ordem (array) são obrigatórios' });
     }
 
+    if (req.userRole === 'instrutor') {
+      const cursoId = await getCursoIdFromModulo(moduloId);
+      if (!cursoId || !(await checkCourseAccess(req, cursoId))) {
+        return res.status(403).json({ erro: 'Acesso negado a este módulo.' });
+      }
+    }
+
     for (let i = 0; i < ordem.length; i++) {
       await pool.query(
         'UPDATE aulas SET ordem = $1 WHERE id = $2 AND modulo_id = $3',
@@ -1097,6 +1286,20 @@ router.post('/aulas/reorder', async (req, res) => {
     res.json({ mensagem: 'Ordem atualizada com sucesso' });
   } catch (error) {
     console.error('Erro ao reordenar aulas:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// ── Instrutores (lista para atribuição em cursos) ─────────────────────────────
+
+router.get('/instrutores', onlyAdmin, async (req, res) => {
+  try {
+    const resultado = await pool.query(
+      `SELECT id, nome, email FROM alunos WHERE role = 'instrutor' AND ativo = true ORDER BY nome`
+    );
+    res.json({ instrutores: resultado.rows });
+  } catch (error) {
+    console.error('Erro ao listar instrutores:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
