@@ -3,7 +3,7 @@
 ## Resumo das Alterações
 
 ### Arquivos Criados:
-1. **`db/migration-admin-completa.sql`** - Script de migração para o banco de dados
+1. **`conatus-academy-react/server/db/ensureSchema.js`** - Migrações idempotentes aplicadas no boot do servidor
 2. **`conatus-academy/src/middlewares/auth.js`** - Middlewares de autenticação e autorização
 3. **`conatus-academy/src/routes/admin.js`** - Rotas da API administrativa
 4. **`conatus-academy/public/dashboard-admin.html`** - Painel administrativo principal
@@ -12,7 +12,7 @@
 7. **`conatus-academy/public/admin-certificados.html`** - Página de gerenciamento de certificados
 
 ### Arquivos Alterados:
-1. **`db/schema.sql`** - Adicionados campos `role` e `ativo` na tabela `alunos`
+1. **`conatus-academy-react/server/db/init.sql`** - Schema canônico (banco novo); inclui `role` e `ativo` em `alunos`
 2. **`conatus-academy/server.js`** - Adicionada rota `/api/admin`
 3. **`conatus-academy/src/routes/auth.js`** - Atualizado para incluir campo `role` no JWT e retorno
 4. **`conatus-academy/public/login.html`** - Atualizado para redirecionar admin para `dashboard-admin.html`
@@ -21,17 +21,14 @@
 
 ## Passo a Passo para Testar
 
-### 1. Executar Migração no Banco de Dados
+### 1. Banco de Dados (automático)
 
-Conecte-se ao banco de dados PostgreSQL e execute o script de migração:
+Não é necessário rodar migração manual. O schema é aplicado sozinho:
 
-```bash
-# Se estiver usando Docker
-docker exec -i <container_id> psql -U <usuario> -d <banco> < db/migration-admin-completa.sql
+- **Banco novo:** `server/db/init.sql` roda automaticamente na primeira inicialização do container Postgres (montado no `docker-compose.yml`).
+- **Banco existente:** `server/db/ensureSchema.js` roda no boot do servidor e aplica de forma idempotente todas as colunas/tabelas faltantes.
 
-# Ou execute diretamente no psql
-psql -U <usuario> -d <banco> -f db/migration-admin-completa.sql
-```
+Basta subir o Postgres e reiniciar o servidor.
 
 ### 2. Reiniciar o Servidor
 
