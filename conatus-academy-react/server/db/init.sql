@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS alunos (
     estado VARCHAR(50),
     role VARCHAR(20) NOT NULL DEFAULT 'aluno',
     ativo BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS cursos (
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS cursos (
     requisitos_certificado TEXT,
     cert_responsavel VARCHAR(255),
     cert_texto TEXT,
+    cert_assinatura TEXT,
     oque_aprender TEXT,
     mercado_trabalho TEXT,
     areas_atuacao TEXT,
@@ -82,6 +84,7 @@ CREATE TABLE IF NOT EXISTS matriculas (
     status VARCHAR(20) DEFAULT 'ativa',
     progresso INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (aluno_id, curso_id)
 );
 

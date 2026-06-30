@@ -180,6 +180,7 @@ export function Login() {
 
   /* Register state */
   const [cep, setCep] = useState('');
+  const [confirmSenha, setConfirmSenha] = useState('');
   const [regData, setRegData] = useState({
     nome: '', email: '', senha: '', cpf: '',
     data_nascimento: '', telefone: '',
@@ -197,6 +198,7 @@ export function Login() {
     setIsLogin(toLogin);
     setError('');
     setShowPass(false);
+    setConfirmSenha('');
     setCepError('');
     setCpfStatus(null);
     setPhoneStatus(null);
@@ -345,6 +347,11 @@ export function Login() {
     const pwdChecks = checkPassword(regData.senha);
     if (!Object.values(pwdChecks).every(Boolean)) {
       setError('A senha não atende aos requisitos de segurança. Corrija antes de continuar.');
+      return;
+    }
+
+    if (regData.senha !== confirmSenha) {
+      setError('As senhas não coincidem. Verifique a confirmação de senha.');
       return;
     }
 
@@ -637,6 +644,31 @@ export function Login() {
                         </div>
                       );
                     })()}
+                  </div>
+
+                  <div className="auth-form-group">
+                    <label htmlFor="reg-confirma-senha" className="auth-label">
+                      Confirmar Senha <span className="auth-required" aria-hidden="true">*</span>
+                    </label>
+                    <div className="auth-input-wrapper">
+                      <input id="reg-confirma-senha" type={showPass ? 'text' : 'password'}
+                        className="auth-input" placeholder="Repita a senha"
+                        value={confirmSenha} autoComplete="new-password"
+                        required aria-required="true"
+                        aria-describedby={confirmSenha && regData.senha !== confirmSenha ? 'confirma-senha-error' : undefined}
+                        aria-invalid={!!confirmSenha && regData.senha !== confirmSenha}
+                        onChange={e => { setError(''); setConfirmSenha(e.target.value); }} />
+                      <button type="button" className="auth-toggle-pass"
+                        onClick={() => setShowPass(v => !v)}
+                        aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}>
+                        {showPass ? '🙈' : '👁️'}
+                      </button>
+                    </div>
+                    {confirmSenha && regData.senha !== confirmSenha && (
+                      <p id="confirma-senha-error" className="auth-field-error" role="alert">
+                        As senhas não coincidem.
+                      </p>
+                    )}
                   </div>
                 </fieldset>
 

@@ -22,8 +22,6 @@ export function AdminDashboard() {
   const [alunos, setAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  if (isInstrutor) return <Navigate to="/admin/cursos" replace />;
-
   useEffect(() => {
     async function loadData() {
       try {
@@ -47,6 +45,8 @@ export function AdminDashboard() {
     }
     loadData();
   }, []);
+
+  if (isInstrutor) return <Navigate to="/admin/cursos" replace />;
 
   if (loading) return <PageLoader message="Carregando painel administrativo..." />;
 

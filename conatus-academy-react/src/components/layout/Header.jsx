@@ -18,9 +18,9 @@ export function Header() {
         
         <ul className={`nav-menu ${isMenuOpen ? 'active' : ''}`}>
           <li><Link to="/#sobre" onClick={closeMenu}>Sobre</Link></li>
-          <li><Link to="/cursos" onClick={closeMenu}>Cursos</Link></li>
+          <li><Link to="/#cursos" onClick={closeMenu}>Cursos</Link></li>
           <li><Link to="/#metodologia" onClick={closeMenu}>Metodologia</Link></li>
-          <li><Link to="/#pesquisa" onClick={closeMenu}>Pesquisa</Link></li>
+          <li><Link to="/#professores" onClick={closeMenu}>Professores</Link></li>
         </ul>
 
         <div className="nav-actions">

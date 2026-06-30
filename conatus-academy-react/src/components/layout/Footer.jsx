@@ -10,13 +10,9 @@ export function Footer() {
           <p>© 2026 Todos os direitos reservados.</p>
         </div>
         <div className="footer-col">
-          <h4>Acadêmico</h4>
-          <Link to="/cursos">Catálogo de Cursos</Link>
-          <a href="#">Calendário Acadêmico</a>
-          <a href="#">Biblioteca Digital</a>
-          <a href="#">Corpo Docente</a>
+          <h4>Certificados</h4>
+          <p><Link to="/validar-certificado">Validar certificado</Link></p>
         </div>
-      
         <div className="footer-col">
           <h4>Contato</h4>
           <p>Sede Digital - Ensino Remoto Global</p>

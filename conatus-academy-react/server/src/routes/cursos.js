@@ -97,6 +97,25 @@ router.get('/aluno/matriculas', authMiddleware, async (req, res) => {
   }
 });
 
+// Certificados de cursos do banco emitidos para o aluno logado.
+router.get('/aluno/certificados', authMiddleware, async (req, res) => {
+  try {
+    const resultado = await pool.query(
+      `SELECT cert.id, cert.codigo, cert.nota_avaliacao, cert.data_emissao,
+              c.id AS curso_id, c.nome AS curso_nome, c.duracao AS curso_duracao
+         FROM certificados cert
+         JOIN cursos c ON c.id = cert.curso_id
+        WHERE cert.aluno_id = $1
+        ORDER BY cert.data_emissao DESC`,
+      [req.alunoId]
+    );
+    res.json({ certificados: resultado.rows });
+  } catch (error) {
+    console.error('Erro ao buscar certificados do aluno:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
@@ -495,7 +514,7 @@ router.get('/:cursoId/certificado', authMiddleware, async (req, res) => {
 
     const certExiste = await pool.query(
       `SELECT cert.*, c.nome as curso_nome, c.duracao as curso_duracao,
-              c.cert_responsavel, c.cert_texto
+              c.cert_responsavel, c.cert_texto, c.cert_assinatura
        FROM certificados cert
        JOIN cursos c ON c.id = cert.curso_id
        WHERE cert.aluno_id = $1 AND cert.curso_id = $2`,

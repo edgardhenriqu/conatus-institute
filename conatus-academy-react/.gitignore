@@ -12,10 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Uploads enviados em runtime (capas de curso, etc.) — não versionar o conteúdo
+server/uploads/
+
 # Environment variables — never commit real credentials
 .env
 .env.local
 .env.*.local
+*.bak
 
 # Editor directories and files
 .vscode/*

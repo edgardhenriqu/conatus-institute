@@ -42,7 +42,9 @@ function emptyForm(aluno = null) {
 
 export function AdminAlunos() {
   const toast = useToast();
-  const { isSuperAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAuth();
+  // Admins podem alterar cargos; só o superadmin pode conceder o perfil "admin".
+  const roleOptions = isSuperAdmin ? ROLE_OPTIONS : ROLE_OPTIONS.filter(o => o.value !== 'admin');
   const [alunos, setAlunos]                 = useState([]);
   const [loading, setLoading]               = useState(true);
   const [busca, setBusca]                   = useState('');
@@ -90,10 +92,10 @@ export function AdminAlunos() {
     e.preventDefault();
     try {
       const payload = { ...formData };
-      if (isSuperAdmin) {
+      if (isAdmin) {
         payload.role = formData.role || 'aluno';
       } else {
-        delete payload.role; // admin comum não pode alterar cargos
+        delete payload.role; // sem permissão para alterar cargos
       }
       const data = await api.updateAdminAluno(alunoSelecionado.id, payload);
       if (data.erro) {
@@ -264,20 +266,24 @@ export function AdminAlunos() {
                   <div>
                     <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Perfil / Função</label>
                     <select value={formData.role || 'aluno'}
-                      disabled={!editando || !isSuperAdmin}
-                      style={inputStyle(editando && isSuperAdmin)}
+                      disabled={!editando || !isAdmin}
+                      style={inputStyle(editando && isAdmin)}
                       onChange={e => setFormData({ ...formData, role: e.target.value })}>
-                      {ROLE_OPTIONS.map(o => (
+                      {roleOptions.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
-                    {!isSuperAdmin ? (
+                    {!isAdmin ? (
                       <p style={{ fontSize: '0.8rem', color: '#b91c1c', marginTop: '6px' }}>
-                        Apenas o Super Administrador pode alterar o cargo dos usuários.
+                        Você não tem permissão para alterar cargos.
                       </p>
-                    ) : !editando && (
+                    ) : !editando ? (
                       <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
                         Clique em "Editar" para alterar o perfil.
+                      </p>
+                    ) : !isSuperAdmin && (
+                      <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
+                        Apenas o Super Administrador pode conceder o perfil de Administrador.
                       </p>
                     )}
                   </div>
@@ -322,12 +328,14 @@ export function AdminAlunos() {
                               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                                 {m.progresso || 0}% concluído
                               </span>
-                              <button type="button" className="admin-btn admin-btn-delete"
-                                style={{ margin: 0 }}
-                                onClick={() => handleDesmatricular(m)}
-                                title="Remover matrícula deste curso">
-                                Desmatricular
-                              </button>
+                              {editando && (
+                                <button type="button" className="admin-btn admin-btn-delete"
+                                  style={{ margin: 0 }}
+                                  onClick={() => handleDesmatricular(m)}
+                                  title="Remover matrícula deste curso">
+                                  Desmatricular
+                                </button>
+                              )}
                             </span>
                           </div>
                         ))}
@@ -356,7 +364,7 @@ export function AdminAlunos() {
                 </div>
               )}
 
-              {editando ? (
+              {editando && (
                 <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
                   <button type="submit" className="admin-btn admin-btn-edit" style={{ padding: '10px 25px' }}>
                     Salvar Alterações
@@ -366,16 +374,8 @@ export function AdminAlunos() {
                     onClick={() => { setEditando(false); setFormData(emptyForm(alunoSelecionado)); setMensagem(''); }}>
                     Cancelar
                   </button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
-                  <button type="button" className="admin-btn admin-btn-edit"
-                    style={{ padding: '10px 25px' }}
-                    onClick={() => setEditando(true)}>
-                    Editar
-                  </button>
                   <button type="button" className="admin-btn admin-btn-delete"
-                    style={{ padding: '10px 25px' }}
+                    style={{ padding: '10px 25px', marginLeft: 'auto' }}
                     onClick={() => handleExcluir(alunoSelecionado.id)}>
                     Excluir Aluno
                   </button>

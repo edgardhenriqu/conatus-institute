@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CourseCard } from './CourseCard';
 
-export function Carousel({ items, variant = 'carousel' }) {
+export function Carousel({ items, variant = 'carousel', renderItem }) {
   const [idx, setIdx] = useState(() => items.length);
 
   const move = useCallback((dir) => {
@@ -35,8 +35,8 @@ export function Carousel({ items, variant = 'carousel' }) {
             style={{ transform: `translateX(calc(${idx} * (-100% / 3 - 8px)))` }}
           >
             {displayItems.map((item, index) => (
-              <div key={`${item.id}-${index}`} className={`${variant}-slide`}>
-                <CourseCard curso={item} variant={variant} />
+              <div key={`${item.id ?? index}-${index}`} className={`${variant}-slide`}>
+                {renderItem ? renderItem(item) : <CourseCard curso={item} variant={variant} />}
               </div>
             ))}
           </div>

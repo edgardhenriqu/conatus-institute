@@ -52,6 +52,48 @@ function senhaForte(senha) {
     && /[^A-Za-z0-9]/.test(senha);
 }
 
+// Quantidade de senhas (incluindo a atual) que não podem ser reutilizadas.
+const HISTORICO_SENHAS = 5;
+
+/**
+ * Indica se a senha em claro coincide com a senha atual ou com alguma das
+ * últimas senhas usadas pelo aluno (bloqueio de reutilização).
+ */
+async function senhaReutilizada(alunoId, senhaPlana, senhaAtualHash) {
+  const historico = await pool.query(
+    'SELECT senha_hash FROM senha_historico WHERE aluno_id = $1 ORDER BY created_at DESC LIMIT $2',
+    [alunoId, HISTORICO_SENHAS - 1]
+  );
+  const hashesAnteriores = [
+    ...(senhaAtualHash ? [senhaAtualHash] : []),
+    ...historico.rows.map(r => r.senha_hash),
+  ];
+  for (const hashAntigo of hashesAnteriores) {
+    if (await bcrypt.compare(senhaPlana, hashAntigo)) return true;
+  }
+  return false;
+}
+
+/** Arquiva o hash da senha anterior no histórico e mantém só as últimas N. */
+async function arquivarSenhaAnterior(alunoId, senhaAnteriorHash) {
+  if (!senhaAnteriorHash) return;
+  await pool.query(
+    'INSERT INTO senha_historico (aluno_id, senha_hash) VALUES ($1, $2)',
+    [alunoId, senhaAnteriorHash]
+  );
+  await pool.query(
+    `DELETE FROM senha_historico
+      WHERE aluno_id = $1
+        AND id NOT IN (
+          SELECT id FROM senha_historico
+           WHERE aluno_id = $1
+           ORDER BY created_at DESC
+           LIMIT $2
+        )`,
+    [alunoId, HISTORICO_SENHAS]
+  );
+}
+
 const SENHA_TOKEN_TTL_MIN = 60; // link de redefinição válido por 1 hora
 
 /**
@@ -462,6 +504,16 @@ router.post('/redefinir-senha', async (req, res) => {
       return res.status(400).json({ erro: 'Link de redefinição expirado. Solicite um novo.', expirado: true });
     }
 
+    // Impede reutilizar a senha atual ou uma das últimas senhas usadas.
+    const alunoRes = await pool.query('SELECT senha FROM alunos WHERE id = $1', [registro.aluno_id]);
+    const senhaAtual = alunoRes.rows[0]?.senha;
+
+    if (await senhaReutilizada(registro.aluno_id, senha, senhaAtual)) {
+      return res.status(400).json({
+        erro: `A nova senha não pode ser igual a nenhuma das últimas ${HISTORICO_SENHAS} senhas utilizadas. Escolha uma senha diferente.`,
+      });
+    }
+
     const salt = await bcrypt.genSalt(10);
     const senhaHash = await bcrypt.hash(senha, salt);
 
@@ -469,6 +521,7 @@ router.post('/redefinir-senha', async (req, res) => {
       'UPDATE alunos SET senha = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [senhaHash, registro.aluno_id]
     );
+    await arquivarSenhaAnterior(registro.aluno_id, senhaAtual);
     await pool.query('UPDATE senha_resets SET usado = true WHERE id = $1', [registro.id]);
     // Invalida quaisquer outros tokens de reset pendentes do mesmo aluno.
     await pool.query('UPDATE senha_resets SET usado = true WHERE aluno_id = $1 AND usado = false', [registro.aluno_id]);
@@ -518,6 +571,54 @@ router.put('/perfil', authMiddleware, async (req, res) => {
     res.json({ aluno: resultado.rows[0] });
   } catch (error) {
     console.error('Erro ao atualizar perfil:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+/**
+ * PUT /api/auth/perfil/senha
+ * Troca a senha do aluno logado. Exige a senha atual e bloqueia a reutilização
+ * das últimas senhas (mesma regra do fluxo de redefinição por e-mail).
+ */
+router.put('/perfil/senha', authMiddleware, async (req, res) => {
+  try {
+    const { senhaAtual, novaSenha } = req.body;
+
+    if (!senhaAtual || typeof senhaAtual !== 'string') {
+      return res.status(400).json({ erro: 'Informe a senha atual.' });
+    }
+    if (!senhaForte(novaSenha)) {
+      return res.status(400).json({ erro: 'A nova senha deve ter no mínimo 8 caracteres, letra maiúscula, minúscula, número e caractere especial.' });
+    }
+
+    const alunoRes = await pool.query('SELECT senha FROM alunos WHERE id = $1', [req.alunoId]);
+    const senhaAtualHash = alunoRes.rows[0]?.senha;
+    if (!senhaAtualHash) {
+      return res.status(404).json({ erro: 'Aluno não encontrado.' });
+    }
+
+    if (!await bcrypt.compare(senhaAtual, senhaAtualHash)) {
+      return res.status(400).json({ erro: 'A senha atual está incorreta.' });
+    }
+
+    if (await senhaReutilizada(req.alunoId, novaSenha, senhaAtualHash)) {
+      return res.status(400).json({
+        erro: `A nova senha não pode ser igual a nenhuma das últimas ${HISTORICO_SENHAS} senhas utilizadas. Escolha uma senha diferente.`,
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const novaSenhaHash = await bcrypt.hash(novaSenha, salt);
+
+    await pool.query(
+      'UPDATE alunos SET senha = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [novaSenhaHash, req.alunoId]
+    );
+    await arquivarSenhaAnterior(req.alunoId, senhaAtualHash);
+
+    res.json({ mensagem: 'Senha alterada com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao alterar senha:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });

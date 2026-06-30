@@ -54,6 +54,9 @@ export const api = {
       body: JSON.stringify({ ticket, captchaId, texto }),
     }),
 
+  // Notícias do setor (feeds RSS de portais de data center, via backend)
+  getNoticias: async () => request(`${API_URL}/noticias`),
+
   // Cursos
   getCursos: async () => request(`${API_URL}/cursos`),
 
@@ -65,12 +68,21 @@ export const api = {
   // Aluno
   getMatriculas: async () => request(`${API_URL}/cursos/aluno/matriculas`),
 
+  getCertificadosAluno: async () => request(`${API_URL}/cursos/aluno/certificados`),
+
   getPerfil: async () => request(`${API_URL}/auth/perfil`),
 
   updatePerfil: async (data) =>
     request(`${API_URL}/auth/perfil`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+
+  // Troca de senha pelo usuário logado (exige a senha atual).
+  alterarSenha: async (senhaAtual, novaSenha) =>
+    request(`${API_URL}/auth/perfil/senha`, {
+      method: 'PUT',
+      body: JSON.stringify({ senhaAtual, novaSenha }),
     }),
 
   // Conteúdo do curso (player)
@@ -102,6 +114,10 @@ export const api = {
 
   emitirCertificado: async (cursoId) =>
     request(`${API_URL}/cursos/${cursoId}/certificado`, { method: 'POST' }),
+
+  // Verificação pública de autenticidade por código (sem login).
+  validarCertificado: async (codigo) =>
+    request(`${API_URL}/certificados/validar/${encodeURIComponent(codigo)}`),
 
   // Admin
   getAdminDashboard: async () => request(`${API_URL}/admin/dashboard`),
@@ -158,4 +174,8 @@ export const api = {
 
   deleteAdminCertificado: async (id) =>
     request(`${API_URL}/admin/certificados/${id}`, { method: 'DELETE' }),
+
+  // Validação de certificado pelo painel admin (envia o token de autenticação).
+  validarAdminCertificado: async (codigo) =>
+    request(`${API_URL}/admin/certificados/validar/${encodeURIComponent(codigo)}`),
 };

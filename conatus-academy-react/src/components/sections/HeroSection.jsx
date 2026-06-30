@@ -11,7 +11,7 @@ export function HeroSection() {
         <p>Excelência acadêmica, pesquisa avançada e laboratórios de ponta. Prepare-se para operar os data centers que movem o mundo digital.</p>
         <div className="hero-buttons">
           <Button variant="primary" to="/cursos">Explorar Programas Acadêmicos</Button>
-          <Button variant="secondary" href="#sobre">Explore o Ambiente Virtual</Button>
+          <Button variant="secondary" to="/#sobre">Sobre o Instituto</Button>
         </div>
       </div>
     </header>

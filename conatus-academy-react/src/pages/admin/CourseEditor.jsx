@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { adminApi } from '../../services/adminApi';
 import { useAuth } from '../../contexts/AuthContext';
+import { ROLE_LABELS } from '../../utils/permissions';
 import { useToast } from '../../components/ui/Toast';
 import QuillEditor from '../../components/common/QuillEditor';
 import { normalizeQuillHtml } from '../../utils/quillHtml';
@@ -51,6 +52,8 @@ export default function CourseEditor() {
   const [instrutores, setInstrutores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingSignature, setUploadingSignature] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
 
   // Módulos & aulas
@@ -164,6 +167,46 @@ export default function CourseEditor() {
       toast.error(err.message || 'Erro ao salvar curso.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite reenviar o mesmo arquivo depois
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.warning('Selecione um arquivo de imagem.');
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const data = await adminApi.uploadCourseImage(file);
+      setField('image', data.path);
+      toast.success('Imagem enviada! Lembre de salvar as alterações.');
+    } catch (err) {
+      toast.error(err.message || 'Erro ao enviar a imagem.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSignatureUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite reenviar o mesmo arquivo depois
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.warning('Selecione um arquivo de imagem.');
+      return;
+    }
+    setUploadingSignature(true);
+    try {
+      const data = await adminApi.uploadCourseImage(file);
+      setField('cert_assinatura', data.path);
+      toast.success('Assinatura enviada! Lembre de salvar as alterações.');
+    } catch (err) {
+      toast.error(err.message || 'Erro ao enviar a assinatura.');
+    } finally {
+      setUploadingSignature(false);
     }
   };
 
@@ -518,7 +561,9 @@ export default function CourseEditor() {
                   >
                     <option value="">— Sem instrutor atribuído —</option>
                     {instrutores.map(i => (
-                      <option key={i.id} value={i.id}>{i.nome} ({i.email})</option>
+                      <option key={i.id} value={i.id}>
+                        {i.nome} ({i.email}){i.role === 'admin' ? ` — ${ROLE_LABELS.admin}` : ''}
+                      </option>
                     ))}
                   </select>
                   <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
@@ -527,10 +572,26 @@ export default function CourseEditor() {
                 </div>
               )}
               <div className="ce-field">
-                <label>Imagem de capa (URL)</label>
-                <input type="text" value={form.image || ''}
+                <label>Imagem de capa</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label className="ce-btn ce-btn--secondary" style={{ cursor: uploadingImage ? 'wait' : 'pointer', margin: 0 }}>
+                    {uploadingImage ? 'Enviando...' : '📎 Anexar imagem'}
+                    <input type="file" accept="image/*" hidden disabled={uploadingImage}
+                      onChange={handleImageUpload} />
+                  </label>
+                  {form.image && (
+                    <button type="button" className="ce-btn ce-btn--secondary"
+                      onClick={() => setField('image', '')}>
+                      Remover
+                    </button>
+                  )}
+                </div>
+                <input type="text" value={form.image || ''} style={{ marginTop: '8px' }}
                   onChange={e => setField('image', e.target.value)}
-                  placeholder="images/courses/nome-da-imagem.png" />
+                  placeholder="Ou cole uma URL/caminho: images/courses/nome.png" />
+                <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  JPG, PNG, WEBP, GIF ou SVG — até 5 MB.
+                </small>
                 {form.image && (
                   <img src={form.image.startsWith('http') ? form.image : `/${form.image}`}
                     alt="Preview" className="ce-img-preview"
@@ -1011,10 +1072,36 @@ export default function CourseEditor() {
                   placeholder="Ex.: Concluir 100% das aulas e obter no mínimo 80% na avaliação final" />
               </div>
               <div className="ce-field">
-                <label>Responsável técnico / assinatura</label>
+                <label>Responsável técnico (nome)</label>
                 <input type="text" value={form.cert_responsavel || ''}
                   onChange={e => setField('cert_responsavel', e.target.value)}
                   placeholder="Ex.: Coordenação de Operações Conatus" />
+              </div>
+              <div className="ce-field">
+                <label>Assinatura do responsável (imagem)</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <label className="ce-btn ce-btn--secondary" style={{ cursor: uploadingSignature ? 'wait' : 'pointer', margin: 0 }}>
+                    {uploadingSignature ? 'Enviando...' : '✍️ Anexar assinatura'}
+                    <input type="file" accept="image/*" hidden disabled={uploadingSignature}
+                      onChange={handleSignatureUpload} />
+                  </label>
+                  {form.cert_assinatura && (
+                    <button type="button" className="ce-btn ce-btn--secondary"
+                      onClick={() => setField('cert_assinatura', '')}>
+                      Remover
+                    </button>
+                  )}
+                </div>
+                <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  PNG com fundo transparente fica melhor — até 5 MB.
+                </small>
+                {form.cert_assinatura && (
+                  <img src={form.cert_assinatura.startsWith('http') ? form.cert_assinatura : `/${form.cert_assinatura}`}
+                    alt="Assinatura" className="ce-img-preview"
+                    style={{ maxHeight: '80px', background: '#fff' }}
+                    onError={e => { e.target.style.display = 'none'; }}
+                    onLoad={e => { e.target.style.display = ''; }} />
+                )}
               </div>
               <div className="ce-field ce-field--full">
                 <label>Texto padrão do certificado</label>

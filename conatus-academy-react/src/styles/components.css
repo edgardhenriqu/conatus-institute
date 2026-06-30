@@ -510,9 +510,42 @@ textarea:focus-visible {
 }
 
 .cert-signature {
-    border-top: 1px solid var(--text-main);
-    padding-top: 8px;
     min-width: 220px;
+    text-align: center;
+}
+
+/* Área reservada acima da linha onde a assinatura digitalizada repousa */
+.cert-signature-line {
+    height: 50px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    border-bottom: 1px solid var(--text-main);
+    margin-bottom: 8px;
+}
+
+.cert-signature-img {
+    max-height: 48px;
+    max-width: 95%;
+    object-fit: contain;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+/* Assinatura do concluinte gerada automaticamente a partir do nome */
+.cert-signature-auto {
+    font-family: var(--font-signature);
+    font-size: clamp(2.7rem, 7vw, 3.7rem);
+    line-height: 1.35;
+    color: #0a1a33;
+    max-width: 100%;
+    padding: 0.12em 6px 2px;
+    white-space: nowrap;
+    overflow: visible;
+    transform: translateY(-4px);
+    text-shadow: 0 1px 1px rgba(10, 26, 51, 0.25);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
 }
 
 .cert-signature strong {
@@ -522,7 +555,7 @@ textarea:focus-visible {
 }
 
 .cert-signature span {
-    font-size: 0.82rem;
+    font-size: 0.98rem;
     color: var(--text-muted);
 }
 
@@ -541,6 +574,11 @@ textarea:focus-visible {
     font-weight: 700;
     color: var(--primary);
     letter-spacing: 1px;
+}
+
+/* Aviso de autenticidade / emissão digital: visível na tela, oculto na impressão */
+@media print {
+    .cert-validation-extra { display: none !important; }
 }
 
 /* Certificado bloqueado */

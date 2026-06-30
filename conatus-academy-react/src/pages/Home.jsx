@@ -4,6 +4,8 @@ import { HeroSection } from '../components/sections/HeroSection';
 import { StatsSection } from '../components/sections/StatsSection';
 import { FreeCoursesCTA } from '../components/sections/FreeCoursesCTA';
 import { ProgramsSection } from '../components/sections/ProgramsSection';
+import { MethodologySection } from '../components/sections/MethodologySection';
+import { ProfessorsSection } from '../components/sections/ProfessorsSection';
 import { NewsSection } from '../components/sections/NewsSection';
 import { api } from '../services/api';
 import { staticCourses, normalizeDbCourse } from '../data/courses';
@@ -51,7 +53,11 @@ export function Home() {
       </section>
 
       <ProgramsSection courses={courses} />
-      
+
+      <MethodologySection />
+
+      <ProfessorsSection />
+
       <FreeCoursesCTA />
       
       <NewsSection />

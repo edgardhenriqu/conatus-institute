@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './components/ui/Toast';
@@ -16,6 +17,7 @@ import { CourseDetails } from './pages/CourseDetails';
 import { CourseViewer } from './pages/CourseViewer';
 import { CourseQuiz } from './pages/CourseQuiz';
 import { Certificate } from './pages/Certificate';
+import { ValidarCertificado } from './pages/ValidarCertificado';
 import { Dashboard } from './pages/Dashboard';
 import { Perfil } from './pages/Perfil';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -27,6 +29,25 @@ import ModuleEditor from './pages/admin/ModuleEditor';
 import LessonEditor from './pages/admin/LessonEditor';
 import CourseEditor from './pages/admin/CourseEditor';
 import AdminLayout from './components/admin/AdminLayout';
+
+// Rola suavemente até a seção indicada no hash da URL (ex.: /#metodologia).
+// Necessário porque o React Router não faz scroll automático em links de âncora.
+function ScrollToHash() {
+  const { hash, pathname } = useLocation();
+  useEffect(() => {
+    if (!hash) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+    const id = hash.slice(1);
+    // pequeno atraso para garantir que a seção já foi renderizada
+    const t = setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [hash, pathname]);
+  return null;
+}
 
 function MainLayout() {
   return (
@@ -44,12 +65,15 @@ function App() {
     <AuthProvider>
       <ToastProvider>
       <Router>
+        <ScrollToHash />
         <Routes>
           {/* Main layout — header + footer */}
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/cursos" element={<Courses />} />
             <Route path="/cursos/:id" element={<CourseDetails />} />
+            <Route path="/validar-certificado" element={<ValidarCertificado />} />
+            <Route path="/validar-certificado/:codigo" element={<ValidarCertificado />} />
 
             <Route
               path="/dashboard"

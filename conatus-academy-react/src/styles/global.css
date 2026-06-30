@@ -71,6 +71,12 @@ input, textarea, select {
     padding: var(--section-padding) 0;
 }
 
+/* Compensa a navbar fixa ao navegar por âncoras (#sobre, #metodologia, etc.) */
+section[id],
+header[id] {
+    scroll-margin-top: var(--navbar-height);
+}
+
 .section-header {
     text-align: center;
     max-width: 700px;
@@ -579,11 +585,313 @@ input, textarea, select {
 }
 
 /* ============================================
+   METHODOLOGY SECTION
+   ============================================ */
+
+.methodology-section {
+    background: var(--bg-light);
+}
+
+/* ---- Pilares ---- */
+.methodology-grid {
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 0 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 28px;
+}
+
+.methodology-card {
+    background: var(--bg-white);
+    border-radius: var(--radius-lg);
+    padding: 34px 28px;
+    box-shadow: var(--shadow);
+    border-top: 4px solid var(--gold);
+    transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.methodology-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lg);
+}
+
+.methodology-card__icon {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    background: var(--bg-light);
+    border-radius: var(--radius-round);
+    margin-bottom: 18px;
+}
+
+.methodology-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 12px;
+}
+
+.methodology-card p {
+    font-size: 0.97rem;
+    color: var(--text-muted);
+}
+
+/* ---- Ciclo de aprendizagem ---- */
+.methodology-cycle {
+    max-width: var(--container-max);
+    margin: 60px auto 0;
+    padding: 50px 40px;
+    background: var(--primary);
+    border-radius: var(--radius-xl);
+    text-align: center;
+    color: white;
+}
+
+.methodology-cycle__title {
+    color: white;
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+}
+
+.methodology-cycle__lead {
+    color: var(--gold);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 40px;
+}
+
+.methodology-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 30px;
+    counter-reset: step;
+}
+
+.methodology-step {
+    position: relative;
+    padding-top: 10px;
+}
+
+.methodology-step__num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    margin: 0 auto 16px;
+    font-family: var(--font-heading);
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--primary);
+    background: var(--gold);
+    border-radius: var(--radius-round);
+    box-shadow: 0 0 0 6px rgba(212, 175, 55, 0.2);
+}
+
+.methodology-step h4 {
+    color: white;
+    font-size: 1.15rem;
+    margin-bottom: 8px;
+}
+
+.methodology-step p {
+    color: var(--text-light);
+    font-size: 0.92rem;
+}
+
+/* ---- Padrões internacionais ---- */
+.methodology-standards {
+    max-width: var(--container-max);
+    margin: 45px auto 0;
+    padding: 0 20px;
+    text-align: center;
+}
+
+.methodology-standards__label {
+    display: block;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 18px;
+}
+
+.methodology-standards__list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+}
+
+.methodology-badge {
+    padding: 10px 24px;
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    font-weight: 600;
+    color: var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ============================================
+   PROFESSORS SECTION (corpo docente)
+   ============================================ */
+
+.professors-section {
+    background: var(--bg-white);
+}
+
+/* ---- Professor em destaque (único) ---- */
+.professor-feature {
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 56px 64px;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 64px;
+    align-items: center;
+    background: var(--bg-light);
+    border-radius: var(--radius-xl);
+    border-top: 4px solid var(--dc-electric);
+}
+
+.professor-feature__media {
+    display: flex;
+    justify-content: center;
+}
+
+.professor-feature__photo {
+    width: 320px;
+    height: 320px;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+}
+
+.professor-feature__avatar {
+    width: 280px;
+    height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-heading);
+    font-size: 4.6rem;
+    font-weight: 700;
+    color: white;
+    background: linear-gradient(135deg, var(--dc-dark), var(--primary));
+    border-radius: 50%;
+    box-shadow: var(--shadow);
+}
+
+.professor-feature__info h3 {
+    font-size: 2rem;
+    margin-bottom: 6px;
+}
+
+.professor-feature__role {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--dc-electric);
+}
+
+.professor-feature__sub {
+    display: block;
+    margin-bottom: 20px;
+    font-size: 0.98rem;
+    color: var(--text-muted);
+}
+
+.professor-feature__bio {
+    font-size: 1.05rem;
+    line-height: 1.65;
+    color: var(--text-muted);
+    margin-bottom: 26px;
+}
+
+.professor-feature__creds {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 28px;
+    display: grid;
+    gap: 12px;
+}
+
+.professor-feature__creds li {
+    position: relative;
+    padding-left: 28px;
+    font-size: 1rem;
+    color: var(--text);
+}
+
+.professor-feature__creds li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--dc-electric);
+    font-weight: 700;
+}
+
+.professor-feature__link {
+    display: inline-block;
+    font-weight: 600;
+    color: var(--primary);
+    text-decoration: none;
+    transition: color var(--transition);
+}
+
+.professor-feature__link:hover {
+    color: var(--dc-electric);
+}
+
+/* ---- Blocos complementares (atuação / formação / certificações) ---- */
+.professor-extra {
+    max-width: var(--container-max);
+    margin: 28px auto 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+}
+
+.professor-extra__card {
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 26px;
+    box-shadow: var(--shadow-sm);
+}
+
+.professor-extra__card h4 {
+    font-size: 1.05rem;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--dc-electric);
+}
+
+.professor-extra__card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 10px;
+}
+
+.professor-extra__card li {
+    font-size: 0.92rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+/* ============================================
    PROGRAMS / COURSES SECTION
    ============================================ */
 
 .programs-section {
-    background: var(--bg-light);
+    background: var(--bg-white);
 }
 
 /* Carousel — shared styles */
@@ -956,6 +1264,55 @@ input, textarea, select {
     color: var(--text-muted);
 }
 
+/* Feed automático de notícias do setor */
+.news-feed {
+    margin-top: 50px;
+}
+
+.news-feed__header {
+    max-width: var(--container-max);
+    margin: 0 auto 24px;
+    padding: 0 20px;
+    text-align: center;
+}
+
+.news-feed__header h3 {
+    font-size: 1.5rem;
+    color: var(--primary);
+    margin-bottom: 6px;
+}
+
+.news-feed__sub {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.news-feed__loading {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 20px;
+}
+
+.news-card--link {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.news-card--link:hover {
+    box-shadow: var(--shadow-lg, 0 12px 28px rgba(0, 0, 0, 0.12));
+}
+
+.news-card__more {
+    margin-top: auto;
+    padding-top: 14px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--gold);
+}
+
 /* ============================================
    FOOTER
    ============================================ */
@@ -972,8 +1329,13 @@ input, textarea, select {
     margin: 0 auto;
     padding: 0 20px;
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1.5fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 40px;
+    align-items: start;
+}
+
+.footer-container .footer-col:nth-child(2) {
+    text-align: center;
 }
 
 .footer-col h4 {
@@ -3187,6 +3549,33 @@ input, textarea, select {
 
     .about-section .section-container {
         grid-template-columns: 1fr;
+    }
+
+    .methodology-cycle {
+        padding: 36px 22px;
+    }
+
+    .methodology-cycle__title {
+        font-size: 1.5rem;
+    }
+
+    .professor-feature {
+        grid-template-columns: 1fr;
+        padding: 30px 24px;
+        gap: 28px;
+        text-align: center;
+    }
+
+    .professor-feature__role {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .professor-feature__creds {
+        text-align: left;
+        max-width: 360px;
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .carousel-slide,

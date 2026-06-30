@@ -1,6 +1,25 @@
 import { API_URL, request } from './httpClient';
 
 export const adminApi = {
+  // ----- Upload de imagem (capa de curso) -----
+  // Envia um arquivo via multipart/form-data. NÃO definimos Content-Type
+  // manualmente — o navegador adiciona o boundary do multipart sozinho.
+  uploadCourseImage: async (file) => {
+    const formData = new FormData();
+    formData.append('imagem', file);
+    const token = sessionStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/upload/imagem`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.erro || `Erro ${res.status}`);
+    }
+    return res.json();
+  },
+
   // ----- Cursos (ações do construtor) -----
   setCourseStatus: async (courseId, status) =>
     request(`${API_URL}/admin/cursos/${courseId}/status`, {

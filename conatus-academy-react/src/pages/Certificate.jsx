@@ -21,7 +21,53 @@ export function Certificate() {
 
 /* ── Layout compartilhado do certificado ───────────────────────────────────── */
 
-function CertificateSheet({ studentName, courseName, duration, score, issuedDate, code, responsavel, texto }) {
+/**
+ * Lê a cor predominante (a tinta) de uma imagem de assinatura.
+ * Ignora pixels transparentes e o fundo claro, retornando a média dos traços.
+ * Usada para que a assinatura automática do concluinte tenha a mesma
+ * tonalidade da assinatura enviada pelo responsável.
+ */
+function useInkColor(src) {
+  const [color, setColor] = useState(null);
+  useEffect(() => {
+    if (!src) { setColor(null); return; }
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, 200 / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] < 128) continue;                       // transparente
+          const cr = data[i], cg = data[i + 1], cb = data[i + 2];
+          if (cr > 200 && cg > 200 && cb > 200) continue;        // fundo claro
+          r += cr; g += cg; b += cb; n++;
+        }
+        if (cancelled) return;
+        setColor(n > 0 ? `rgb(${Math.round(r / n)}, ${Math.round(g / n)}, ${Math.round(b / n)})` : null);
+      } catch {
+        if (!cancelled) setColor(null);                          // canvas tainted → fallback CSS
+      }
+    };
+    img.onerror = () => { if (!cancelled) setColor(null); };
+    img.src = src;
+    return () => { cancelled = true; };
+  }, [src]);
+  return color;
+}
+
+function CertificateSheet({ studentName, courseName, duration, score, issuedDate, code, responsavel, assinatura, texto }) {
+  const assinaturaSrc = assinatura?.trim()
+    ? (assinatura.startsWith('http') ? assinatura : `/${assinatura}`)
+    : null;
+  const inkColor = useInkColor(assinaturaSrc);
   return (
     <div className="certificate" id="certificate">
       <div className="cert-brand">Conatus Institute</div>
@@ -61,10 +107,20 @@ function CertificateSheet({ studentName, courseName, duration, score, issuedDate
 
       <div className="cert-signatures">
         <div className="cert-signature">
+          <div className="cert-signature-line">
+            {assinaturaSrc && (
+              <img src={assinaturaSrc} alt="Assinatura do responsável" className="cert-signature-img" />
+            )}
+          </div>
           <strong>{responsavel?.trim() || 'Conatus Institute'}</strong>
           <span>Responsável Técnico</span>
         </div>
         <div className="cert-signature">
+          <div className="cert-signature-line">
+            <span className="cert-signature-auto" style={inkColor ? { color: inkColor } : undefined}>
+              {studentName}
+            </span>
+          </div>
           <strong>{studentName}</strong>
           <span>Concluinte</span>
         </div>
@@ -72,8 +128,12 @@ function CertificateSheet({ studentName, courseName, duration, score, issuedDate
 
       <div className="cert-validation">
         Código de validação: <code>{code}</code>
-        <br />
-        Documento emitido digitalmente pela plataforma Conatus Institute.
+        <span className="cert-validation-extra">
+          <br />
+          Verifique a autenticidade em {window.location.origin}/validar-certificado
+          <br />
+          Documento emitido digitalmente pela plataforma Conatus Institute.
+        </span>
       </div>
     </div>
   );
@@ -116,6 +176,8 @@ ${appStyles}
   }
   /* Neutraliza regras de impressão/posicionamento herdadas do app */
   body * { visibility: visible !important; }
+  /* Não imprime o aviso de autenticidade / emissão digital */
+  .cert-validation-extra { display: none !important; }
   .certificate {
     position: static !important;
     visibility: visible !important;
@@ -258,6 +320,7 @@ function DbCertificate({ cursoId }) {
         issuedDate={issuedDate}
         code={cert.codigo}
         responsavel={cert.cert_responsavel || curso?.cert_responsavel}
+        assinatura={cert.cert_assinatura || curso?.cert_assinatura}
         texto={cert.cert_texto || curso?.cert_texto}
       />
     </div>

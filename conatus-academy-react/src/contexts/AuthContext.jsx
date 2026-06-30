@@ -8,8 +8,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token      = localStorage.getItem('token');
+    const storedUser = sessionStorage.getItem('user');
+    const token      = sessionStorage.getItem('token');
 
     if (!storedUser || !token) {
       initMopProgress(null);
@@ -23,8 +23,8 @@ export function AuthProvider({ children }) {
       initMopProgress(parsed.id);
       setUser(parsed);
     } catch {
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
       initMopProgress(null);
       setLoading(false);
       return;
@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
         if (!data?.aluno) return;
         const refreshed = { ...parsed, ...data.aluno };
         delete refreshed.senha;
-        localStorage.setItem('user', JSON.stringify(refreshed));
+        sessionStorage.setItem('user', JSON.stringify(refreshed));
         initMopProgress(refreshed.id);
         setUser(refreshed);
       })
@@ -49,15 +49,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = (userData, token) => {
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', token);
+    sessionStorage.setItem('user', JSON.stringify(userData));
+    sessionStorage.setItem('token', token);
     initMopProgress(userData.id);
     setUser(userData);
   };
 
   const logout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('token');
     initMopProgress(null);
     setUser(null);
   };

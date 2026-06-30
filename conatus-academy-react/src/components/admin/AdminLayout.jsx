@@ -16,7 +16,7 @@ const instrutorLinks = [
 ];
 
 export default function AdminLayout() {
-  const { isAdmin, isInstrutor } = useAuth();
+  const { isAdmin } = useAuth();
 
   const links = isAdmin ? adminLinks : instrutorLinks;
   const brandLabel = isAdmin ? 'Conatus Admin' : 'Área do Instrutor';

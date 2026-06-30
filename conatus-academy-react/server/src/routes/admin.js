@@ -1,10 +1,63 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const pool = require('../../db/connection');
 const { contentMiddleware } = require('../middlewares/auth');
 
 const router = express.Router();
 
 router.use(contentMiddleware);
+
+// ── Upload de imagens (capa de curso) ──────────────────────────────────────────
+// Os arquivos são gravados em server/uploads/courses e servidos estaticamente
+// pelo server.js em /api/uploads. O caminho salvo no banco fica
+// "api/uploads/courses/<arquivo>" (sem barra inicial, como as imagens do /public).
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'courses');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+// SVG é deliberadamente omitido: pode conter <script> e abrir XSS armazenado.
+// A extensão gravada é derivada do mimetype verificado, nunca do nome original.
+const TIPOS_IMAGEM = {
+  'image/jpeg': '.jpg',
+  'image/png':  '.png',
+  'image/webp': '.webp',
+  'image/gif':  '.gif',
+};
+
+const uploadImagem = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+    filename: (req, file, cb) => {
+      const ext = TIPOS_IMAGEM[file.mimetype] || '.png';
+      const base = path.basename(file.originalname, path.extname(file.originalname))
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')   // remove acentos
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+        .slice(0, 40) || 'capa';
+      cb(null, `${base}-${Date.now()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (req, file, cb) => {
+    if (TIPOS_IMAGEM[file.mimetype]) return cb(null, true);
+    cb(new Error('Formato inválido. Envie uma imagem JPG, PNG, WEBP ou GIF.'));
+  },
+});
+
+router.post('/upload/imagem', (req, res) => {
+  uploadImagem.single('imagem')(req, res, (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE'
+        ? 'Imagem muito grande. O tamanho máximo é 5 MB.'
+        : err.message || 'Erro ao enviar a imagem.';
+      return res.status(400).json({ erro: msg });
+    }
+    if (!req.file) return res.status(400).json({ erro: 'Nenhuma imagem enviada.' });
+    const caminho = `api/uploads/courses/${req.file.filename}`;
+    res.status(201).json({ path: caminho, url: `/${caminho}` });
+  });
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -179,8 +232,9 @@ router.put('/alunos/:id', onlyAdmin, async (req, res) => {
       return res.status(403).json({ erro: 'Apenas o Super Administrador pode editar perfis de administradores.' });
     }
 
-    if (role !== undefined && role !== roleAlvo && req.userRole !== 'superadmin') {
-      return res.status(403).json({ erro: 'Apenas o Super Administrador pode alterar o cargo de usuários.' });
+    // Admins podem alterar cargos, mas NÃO podem conceder admin/superadmin.
+    if (role !== undefined && ['admin', 'superadmin'].includes(role) && req.userRole !== 'superadmin') {
+      return res.status(403).json({ erro: 'Apenas o Super Administrador pode conceder o perfil de Administrador.' });
     }
 
     const newRole = validRoles.includes(role) ? role : null;
@@ -288,7 +342,7 @@ router.get('/cursos', async (req, res) => {
 const CURSO_FIELDS = [
   'nome', 'duracao', 'image', 'descricao', 'descricao_curta', 'categoria',
   'nivel', 'tipo', 'status', 'visivel', 'publico_alvo', 'objetivo',
-  'requisitos', 'requisitos_certificado', 'cert_responsavel', 'cert_texto',
+  'requisitos', 'requisitos_certificado', 'cert_responsavel', 'cert_texto', 'cert_assinatura',
   'oque_aprender', 'mercado_trabalho', 'areas_atuacao', 'diferenciais',
   'infraestrutura', 'coordenacao', 'informacoes_complementares', 'matriz_curricular',
 ];
@@ -1294,8 +1348,12 @@ router.post('/aulas/reorder', async (req, res) => {
 
 router.get('/instrutores', onlyAdmin, async (req, res) => {
   try {
+    // Instrutores e administradores podem ser responsáveis por um curso.
+    // O superadmin é intencionalmente excluído (não atua como instrutor).
     const resultado = await pool.query(
-      `SELECT id, nome, email FROM alunos WHERE role = 'instrutor' AND ativo = true ORDER BY nome`
+      `SELECT id, nome, email, role FROM alunos
+       WHERE role IN ('instrutor', 'admin') AND ativo = true
+       ORDER BY role DESC, nome`
     );
     res.json({ instrutores: resultado.rows });
   } catch (error) {

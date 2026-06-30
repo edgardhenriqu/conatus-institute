@@ -16,6 +16,7 @@ const isMopId = (cursoId) => cursoId === MOP_ID || cursoId === '6' || cursoId ==
 export function Dashboard() {
   const { user } = useAuth();
   const [matriculas, setMatriculas] = useState([]);
+  const [dbCertCount, setDbCertCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // All MOP lessons (for progress calc)
@@ -41,7 +42,16 @@ export function Dashboard() {
         setLoading(false);
       }
     }
+    async function loadCerts() {
+      try {
+        const data = await api.getCertificadosAluno();
+        setDbCertCount((data.certificados || []).length);
+      } catch {
+        setDbCertCount(0);
+      }
+    }
     loadData();
+    loadCerts();
   }, []);
 
   // Enrich static MOP enrollment with real progress
@@ -63,7 +73,8 @@ export function Dashboard() {
     return (m.progresso || 0) === 100;
   }).length;
   const emAndamento = enrichedMatriculas.length - concluidos;
-  const certificados = mopCertOk ? 1 : 0;
+  // Certificados emitidos: cursos do banco (tabela certificados) + MOP estático.
+  const certificados = dbCertCount + (mopCertOk ? 1 : 0);
 
   // Próximas etapas recomendadas
   const nextSteps = useMemo(() => {

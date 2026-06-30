@@ -38,17 +38,13 @@ export function AdminCertificados() {
     }
 
     try {
-      const data = await fetch(`/api/admin/certificados/validar/${codigoValidacao}`);
-      const json = await data.json();
-      
-      if (json.erro) {
-        setMensagem({ tipo: 'erro', texto: json.erro });
-      } else if (json.certificado) {
+      const json = await api.validarAdminCertificado(codigoValidacao.trim());
+      if (json.certificado) {
         setResultadoValidacao(json.certificado);
         setMensagem({ tipo: 'sucesso', texto: 'Certificado válido!' });
       }
-    } catch {
-      setMensagem({ tipo: 'erro', texto: 'Erro ao validar certificado.' });
+    } catch (err) {
+      setMensagem({ tipo: 'erro', texto: err.message || 'Certificado não encontrado.' });
     }
   }
 

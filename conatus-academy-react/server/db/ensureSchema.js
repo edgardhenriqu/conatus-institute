@@ -19,6 +19,7 @@ const STATEMENTS = [
   `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS requisitos_certificado TEXT`,
   `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS cert_responsavel VARCHAR(255)`,
   `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS cert_texto TEXT`,
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS cert_assinatura TEXT`,
   `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
   // perfil instrutor — instrutor_id em cursos (db/migration-instrutor.sql)
   `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS instrutor_id UUID REFERENCES alunos(id) ON DELETE SET NULL`,
@@ -35,6 +36,10 @@ const STATEMENTS = [
   // updated_at em aulas — sem ela o UPDATE de edição de aula dá erro 500
   // (db/migration-aulas-updated-at.sql)
   `ALTER TABLE aulas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+  // updated_at em alunos — sem ela o UPDATE de edição de aluno (admin) dá erro 500
+  `ALTER TABLE alunos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+  // updated_at em matriculas — sem ela o salvar progresso (recalcularProgresso) dá erro 500
+  `ALTER TABLE matriculas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
   // avaliação (config por curso)
   `CREATE TABLE IF NOT EXISTS avaliacoes (
     id SERIAL PRIMARY KEY,
@@ -107,6 +112,14 @@ const STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_senha_reset_hash ON senha_resets(token_hash)`,
   `CREATE INDEX IF NOT EXISTS idx_senha_reset_aluno ON senha_resets(aluno_id)`,
+  // histórico de senhas (hashes) para impedir reutilização das últimas senhas
+  `CREATE TABLE IF NOT EXISTS senha_historico (
+    id SERIAL PRIMARY KEY,
+    aluno_id UUID NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
+    senha_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_senha_hist_aluno ON senha_historico(aluno_id)`,
   // data de emissão dos certificados (db/migration-certificados-data-emissao.sql)
   `ALTER TABLE certificados ADD COLUMN IF NOT EXISTS data_emissao TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
   `UPDATE certificados SET data_emissao = created_at WHERE data_emissao IS NULL`,

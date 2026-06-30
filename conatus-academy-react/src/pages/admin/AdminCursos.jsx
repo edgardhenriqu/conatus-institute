@@ -51,8 +51,8 @@ export function AdminCursos() {
       setCursos(data.cursos || []);
     } catch (err) {
       if (err.message?.includes('Token') || err.message?.includes('401') || err.message?.includes('403')) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
         navigate('/login');
         return;
       }

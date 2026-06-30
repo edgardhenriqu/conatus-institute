@@ -22,7 +22,6 @@ function getTransporter() {
   if (transporter || configError) return transporter;
 
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  console.log('DEBUG SMTP:', { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS: !!SMTP_PASS });
   if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
     configError = 'SMTP não configurado (defina SMTP_HOST, SMTP_PORT, SMTP_USER e SMTP_PASS no .env).';
     return null;
