@@ -72,6 +72,6 @@ export function isRegularStudent(user) {
 
 /** True se o curso deve aparecer na listagem para o usuário. */
 export function canSeeCourse(user, course) {
-  if (!course || course.tipo !== 'interno') return true;
+  if (!course || course.acesso !== 'restrito') return true;
   return canAccessInternalCourse(user);
 }

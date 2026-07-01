@@ -25,9 +25,12 @@ function senhaForte(senha) {
     && /[^A-Za-z0-9]/.test(senha);
 }
 
-export function Perfil() {
+// `embedded`: quando renderizada dentro de outro layout (ex.: painel do
+// instrutor, dentro do AdminLayout), dispensa o wrapper de página inteira
+// (sem min-height/background próprios) para se encaixar na área de conteúdo.
+export function Perfil({ embedded = false }) {
   const { user, login } = useAuth();
-  const [form, setForm] = useState({ nome: '', telefone: '', endereco: '', cidade: '', estado: '' });
+  const [form, setForm] = useState({ nome: '', telefone: '', endereco: '', cidade: '', estado: '', empresa: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null); // { type: 'success'|'error', text }
@@ -87,6 +90,7 @@ export function Perfil() {
           endereco: a.endereco || '',
           cidade: a.cidade || '',
           estado: a.estado || '',
+          empresa: a.empresa || '',
         });
       })
       .catch(() => {
@@ -97,6 +101,7 @@ export function Perfil() {
             endereco: user.endereco || '',
             cidade: user.cidade || '',
             estado: user.estado || '',
+            empresa: user.empresa || '',
           });
         }
       })
@@ -130,8 +135,8 @@ export function Perfil() {
 
   if (loading) {
     return (
-      <div className="dashboard-body">
-        <div className="dashboard-container" style={{ textAlign: 'center', padding: '60px 0' }}>
+      <div className={embedded ? undefined : 'dashboard-body'}>
+        <div className="dashboard-container" style={{ textAlign: 'center', padding: embedded ? 0 : '60px 0' }}>
           <p style={{ color: 'var(--text-muted)' }}>Carregando perfil...</p>
         </div>
       </div>
@@ -139,8 +144,8 @@ export function Perfil() {
   }
 
   return (
-    <div className="dashboard-body">
-      <div className="dashboard-container" style={{ maxWidth: '640px' }}>
+    <div className={embedded ? undefined : 'dashboard-body'}>
+      <div className="dashboard-container" style={{ maxWidth: '640px', ...(embedded ? { padding: 0 } : {}) }}>
         <header className="welcome-header">
           <h1>Meu Perfil</h1>
           <p>Atualize seus dados cadastrais.</p>
@@ -174,6 +179,7 @@ export function Perfil() {
           <Field label="Telefone" name="telefone" value={form.telefone} onChange={handleChange} placeholder="(11) 99999-9999" />
           <Field label="Endereço" name="endereco" value={form.endereco} onChange={handleChange} />
           <Field label="Cidade" name="cidade" value={form.cidade} onChange={handleChange} />
+          <Field label="Empresa (opcional)" name="empresa" value={form.empresa} onChange={handleChange} placeholder="Empresa onde você trabalha" />
 
           <div>
             <label style={labelStyle}>Estado</label>

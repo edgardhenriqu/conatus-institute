@@ -8,11 +8,13 @@ const adminLinks = [
   { to: '/admin/cursos',       label: '📚 Cursos' },
   { to: '/admin/avaliacoes',   label: '📝 Avaliações' },
   { to: '/admin/certificados', label: '🏆 Certificados' },
+  { to: '/admin/perfil',       label: '👤 Meu Perfil' },
 ];
 
 const instrutorLinks = [
   { to: '/admin/cursos',     label: '📚 Meus Cursos' },
   { to: '/admin/avaliacoes', label: '📝 Avaliações' },
+  { to: '/admin/perfil',     label: '👤 Meu Perfil' },
 ];
 
 export default function AdminLayout() {

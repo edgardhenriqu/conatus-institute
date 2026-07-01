@@ -126,6 +126,7 @@ function App() {
               }
             >
               <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="perfil" element={<Perfil embedded />} />
               <Route path="alunos" element={<AdminAlunos />} />
               <Route path="cursos" element={<AdminCursos />} />
               <Route path="certificados" element={<AdminCertificados />} />

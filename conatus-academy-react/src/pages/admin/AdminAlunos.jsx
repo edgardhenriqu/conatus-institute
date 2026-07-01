@@ -35,6 +35,8 @@ function emptyForm(aluno = null) {
     endereco: aluno?.endereco || '',
     cidade:   aluno?.cidade   || '',
     estado:   aluno?.estado   || '',
+    empresa:  aluno?.empresa  || '',
+    empresa_id: aluno?.empresa_id != null ? String(aluno.empresa_id) : '',
     ativo:    aluno?.ativo !== false,
     role:     aluno?.role     || 'aluno',
   };
@@ -53,8 +55,16 @@ export function AdminAlunos() {
   const [editando, setEditando]             = useState(false);
   const [formData, setFormData]             = useState({});
   const [mensagem, setMensagem]             = useState('');
+  const [empresas, setEmpresas]             = useState([]); // catálogo de empresas parceiras
 
   useEffect(() => { carregarAlunos(); }, []);
+
+  // Catálogo de empresas parceiras — usado no seletor de vínculo (empresa_id).
+  useEffect(() => {
+    adminApi.getCompanies()
+      .then(data => setEmpresas(data.empresas || []))
+      .catch(() => { /* sem catálogo: seletor fica vazio */ });
+  }, []);
 
   async function carregarAlunos(buscaTexto = '') {
     setLoading(true);
@@ -241,6 +251,12 @@ export function AdminAlunos() {
                     onChange={e => setFormData({ ...formData, estado: e.target.value })} />
                 </div>
                 <div>
+                  <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Empresa</label>
+                  <input type="text" value={formData.empresa || ''} disabled={!editando}
+                    placeholder="—" style={inputStyle(editando)}
+                    onChange={e => setFormData({ ...formData, empresa: e.target.value })} />
+                </div>
+                <div>
                   <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Status da Conta</label>
                   <select value={formData.ativo ? 'true' : 'false'}
                     disabled={!editando} style={inputStyle(editando)}
@@ -302,6 +318,28 @@ export function AdminAlunos() {
                     <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
                       Liberado para Funcionário Conatus e Administradores.
                     </p>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Empresa Parceira (vínculo)</label>
+                    <select value={formData.empresa_id || ''}
+                      disabled={!editando || !isAdmin}
+                      style={inputStyle(editando && isAdmin)}
+                      onChange={e => setFormData({ ...formData, empresa_id: e.target.value })}>
+                      <option value="">Sem vínculo</option>
+                      {empresas.map(emp => (
+                        <option key={emp.id} value={String(emp.id)}>{emp.nome}</option>
+                      ))}
+                    </select>
+                    {!isAdmin ? (
+                      <p style={{ fontSize: '0.8rem', color: '#b91c1c', marginTop: '6px' }}>
+                        Apenas administradores podem vincular o usuário a uma empresa parceira.
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
+                        Vincula o usuário a uma empresa parceira. Cursos restritos liberados
+                        para essa empresa passam a valer para ele automaticamente.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -424,6 +462,7 @@ export function AdminAlunos() {
                 <tr>
                   <th>Nome</th>
                   <th>Email</th>
+                  <th>Empresa</th>
                   <th>Perfil</th>
                   <th>Status</th>
                   <th>Matrículas</th>
@@ -433,7 +472,7 @@ export function AdminAlunos() {
               <tbody>
                 {alunos.length === 0 ? (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
                       Nenhum usuário encontrado.
                     </td>
                   </tr>
@@ -442,6 +481,9 @@ export function AdminAlunos() {
                     <tr key={aluno.id}>
                       <td style={{ fontWeight: 500 }}>{aluno.nome}</td>
                       <td style={{ fontSize: '0.9rem' }}>{aluno.email}</td>
+                      <td style={{ fontSize: '0.9rem', color: aluno.empresa ? 'var(--text)' : 'var(--text-muted)' }}>
+                        {aluno.empresa || '—'}
+                      </td>
                       <td><RoleBadge role={aluno.role} /></td>
                       <td>
                         <span style={{ color: aluno.ativo !== false ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>

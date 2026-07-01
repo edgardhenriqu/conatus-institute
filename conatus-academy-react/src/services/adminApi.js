@@ -67,18 +67,37 @@ export const adminApi = {
   deleteQuestion: async (questionId) =>
     request(`${API_URL}/admin/questoes/${questionId}`, { method: 'DELETE' }),
 
-  // ----- Autorizações (cursos internos) -----
-  getAuthorizations: async (courseId) =>
-    request(`${API_URL}/admin/cursos/${courseId}/autorizacoes`),
+  // ----- Empresas parceiras (fabricantes) -----
+  getCompanies: async () =>
+    request(`${API_URL}/admin/empresas`),
 
-  addAuthorization: async (courseId, email) =>
-    request(`${API_URL}/admin/cursos/${courseId}/autorizacoes`, {
+  createCompany: async (nome) =>
+    request(`${API_URL}/admin/empresas`, {
+      method: 'POST',
+      body: JSON.stringify({ nome }),
+    }),
+
+  deleteCompany: async (empresaId) =>
+    request(`${API_URL}/admin/empresas/${empresaId}`, { method: 'DELETE' }),
+
+  // ----- Controle de acesso do curso (modo + regras) -----
+  getCourseAccess: async (courseId) =>
+    request(`${API_URL}/admin/cursos/${courseId}/acesso`),
+
+  saveCourseAccess: async (courseId, data) =>
+    request(`${API_URL}/admin/cursos/${courseId}/acesso`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  addCourseUser: async (courseId, email) =>
+    request(`${API_URL}/admin/cursos/${courseId}/acesso/usuarios`, {
       method: 'POST',
       body: JSON.stringify({ email }),
     }),
 
-  removeAuthorization: async (courseId, alunoId) =>
-    request(`${API_URL}/admin/cursos/${courseId}/autorizacoes/${alunoId}`, {
+  removeCourseUser: async (courseId, alunoId) =>
+    request(`${API_URL}/admin/cursos/${courseId}/acesso/usuarios/${alunoId}`, {
       method: 'DELETE',
     }),
 

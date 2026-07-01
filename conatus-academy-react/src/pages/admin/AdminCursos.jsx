@@ -12,9 +12,9 @@ const STATUS_BADGE = {
   inativo:   { label: 'Inativo',   bg: '#fee2e2', color: '#991b1b' },
 };
 
-const TIPO_BADGE = {
-  gratuito: { label: 'Gratuito', bg: '#d4edda', color: '#155724' },
-  interno:  { label: 'Interno',  bg: '#f8d7da', color: '#721c24' },
+const ACESSO_BADGE = {
+  publico:  { label: 'Público',  bg: '#d4edda', color: '#155724' },
+  restrito: { label: 'Restrito', bg: '#f8d7da', color: '#721c24' },
   pago:     { label: 'Pago',     bg: '#e3f2fd', color: '#0d47a1' },
 };
 
@@ -182,7 +182,7 @@ export function AdminCursos() {
             <thead>
               <tr>
                 <th>Curso</th>
-                <th>Tipo</th>
+                <th>Acesso</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'center' }}>Módulos</th>
                 <th style={{ textAlign: 'center' }}>Aulas</th>
@@ -216,13 +216,13 @@ export function AdminCursos() {
                         </div>
                       </div>
                     </td>
-                    <td><Pill map={TIPO_BADGE} value={curso.tipo || 'gratuito'} /></td>
+                    <td><Pill map={ACESSO_BADGE} value={curso.acesso || 'publico'} /></td>
                     <td><Pill map={STATUS_BADGE} value={curso.status || 'rascunho'} /></td>
                     <td style={{ textAlign: 'center' }}>{curso.total_modulos || 0}</td>
                     <td style={{ textAlign: 'center' }}>{curso.total_aulas || 0}</td>
                     <td style={{ textAlign: 'center' }}>{curso.total_matriculas || 0}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                      <div className="admin-actions">
                         <button onClick={() => navigate(`/admin/cursos/${curso.id}/editar`)}
                           className="admin-btn admin-btn-edit" title="Abrir editor completo">Editar</button>
                         <Link to={`/cursos/${curso.id}`} target="_blank"

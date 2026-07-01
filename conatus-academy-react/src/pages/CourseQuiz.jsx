@@ -23,8 +23,55 @@ function shuffle(arr) {
 
 export function CourseQuiz() {
   const { id } = useParams();
-  const isMop = id === 'mop-interno' || id === '6';
+  // Só a rota estática legada usa o quiz MOP; id 6 hoje é um curso do banco (Huawei).
+  const isMop = id === 'mop-interno';
   return isMop ? <MopQuiz /> : <DbQuiz cursoId={id} />;
+}
+
+/* Lista de revisão reutilizável (correção pós-prova e revisão persistida).
+   Recebe itens já normalizados:
+   { id, enunciado, alternativas, correta, explicacao, resposta, acertou }. */
+function QuizReviewList({ itens }) {
+  return (
+    <>
+      {itens.map((it, i) => {
+        const sel = it.resposta;
+        return (
+          <div key={it.id ?? i} className="quiz-review-item">
+            <div className="quiz-review-q">
+              <span className={`review-status ${it.acertou ? 'ok' : 'fail'}`}>
+                {it.acertou ? '✓' : '✗'}
+              </span>
+              <span>{i + 1}. {it.enunciado}</span>
+            </div>
+            <div className="quiz-options">
+              {(Array.isArray(it.alternativas) ? it.alternativas : []).map((alt, idx) => {
+                let cls = 'quiz-option';
+                if (idx === it.correta) cls += ' correct';
+                else if (idx === sel) cls += ' wrong';
+                else cls += ' dimmed';
+                return (
+                  <div key={idx} className={cls}>
+                    <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
+                    <span>{alt}</span>
+                    {idx === sel && idx === it.correta && <span className="review-tag ok">sua resposta ✓</span>}
+                    {idx === sel && idx !== it.correta && <span className="review-tag fail">sua resposta ✗</span>}
+                    {idx === it.correta && idx !== sel && <span className="review-tag ok">resposta correta</span>}
+                  </div>
+                );
+              })}
+            </div>
+            {it.explicacao && (
+              <div className={`quiz-explanation ${it.acertou ? 'correct' : 'wrong'}`}>
+                <strong>{it.acertou ? '✅ Você acertou' : '❌ Você errou'}</strong>
+                <p>{it.explicacao}</p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -43,6 +90,9 @@ function DbQuiz({ cursoId }) {
   const [result, setResult]     = useState(null);
   const [error, setError]       = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showReview, setShowReview] = useState(false); // revisão pós-prova (acertos/erros)
+  const [reviewData, setReviewData] = useState(null);   // revisão persistida da última tentativa
+  const [loadingReview, setLoadingReview] = useState(false);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -67,9 +117,28 @@ function DbQuiz({ cursoId }) {
       setAnswers({});
       setCurrent(0);
       setError('');
+      setShowReview(false);
       setPhase('running');
     } catch (err) {
       setError(err.message || 'Erro ao iniciar a avaliação.');
+    }
+  }
+
+  async function loadUltimaRevisao() {
+    setLoadingReview(true);
+    setError('');
+    try {
+      const data = await api.getRevisaoUltimaTentativa(cursoId);
+      if (!data.existe || !(data.revisao || []).length) {
+        setError('Não há tentativa anterior para revisar.');
+        return;
+      }
+      setReviewData(data);
+      setPhase('review');
+    } catch (err) {
+      setError(err.message || 'Não foi possível carregar a revisão.');
+    } finally {
+      setLoadingReview(false);
     }
   }
 
@@ -88,6 +157,42 @@ function DbQuiz({ cursoId }) {
   }
 
   if (phase === 'loading') return <PageLoader message="Carregando avaliação..." />;
+
+  /* ── REVISÃO PERSISTIDA (última tentativa) ── */
+  if (phase === 'review' && reviewData) {
+    return (
+      <div className="quiz-page">
+        <div className="quiz-result-stack">
+          <div className="quiz-card">
+            <div className="quiz-header">
+              <button type="button" className="quiz-back quiz-back-btn"
+                onClick={() => { setPhase('intro'); setReviewData(null); }}>
+                ← Voltar
+              </button>
+              <h1>Revisão da última prova</h1>
+            </div>
+            <div className="quiz-review-summary">
+              <span className={`hist-value ${reviewData.aprovado ? 'pass' : 'fail'}`}>{reviewData.nota}%</span>
+              <span>
+                {reviewData.aprovado ? 'Aprovado' : 'Reprovado'}
+                {reviewData.data && ` · ${new Date(reviewData.data).toLocaleDateString('pt-BR')}`}
+              </span>
+            </div>
+
+            {/* Ainda tem tentativa sobrando? Permite tentar de novo direto da revisão. */}
+            {status && !status.aprovado && (status.restantes ?? 0) > 0 && (status.progresso ?? 0) >= 100 && (
+              <button className="btn-quiz-start" style={{ marginTop: '18px' }} onClick={startQuiz}>
+                Tentar Novamente ({status.restantes} {status.restantes === 1 ? 'restante' : 'restantes'})
+              </button>
+            )}
+          </div>
+          <div className="quiz-card quiz-review">
+            <QuizReviewList itens={reviewData.revisao} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   /* ── INTRO ── */
   if (phase === 'intro') {
@@ -144,6 +249,10 @@ function DbQuiz({ cursoId }) {
                       </span>
                     </div>
                   </div>
+                  <button className="btn-quiz-secondary" style={{ marginTop: '14px', width: '100%' }}
+                    onClick={loadUltimaRevisao} disabled={loadingReview}>
+                    {loadingReview ? 'Carregando...' : '📋 Revisar minha última prova (acertos e erros)'}
+                  </button>
                 </div>
               )}
 
@@ -267,8 +376,21 @@ function DbQuiz({ cursoId }) {
 
   /* ── RESULT ── */
   if (phase === 'result' && result) {
+    // Correção por questão (id → { correta, explicacao, acertou }) para a revisão.
+    const correcaoMap = {};
+    for (const c of (result.correcao || [])) correcaoMap[c.id] = c;
+    const reviewItens = questions.map(q => {
+      const corr = correcaoMap[q.id] || {};
+      return {
+        id: q.id, enunciado: q.enunciado, alternativas: q.alternativas,
+        correta: corr.correta, explicacao: corr.explicacao,
+        resposta: answers[q.id], acertou: !!corr.acertou,
+      };
+    });
+
     return (
       <div className="quiz-page">
+        <div className="quiz-result-stack">
         <div className="quiz-card quiz-result">
           <div className={`result-badge ${result.aprovado ? 'pass' : 'fail'}`}>
             {result.aprovado ? '🏆' : '📋'}
@@ -319,9 +441,24 @@ function DbQuiz({ cursoId }) {
                 Tentar Novamente ({result.restantes} restantes)
               </button>
             )}
+            <button className="btn-quiz-secondary" onClick={() => setShowReview(v => !v)}>
+              {showReview ? 'Ocultar correção' : '📋 Revisar prova'}
+            </button>
             <Link to="/dashboard" className="btn-quiz-secondary">Ir para o Dashboard</Link>
             <Link to={`/cursos/${cursoId}/sala-de-aula`} className="btn-quiz-secondary">Revisar Aulas</Link>
           </div>
+        </div>
+
+        {/* Revisão da prova: cada questão com a resposta do aluno x correta + explicação */}
+        {showReview && (
+          <div className="quiz-card quiz-review">
+            <h3 className="quiz-review-title">Revisão da prova</h3>
+            <p className="quiz-review-sub">
+              Confira abaixo cada questão: <strong>sua resposta</strong> e a <strong>resposta correta</strong>.
+            </p>
+            <QuizReviewList itens={reviewItens} />
+          </div>
+        )}
         </div>
       </div>
     );

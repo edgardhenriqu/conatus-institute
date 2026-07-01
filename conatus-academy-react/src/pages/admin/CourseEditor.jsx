@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_LABELS } from '../../utils/permissions';
 import { useToast } from '../../components/ui/Toast';
 import QuillEditor from '../../components/common/QuillEditor';
+import CourseAccessPanel from './CourseAccessPanel';
 import { normalizeQuillHtml } from '../../utils/quillHtml';
 import './CourseEditor.css';
 
@@ -13,12 +14,6 @@ const NIVEIS = [
   { value: 'basico',        label: 'Básico' },
   { value: 'intermediario', label: 'Intermediário' },
   { value: 'avancado',      label: 'Avançado' },
-];
-
-const TIPOS = [
-  { value: 'gratuito', label: 'Gratuito — aberto a todos' },
-  { value: 'interno',  label: 'Interno — somente funcionários autorizados' },
-  { value: 'pago',     label: 'Pago — mediante pagamento (futuro)' },
 ];
 
 const STATUS_LABEL = { rascunho: 'Rascunho', publicado: 'Publicado', inativo: 'Inativo' };
@@ -73,10 +68,6 @@ export default function CourseEditor() {
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
 
-  // Permissões
-  const [authorized, setAuthorized] = useState([]);
-  const [authEmail, setAuthEmail] = useState('');
-
   // Alunos
   const [students, setStudents] = useState([]);
 
@@ -116,13 +107,6 @@ export default function CourseEditor() {
     } catch { /* servidor offline */ }
   }, [cursoId]);
 
-  const loadAuthorized = useCallback(async () => {
-    try {
-      const data = await adminApi.getAuthorizations(cursoId);
-      setAuthorized(data.autorizados || []);
-    } catch { /* servidor offline */ }
-  }, [cursoId]);
-
   const loadStudents = useCallback(async () => {
     try {
       const data = await adminApi.getCourseStudents(cursoId);
@@ -134,12 +118,11 @@ export default function CourseEditor() {
     loadCurso();
     loadModules();
     loadQuiz();
-    loadAuthorized();
     loadStudents();
     if (isAdmin) {
       api.getAdminInstrutores().then(d => setInstrutores(d.instrutores || [])).catch(() => {});
     }
-  }, [loadCurso, loadModules, loadQuiz, loadAuthorized, loadStudents, isAdmin]);
+  }, [loadCurso, loadModules, loadQuiz, loadStudents, isAdmin]);
 
   /* ── Curso (salvar / publicar) ────────────────────────────────── */
 
@@ -401,33 +384,6 @@ export default function CourseEditor() {
       ...f,
       alternativas: f.alternativas.map((a, i) => i === idx ? value : a),
     }));
-  };
-
-  /* ── Permissões ───────────────────────────────────────────────── */
-
-  const handleAddAuthorization = async (e) => {
-    e.preventDefault();
-    if (!authEmail.trim()) return;
-    try {
-      const data = await adminApi.addAuthorization(cursoId, authEmail.trim());
-      if (data.erro) { toast.error(data.erro); return; }
-      toast.success(`Acesso liberado para ${data.autorizado.nome}.`);
-      setAuthEmail('');
-      await loadAuthorized();
-    } catch (err) {
-      toast.error(err.message || 'Erro ao autorizar usuário.');
-    }
-  };
-
-  const handleRemoveAuthorization = async (alunoId, nome) => {
-    if (!window.confirm(`Remover o acesso de ${nome} a este curso?`)) return;
-    try {
-      await adminApi.removeAuthorization(cursoId, alunoId);
-      toast.success('Autorização removida.');
-      await loadAuthorized();
-    } catch {
-      toast.error('Erro ao remover autorização.');
-    }
   };
 
   /* ── Alunos ───────────────────────────────────────────────────── */
@@ -1132,79 +1088,19 @@ export default function CourseEditor() {
       {/* ════════ ABA: PERMISSÕES ════════ */}
       {activeTab === 'perms' && (
         <div className="ce-form">
-          <div className="ce-section">
-            <h3 className="ce-section__title">Acesso ao Curso</h3>
-            <div className="ce-grid ce-grid--2">
-              <div className="ce-field">
-                <label>Tipo de curso</label>
-                <select value={form.tipo || 'gratuito'} onChange={e => setField('tipo', e.target.value)}>
-                  {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div className="ce-field">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '28px' }}>
-                  <input type="checkbox" checked={form.visivel !== false}
-                    onChange={e => setField('visivel', e.target.checked)} />
-                  Visível na listagem de cursos
-                </label>
-              </div>
-            </div>
-            {form.tipo === 'interno' && (
-              <div style={{
-                background: '#fff8e6', border: '1px solid #f0d98c', borderRadius: '8px',
-                padding: '14px 18px', marginTop: '16px', fontSize: '0.9rem', color: '#6b5800',
-              }}>
-                🔐 Cursos internos só aparecem para administradores, funcionários Conatus
-                (perfil definido em <strong>Alunos</strong>) e usuários autorizados manualmente abaixo.
-                Os demais verão a mensagem: <em>"Este curso é exclusivo para funcionários autorizados
-                da Conatus. Solicite liberação ao administrador."</em>
-              </div>
-            )}
+          <div className="ce-section" style={{ paddingBottom: 0 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input type="checkbox" checked={form.visivel !== false}
+                onChange={e => setField('visivel', e.target.checked)} />
+              Visível na listagem de cursos
+            </label>
             <div className="ce-save-bar">
-              <button onClick={handleSaveCourse} disabled={saving} className="ce-btn ce-btn--primary">
-                {saving ? 'Salvando...' : '💾 Salvar Permissões'}
+              <button onClick={handleSaveCourse} disabled={saving} className="ce-btn ce-btn--secondary">
+                {saving ? 'Salvando...' : 'Salvar visibilidade'}
               </button>
             </div>
           </div>
-
-          <div className="ce-section">
-            <h3 className="ce-section__title">Usuários Autorizados ({authorized.length})</h3>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '16px' }}>
-              Libere o acesso individual a este curso para usuários específicos
-              (útil para cursos internos).
-            </p>
-            <form onSubmit={handleAddAuthorization} style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-              <input type="email" value={authEmail} className="admin-search"
-                onChange={e => setAuthEmail(e.target.value)}
-                placeholder="E-mail do usuário cadastrado" style={{ flex: 1, minWidth: '240px' }} />
-              <button type="submit" className="ce-btn ce-btn--primary">Liberar Acesso</button>
-            </form>
-
-            {authorized.length === 0 ? (
-              <div className="ce-empty-small"><p>Nenhum usuário autorizado manualmente.</p></div>
-            ) : (
-              <table className="admin-table">
-                <thead>
-                  <tr><th>Nome</th><th>E-mail</th><th>Autorizado em</th><th>Ações</th></tr>
-                </thead>
-                <tbody>
-                  {authorized.map(a => (
-                    <tr key={a.id}>
-                      <td>{a.nome}</td>
-                      <td>{a.email}</td>
-                      <td>{new Date(a.autorizado_em).toLocaleDateString('pt-BR')}</td>
-                      <td>
-                        <button className="ce-btn ce-btn--danger ce-btn--sm"
-                          onClick={() => handleRemoveAuthorization(a.id, a.nome)}>
-                          Remover acesso
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          <CourseAccessPanel courseId={cursoId} />
         </div>
       )}
 

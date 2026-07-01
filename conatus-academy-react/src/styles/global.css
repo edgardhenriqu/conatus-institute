@@ -1219,6 +1219,19 @@ header[id] {
     padding: 0 20px;
 }
 
+.fabricante-group {
+    margin-bottom: 40px;
+}
+
+.fabricante-group-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-dark, #1e293b);
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid var(--border, #e2e8f0);
+}
+
 /* ============================================
    NEWS SECTION
    ============================================ */
@@ -1532,6 +1545,13 @@ header[id] {
 .auth-required {
     color: var(--danger);
     margin-left: 2px;
+}
+
+.auth-optional {
+    color: var(--text-muted, #94a3b8);
+    font-weight: 400;
+    font-size: 0.85em;
+    margin-left: 4px;
 }
 
 /* Two-column row */
@@ -2450,6 +2470,34 @@ header[id] {
 }
 .viewer-cta-cert:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
 
+/* Agendar aula presencial — recurso futuro (botão desativado). */
+.viewer-cta-agendar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    background: var(--bg-light);
+    color: var(--text-muted);
+    border: 1px dashed var(--border);
+    cursor: not-allowed;
+}
+.viewer-cta-agendar .cta-soon {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 700;
+    background: var(--border);
+    color: var(--text-muted);
+    padding: 1px 6px;
+    border-radius: 8px;
+}
+
 /* Module / Lesson list */
 .viewer-module-list {
     flex: 1;
@@ -2975,6 +3023,54 @@ header[id] {
 .quiz-explanation strong  { display: block; margin-bottom: 6px; font-size: 0.95rem; }
 .quiz-explanation p { margin: 0; color: var(--text-main); }
 
+/* Empilha o card de resultado + o card de revisão verticalmente
+   (o .quiz-page é flex em linha e centraliza este container). */
+.quiz-result-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: 780px;
+}
+
+/* Revisão pós-prova (correção por questão) */
+.quiz-review { text-align: left; }
+
+/* Botão "Voltar" da tela de revisão (mesmo visual do link .quiz-back) */
+.quiz-back-btn { background: none; border: none; cursor: pointer; padding: 0; font: inherit; }
+
+/* Resumo da tentativa no topo da revisão persistida */
+.quiz-review-summary { display: flex; align-items: center; gap: 12px; margin-top: 10px; color: var(--text-muted); font-size: 0.95rem; }
+.quiz-review-summary .hist-value { font-size: 1.6rem; font-weight: 800; }
+.quiz-review-title { font-size: 1.3rem; margin-bottom: 6px; }
+.quiz-review-sub { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 22px; }
+.quiz-review-item { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.quiz-review-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.quiz-review-q {
+    display: flex; gap: 10px; align-items: flex-start;
+    font-weight: 600; font-size: 1rem; margin-bottom: 14px;
+}
+.review-status {
+    flex-shrink: 0; width: 24px; height: 24px; border-radius: var(--radius-round);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.85rem; color: white;
+}
+.review-status.ok   { background: var(--success); }
+.review-status.fail { background: var(--danger); }
+.review-tag {
+    margin-left: auto; white-space: nowrap;
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 2px 8px; border-radius: 10px;
+}
+.review-tag.ok   { background: var(--success); color: white; }
+.review-tag.fail { background: var(--danger); color: white; }
+
+/* Opções na revisão são estáticas — mantêm a cor de acerto/erro no hover. */
+.quiz-review .quiz-option { cursor: default; }
+.quiz-review .quiz-option.correct:hover { background: var(--success-light); border-color: var(--success); }
+.quiz-review .quiz-option.wrong:hover   { background: #fce4ec; border-color: var(--danger); }
+.quiz-review .quiz-option.dimmed:hover  { background: var(--bg-light); border-color: var(--border); }
+
 .btn-quiz-next {
     display: block;
     width: 100%;
@@ -3462,6 +3558,26 @@ header[id] {
 .admin-btn-view:hover {
     background: var(--success);
     color: white;
+}
+
+/* Coluna "Ações": grid de botões com a MESMA proporção (colunas iguais que
+   se ajustam ao espaço). Cada botão preenche a célula, ficando todos do mesmo
+   tamanho independente do texto. */
+.admin-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    align-items: stretch;
+}
+
+.admin-actions .admin-btn {
+    width: 100%;
+    margin-right: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    white-space: nowrap;
 }
 
 /* Admin Nav */

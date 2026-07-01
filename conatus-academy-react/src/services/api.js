@@ -108,6 +108,10 @@ export const api = {
       body: JSON.stringify({ respostas }),
     }),
 
+  // Revisão persistida: recompõe a correção da última tentativa do aluno.
+  getRevisaoUltimaTentativa: async (cursoId) =>
+    request(`${API_URL}/cursos/${cursoId}/avaliacao/ultima-tentativa`),
+
   // Certificado (aluno)
   getCertificado: async (cursoId) =>
     request(`${API_URL}/cursos/${cursoId}/certificado`),

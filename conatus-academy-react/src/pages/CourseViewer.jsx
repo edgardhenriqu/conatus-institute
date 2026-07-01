@@ -13,7 +13,10 @@ import {
 } from '../utils/mopProgress';
 import { canAccessInternalCourse } from '../utils/permissions';
 
-const isMopId = (id) => id === 'mop-interno' || id === '6';
+// Só a rota estática legada 'mop-interno' usa o fluxo MOP em localStorage.
+// NÃO incluir o id 6 (hoje é o curso do banco Huawei Module800); o MOP migrou
+// para o banco (id 1) e é servido pelo fluxo normal de cursos.
+const isMopId = (id) => id === 'mop-interno';
 
 /** Converte URLs do YouTube/Vimeo em URL de embed. */
 function toEmbedUrl(url) {
@@ -282,6 +285,14 @@ export function CourseViewer() {
               <Link to={quizCta.to} className={`viewer-cta-quiz ${quizCta.enabled ? '' : 'disabled'}`}>
                 📝 {quizCta.enabled ? 'Fazer Avaliação' : 'Avaliação (conclua as aulas)'}
               </Link>
+            )}
+            {/* Agendamento de aula presencial — recurso futuro. Só aparece para
+                quem já pode emitir o certificado; botão desativado por enquanto. */}
+            {certCta && (
+              <button type="button" className="viewer-cta-agendar" disabled
+                title="Disponível em breve">
+                📅 Agendar aula presencial <span className="cta-soon">em breve</span>
+              </button>
             )}
           </div>
         )}

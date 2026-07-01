@@ -138,7 +138,7 @@ router.get('/alunos', onlyAdmin, async (req, res) => {
       ? `a.role != 'superadmin'`
       : `a.role NOT IN ('admin', 'superadmin')`;
     let query = `
-      SELECT a.id, a.nome, a.email, a.cpf, a.data_nascimento, a.telefone, a.cidade, a.estado, a.role, a.ativo, a.created_at,
+      SELECT a.id, a.nome, a.email, a.cpf, a.data_nascimento, a.telefone, a.cidade, a.estado, a.empresa, a.role, a.ativo, a.created_at,
         (SELECT COUNT(*) FROM matriculas m WHERE m.aluno_id = a.id) as total_matriculas,
         (SELECT COUNT(*) FROM certificados c WHERE c.aluno_id = a.id) as total_certificados
       FROM alunos a
@@ -166,8 +166,11 @@ router.get('/alunos/:id', onlyAdmin, async (req, res) => {
     const { id } = req.params;
 
     const aluno = await pool.query(
-      `SELECT id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, role, ativo, created_at
-       FROM alunos WHERE id = $1`,
+      `SELECT a.id, a.nome, a.email, a.cpf, a.data_nascimento, a.telefone, a.endereco, a.cidade, a.estado,
+              a.empresa, a.empresa_id, e.nome AS empresa_parceira_nome, a.role, a.ativo, a.created_at
+       FROM alunos a
+       LEFT JOIN empresas e ON e.id = a.empresa_id
+       WHERE a.id = $1`,
       [id]
     );
 
@@ -211,7 +214,32 @@ router.get('/alunos/:id', onlyAdmin, async (req, res) => {
 router.put('/alunos/:id', onlyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, email, telefone, endereco, cidade, estado, ativo, role } = req.body;
+    const { nome, email, telefone, endereco, cidade, estado, empresa, empresa_id, ativo, role } = req.body;
+
+    // Empresa é opcional: string vazia limpa (null); undefined preserva o valor atual.
+    const empresaParam = empresa === undefined
+      ? null
+      : (typeof empresa === 'string' && empresa.trim() ? empresa.trim() : '');
+
+    // Vínculo com empresa PARCEIRA (empresa_id) — controla o acesso a cursos
+    // restritos. Só o admin (onlyAdmin) chega aqui. undefined preserva o valor
+    // atual; null/'' remove o vínculo; número define (validado no catálogo).
+    let empresaIdParam;
+    if (empresa_id === undefined) {
+      empresaIdParam = null;
+    } else if (empresa_id === null || empresa_id === '') {
+      empresaIdParam = '';
+    } else {
+      const n = Number.parseInt(empresa_id, 10);
+      if (!Number.isInteger(n)) {
+        return res.status(400).json({ erro: 'Empresa parceira inválida.' });
+      }
+      const emp = await pool.query('SELECT id FROM empresas WHERE id = $1 AND ativo = true', [n]);
+      if (emp.rows.length === 0) {
+        return res.status(400).json({ erro: 'Empresa parceira inválida ou inativa.' });
+      }
+      empresaIdParam = String(n);
+    }
 
     const validRoles = ['aluno', 'conatus_employee', 'admin', 'instrutor'];
     if (role !== undefined && !validRoles.includes(role)) {
@@ -247,12 +275,18 @@ router.put('/alunos/:id', onlyAdmin, async (req, res) => {
            endereco  = COALESCE($4, endereco),
            cidade    = COALESCE($5, cidade),
            estado    = COALESCE($6, estado),
-           ativo     = COALESCE($7, ativo),
-           role      = CASE WHEN $8::text IS NOT NULL THEN $8::varchar ELSE role END,
+           empresa   = CASE WHEN $7::text IS NULL THEN empresa
+                            WHEN $7 = '' THEN NULL
+                            ELSE $7 END,
+           ativo     = COALESCE($8, ativo),
+           role      = CASE WHEN $9::text IS NOT NULL THEN $9::varchar ELSE role END,
+           empresa_id = CASE WHEN $10::text IS NULL THEN empresa_id
+                             WHEN $10 = '' THEN NULL
+                             ELSE $10::integer END,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $9
-       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, role, ativo, created_at, updated_at`,
-      [nome, email, telefone, endereco, cidade, estado, ativo, newRole, id]
+       WHERE id = $11
+       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, empresa_id, role, ativo, created_at, updated_at`,
+      [nome, email, telefone, endereco, cidade, estado, empresaParam, ativo, newRole, empresaIdParam, id]
     );
 
     if (resultado.rows.length === 0) {
@@ -341,14 +375,13 @@ router.get('/cursos', async (req, res) => {
 
 const CURSO_FIELDS = [
   'nome', 'duracao', 'image', 'descricao', 'descricao_curta', 'categoria',
-  'nivel', 'tipo', 'status', 'visivel', 'publico_alvo', 'objetivo',
+  'nivel', 'status', 'visivel', 'publico_alvo', 'objetivo',
   'requisitos', 'requisitos_certificado', 'cert_responsavel', 'cert_texto', 'cert_assinatura',
   'oque_aprender', 'mercado_trabalho', 'areas_atuacao', 'diferenciais',
   'infraestrutura', 'coordenacao', 'informacoes_complementares', 'matriz_curricular',
 ];
 
 const NIVEIS_VALIDOS  = ['basico', 'intermediario', 'avancado'];
-const TIPOS_VALIDOS   = ['gratuito', 'interno', 'pago'];
 const STATUS_VALIDOS  = ['rascunho', 'publicado', 'inativo'];
 
 function validarCurso(body, { exigirObrigatorios = false } = {}) {
@@ -357,9 +390,6 @@ function validarCurso(body, { exigirObrigatorios = false } = {}) {
   }
   if (body.nivel != null && !NIVEIS_VALIDOS.includes(body.nivel)) {
     return `Nível inválido. Use: ${NIVEIS_VALIDOS.join(', ')}`;
-  }
-  if (body.tipo != null && !TIPOS_VALIDOS.includes(body.tipo)) {
-    return `Tipo inválido. Use: ${TIPOS_VALIDOS.join(', ')}`;
   }
   if (body.status != null && !STATUS_VALIDOS.includes(body.status)) {
     return `Status inválido. Use: ${STATUS_VALIDOS.join(', ')}`;
@@ -813,43 +843,177 @@ router.delete('/questoes/:id', async (req, res) => {
   }
 });
 
-// ── Autorizações de acesso (cursos internos) ──────────────────────────────────
+// ── Empresas parceiras (fabricantes) ──────────────────────────────────────────
 
-router.get('/cursos/:id/autorizacoes', onlyAdmin, async (req, res) => {
+// Modo de acesso do curso (fonte única — o antigo campo 'tipo' foi aposentado).
+const ACESSO_VALIDOS = ['publico', 'restrito', 'pago'];
+
+router.get('/empresas', async (req, res) => {
   try {
-    const { id } = req.params;
-    const resultado = await pool.query(
-      `SELECT a.id, a.nome, a.email, a.role, ca.created_at as autorizado_em
-       FROM curso_autorizacoes ca
-       JOIN alunos a ON a.id = ca.aluno_id
-       WHERE ca.curso_id = $1
-       ORDER BY a.nome`,
-      [id]
-    );
-    res.json({ autorizados: resultado.rows });
+    const r = await pool.query('SELECT id, nome, slug, ativo FROM empresas ORDER BY nome');
+    res.json({ empresas: r.rows });
   } catch (error) {
-    console.error('Erro ao listar autorizações:', error);
+    console.error('Erro ao listar empresas:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
 
-router.post('/cursos/:id/autorizacoes', onlyAdmin, async (req, res) => {
+router.post('/empresas', onlyAdmin, async (req, res) => {
+  try {
+    const nome = (req.body.nome || '').trim();
+    if (!nome) return res.status(400).json({ erro: 'Informe o nome da empresa' });
+    const slug = (req.body.slug || nome).toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+    if (!slug) return res.status(400).json({ erro: 'Nome inválido' });
+
+    const r = await pool.query(
+      `INSERT INTO empresas (nome, slug) VALUES ($1, $2)
+       ON CONFLICT (slug) DO NOTHING
+       RETURNING id, nome, slug, ativo`,
+      [nome, slug]
+    );
+    if (r.rows.length === 0) {
+      return res.status(409).json({ erro: 'Já existe uma empresa com este identificador' });
+    }
+    res.status(201).json({ empresa: r.rows[0] });
+  } catch (error) {
+    console.error('Erro ao criar empresa:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// Remove um fabricante do catálogo. Via ON DELETE CASCADE, também apaga as
+// regras 'empresa' que o referenciam em qualquer curso.
+router.delete('/empresas/:id', onlyAdmin, async (req, res) => {
+  try {
+    const r = await pool.query('DELETE FROM empresas WHERE id = $1 RETURNING id', [req.params.id]);
+    if (r.rows.length === 0) return res.status(404).json({ erro: 'Empresa não encontrada' });
+    res.json({ mensagem: 'Empresa removida com sucesso' });
+  } catch (error) {
+    console.error('Erro ao remover empresa:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// ── Controle de acesso do curso (modo + regras cumulativas) ───────────────────
+
+router.get('/cursos/:id/acesso', async (req, res) => {
   try {
     const { id } = req.params;
-    const { email } = req.body;
-
-    if (!email || !email.trim()) {
-      return res.status(400).json({ erro: 'Informe o e-mail do usuário' });
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
     }
 
-    const aluno = await pool.query('SELECT id, nome, email FROM alunos WHERE email = $1', [email.trim().toLowerCase()]);
+    const curso = await pool.query('SELECT acesso FROM cursos WHERE id = $1', [id]);
+    if (curso.rows.length === 0) return res.status(404).json({ erro: 'Curso não encontrado' });
+
+    const regras = await pool.query(
+      'SELECT tipo, empresa_id, aluno_id FROM curso_acesso_regras WHERE curso_id = $1',
+      [id]
+    );
+    const usuarios = await pool.query(
+      `SELECT a.id, a.nome, a.email, r.created_at AS autorizado_em
+       FROM curso_acesso_regras r
+       JOIN alunos a ON a.id = r.aluno_id
+       WHERE r.curso_id = $1 AND r.tipo = 'usuario'
+       ORDER BY a.nome`,
+      [id]
+    );
+
+    res.json({
+      acesso: curso.rows[0].acesso || 'publico',
+      funcionarios: regras.rows.some(r => r.tipo === 'funcionarios'),
+      empresas: regras.rows.filter(r => r.tipo === 'empresa').map(r => r.empresa_id),
+      usuarios: usuarios.rows,
+    });
+  } catch (error) {
+    console.error('Erro ao carregar acesso do curso:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// Salva o modo e as regras de funcionários/empresas de uma vez (transacional).
+// As regras de usuários específicos são gerenciadas em /acesso/usuarios.
+router.put('/cursos/:id/acesso', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    if (!(await checkCourseAccess(req, id))) {
+      client.release();
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
+    const acesso = req.body.acesso;
+    if (!ACESSO_VALIDOS.includes(acesso)) {
+      client.release();
+      return res.status(400).json({ erro: 'Modo de acesso inválido' });
+    }
+    const funcionarios = Boolean(req.body.funcionarios);
+    const empresas = Array.isArray(req.body.empresas)
+      ? [...new Set(req.body.empresas.map(Number).filter(Number.isInteger))]
+      : [];
+
+    await client.query('BEGIN');
+
+    await client.query(
+      'UPDATE cursos SET acesso = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [acesso, id]
+    );
+
+    // regra 'funcionarios'
+    await client.query(
+      `DELETE FROM curso_acesso_regras WHERE curso_id = $1 AND tipo = 'funcionarios'`,
+      [id]
+    );
+    if (funcionarios) {
+      await client.query(
+        `INSERT INTO curso_acesso_regras (curso_id, tipo) VALUES ($1, 'funcionarios')`,
+        [id]
+      );
+    }
+
+    // regras 'empresa' — substitui o conjunto inteiro
+    await client.query(
+      `DELETE FROM curso_acesso_regras WHERE curso_id = $1 AND tipo = 'empresa'`,
+      [id]
+    );
+    for (const empresaId of empresas) {
+      await client.query(
+        `INSERT INTO curso_acesso_regras (curso_id, tipo, empresa_id) VALUES ($1, 'empresa', $2)`,
+        [id, empresaId]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ acesso, funcionarios, empresas });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Erro ao salvar acesso do curso:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  } finally {
+    client.release();
+  }
+});
+
+router.post('/cursos/:id/acesso/usuarios', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
+    const email = (req.body.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ erro: 'Informe o e-mail do usuário' });
+
+    const aluno = await pool.query('SELECT id, nome, email FROM alunos WHERE email = $1', [email]);
     if (aluno.rows.length === 0) {
       return res.status(404).json({ erro: 'Nenhum usuário cadastrado com este e-mail' });
     }
 
     await pool.query(
-      `INSERT INTO curso_autorizacoes (curso_id, aluno_id) VALUES ($1, $2)
-       ON CONFLICT (curso_id, aluno_id) DO NOTHING`,
+      `INSERT INTO curso_acesso_regras (curso_id, tipo, aluno_id) VALUES ($1, 'usuario', $2)
+       ON CONFLICT (curso_id, aluno_id) WHERE tipo = 'usuario' DO NOTHING`,
       [id, aluno.rows[0].id]
     );
 
@@ -860,17 +1024,19 @@ router.post('/cursos/:id/autorizacoes', onlyAdmin, async (req, res) => {
   }
 });
 
-router.delete('/cursos/:id/autorizacoes/:alunoId', onlyAdmin, async (req, res) => {
+router.delete('/cursos/:id/acesso/usuarios/:alunoId', async (req, res) => {
   try {
     const { id, alunoId } = req.params;
-    const resultado = await pool.query(
-      'DELETE FROM curso_autorizacoes WHERE curso_id = $1 AND aluno_id = $2 RETURNING aluno_id',
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+
+    const r = await pool.query(
+      `DELETE FROM curso_acesso_regras
+       WHERE curso_id = $1 AND aluno_id = $2 AND tipo = 'usuario' RETURNING aluno_id`,
       [id, alunoId]
     );
-
-    if (resultado.rows.length === 0) {
-      return res.status(404).json({ erro: 'Autorização não encontrada' });
-    }
+    if (r.rows.length === 0) return res.status(404).json({ erro: 'Autorização não encontrada' });
 
     res.json({ mensagem: 'Autorização removida com sucesso' });
   } catch (error) {

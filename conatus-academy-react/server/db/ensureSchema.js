@@ -38,6 +38,10 @@ const STATEMENTS = [
   `ALTER TABLE aulas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
   // updated_at em alunos — sem ela o UPDATE de edição de aluno (admin) dá erro 500
   `ALTER TABLE alunos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+  // empresa (texto livre, opcional) — informada pelo aluno no cadastro; é o
+  // empregador declarado, NÃO confundir com empresa_id (vínculo com empresa
+  // parceira usado no controle de acesso a cursos).
+  `ALTER TABLE alunos ADD COLUMN IF NOT EXISTS empresa VARCHAR(150)`,
   // updated_at em matriculas — sem ela o salvar progresso (recalcularProgresso) dá erro 500
   `ALTER TABLE matriculas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
   // avaliação (config por curso)
@@ -82,6 +86,74 @@ const STATEMENTS = [
     PRIMARY KEY (curso_id, aluno_id)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_autorizacoes_aluno ON curso_autorizacoes(aluno_id)`,
+
+  // ── Controle de acesso a cursos (público / restrito / pago) ─────────────────
+  // Substitui o antigo conceito de "tipo" (gratuito/interno/pago) por um modelo
+  // escalável: modo de acesso no curso + regras cumulativas (funcionários,
+  // empresas parceiras, usuários específicos). Ver server/src/services/accessControl.js.
+
+  // Fabricantes / empresas parceiras (sem ENUM — cadastráveis em runtime)
+  `CREATE TABLE IF NOT EXISTS empresas (
+    id     SERIAL PRIMARY KEY,
+    nome   VARCHAR(120) NOT NULL,
+    slug   VARCHAR(60) UNIQUE NOT NULL,
+    ativo  BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  // vínculo usuário → empresa (um aluno pode pertencer a um fabricante parceiro)
+  `ALTER TABLE alunos ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id) ON DELETE SET NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_alunos_empresa ON alunos(empresa_id)`,
+  // modo de acesso do curso — 'publico' | 'restrito' | 'pago'
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS acesso VARCHAR(20) DEFAULT 'publico'`,
+  // regras de liberação (heterogêneas; discriminador = tipo)
+  `CREATE TABLE IF NOT EXISTS curso_acesso_regras (
+    id         SERIAL PRIMARY KEY,
+    curso_id   INTEGER NOT NULL REFERENCES cursos(id)   ON DELETE CASCADE,
+    tipo       VARCHAR(20) NOT NULL,
+    empresa_id INTEGER REFERENCES empresas(id) ON DELETE CASCADE,
+    aluno_id   UUID    REFERENCES alunos(id)   ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT regra_coerente CHECK (
+      (tipo = 'funcionarios' AND empresa_id IS NULL AND aluno_id IS NULL) OR
+      (tipo = 'empresa'      AND empresa_id IS NOT NULL AND aluno_id IS NULL) OR
+      (tipo = 'usuario'      AND aluno_id  IS NOT NULL AND empresa_id IS NULL)
+    )
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_regra_func    ON curso_acesso_regras(curso_id)             WHERE tipo = 'funcionarios'`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_regra_empresa ON curso_acesso_regras(curso_id, empresa_id) WHERE tipo = 'empresa'`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_regra_usuario ON curso_acesso_regras(curso_id, aluno_id)   WHERE tipo = 'usuario'`,
+  `CREATE INDEX IF NOT EXISTS idx_regras_curso ON curso_acesso_regras(curso_id)`,
+
+  // Seed dos fabricantes parceiros
+  `INSERT INTO empresas (nome, slug) VALUES
+     ('Huawei','huawei'),('Vertiv','vertiv'),('Schneider','schneider'),
+     ('Delta','delta'),('Cummins','cummins')
+   ON CONFLICT (slug) DO NOTHING`,
+
+  // Migração retrocompatível 'tipo' (legado) → 'acesso' + regras.
+  // É ONE-SHOT: guardada por uma flag para nunca reprocessar em boots futuros
+  // (assim edições posteriores de acesso/tipo jamais são revertidas).
+  //   gratuito → publico | interno → restrito + regra 'funcionarios' | pago → pago
+  `CREATE TABLE IF NOT EXISTS schema_flags (
+    chave VARCHAR(60) PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `UPDATE cursos SET acesso = 'restrito'
+    WHERE tipo = 'interno' AND acesso = 'publico'
+      AND NOT EXISTS (SELECT 1 FROM schema_flags WHERE chave = 'acesso_migrado')`,
+  `UPDATE cursos SET acesso = 'pago'
+    WHERE tipo = 'pago' AND acesso = 'publico'
+      AND NOT EXISTS (SELECT 1 FROM schema_flags WHERE chave = 'acesso_migrado')`,
+  `INSERT INTO curso_acesso_regras (curso_id, tipo)
+   SELECT id, 'funcionarios' FROM cursos
+    WHERE tipo = 'interno'
+      AND NOT EXISTS (SELECT 1 FROM schema_flags WHERE chave = 'acesso_migrado')
+   ON CONFLICT DO NOTHING`,
+  `INSERT INTO curso_acesso_regras (curso_id, tipo, aluno_id)
+   SELECT curso_id, 'usuario', aluno_id FROM curso_autorizacoes
+    WHERE NOT EXISTS (SELECT 1 FROM schema_flags WHERE chave = 'acesso_migrado')
+   ON CONFLICT DO NOTHING`,
+  `INSERT INTO schema_flags (chave) VALUES ('acesso_migrado') ON CONFLICT DO NOTHING`,
   // admin@conatus.com é o superadmin: único perfil que pode alterar cargos
   `UPDATE alunos SET role = 'superadmin' WHERE email = 'admin@conatus.com' AND role != 'superadmin'`,
   // verificação de e-mail no cadastro.

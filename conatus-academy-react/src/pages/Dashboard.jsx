@@ -11,7 +11,9 @@ import {
 } from '../utils/mopProgress';
 
 const MOP_ID = 'mop-interno';
-const isMopId = (cursoId) => cursoId === MOP_ID || cursoId === '6' || cursoId === 6;
+// Só a matrícula estática legada (curso_id 'mop-interno' em localStorage) é MOP.
+// NÃO tratar id 6 como MOP: hoje é um curso do banco (Huawei Module800).
+const isMopId = (cursoId) => cursoId === MOP_ID;
 
 export function Dashboard() {
   const { user } = useAuth();

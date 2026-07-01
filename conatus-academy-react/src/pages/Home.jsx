@@ -17,7 +17,7 @@ export function Home() {
 
   useEffect(() => {
     async function loadCourses() {
-      const availableStatic = staticCourses.filter(c => c.tipo !== 'interno' || canAccessInternalCourse(user));
+      const availableStatic = staticCourses.filter(c => !c.restrito || canAccessInternalCourse(user));
 
       try {
         const dbCourses = await api.getCursos();

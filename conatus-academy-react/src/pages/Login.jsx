@@ -183,7 +183,7 @@ export function Login() {
   const [confirmSenha, setConfirmSenha] = useState('');
   const [regData, setRegData] = useState({
     nome: '', email: '', senha: '', cpf: '',
-    data_nascimento: '', telefone: '',
+    data_nascimento: '', telefone: '', empresa: '',
     endereco: '', cidade: '', estado: '',
   });
 
@@ -564,8 +564,8 @@ export function Login() {
               <div className="auth-form-header">
                 <h1 className="auth-title">Cadastro de Aluno</h1>
                 <p className="auth-subtitle">
-                  Preencha todos os dados para criar sua conta no portal de cursos da Conatus Institute.
-                  Todos os campos são obrigatórios.
+                  Preencha seus dados para criar sua conta no portal de cursos da Conatus Institute.
+                  Os campos marcados com <span className="auth-required" aria-hidden="true">*</span> são obrigatórios.
                 </p>
               </div>
 
@@ -738,6 +738,16 @@ export function Login() {
                         Telefone inválido. Use DDD + número: (11) 99999-9999 ou (11) 9999-9999.
                       </p>
                     )}
+                  </div>
+
+                  <div className="auth-form-group">
+                    <label htmlFor="reg-empresa" className="auth-label">
+                      Empresa <span className="auth-optional">(opcional)</span>
+                    </label>
+                    <input id="reg-empresa" type="text" className="auth-input"
+                      placeholder="Empresa onde você trabalha"
+                      value={regData.empresa} autoComplete="organization" maxLength={150}
+                      onChange={e => setReg('empresa', e.target.value)} />
                   </div>
                 </fieldset>
 

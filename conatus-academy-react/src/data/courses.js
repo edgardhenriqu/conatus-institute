@@ -9,8 +9,9 @@ export const legacyMopCourse =
   {
     id: 'mop-interno',
     nome: 'Especialização Operacional: Elaboração de MOPs para Data Centers',
-    tipo: 'interno',
+    acesso: 'restrito',
     gratuito: false,
+    restrito: true,
     duracao: '16h',
     nivel: 'Avançado',
     image: 'images/courses/Criação de MOPs para Operações em Data Centers.png',
@@ -59,11 +60,22 @@ export const NIVEL_LABELS = {
   avancado: 'Avançado',
 };
 
-/** Normaliza um curso vindo do banco para o formato usado nos cards/páginas. */
+/**
+ * Normaliza um curso vindo do banco para o formato usado nos cards/páginas.
+ * O acesso é a fonte única (o antigo campo `tipo` foi aposentado): dele derivamos
+ * os flags de conveniência usados na UI.
+ *   acesso 'publico'  → gratuito (aberto a todos)
+ *   acesso 'restrito' → restrito (empresa parceira / funcionários / liberação)
+ *   acesso 'pago'     → pago
+ */
 export function normalizeDbCourse(c) {
+  const acesso = c.acesso || 'publico';
   return {
     ...c,
-    gratuito: c.tipo ? c.tipo === 'gratuito' : freeCourseIds.includes(c.id),
+    acesso,
+    gratuito: acesso === 'publico',
+    restrito: acesso === 'restrito',
+    pago: acesso === 'pago',
     nivel: NIVEL_LABELS[c.nivel] || c.nivel,
     descricao: c.descricao_curta || c.descricao,
     image: c.image || `images/courses/${c.nome}.png`,

@@ -8,7 +8,6 @@ import { PageLoader } from '../components/ui/PageLoader';
 import { useToast } from '../components/ui/Toast';
 import { mopCourseContent } from '../data/mopCourseContent';
 import { calcLessonStats, quizStatus, isCertEligible, getStaticEnrollments, saveStaticEnrollments } from '../utils/mopProgress';
-import { canAccessInternalCourse } from '../utils/permissions';
 
 const INTERNAL_DENIED_MSG =
   'Este curso é exclusivo para funcionários autorizados da Conatus. Solicite liberação ao administrador.';
@@ -23,8 +22,11 @@ export function CourseDetails() {
   const [loading, setLoading] = useState(true);
   const [restricted, setRestricted] = useState(false);
 
-  // MOP progress (only computed when viewing mop-interno)
-  const isMopCourse = id === 'mop-interno' || id === '6';
+  // MOP progress (only computed when viewing the legacy static MOP route).
+  // Atenção: NÃO incluir o id '6' aqui — hoje o id 6 é um curso do banco
+  // (Huawei Module800). O curso MOP migrou para o banco (id 1) e usa o fluxo
+  // normal de matrícula; só a rota estática legada 'mop-interno' usa localStorage.
+  const isMopCourse = id === 'mop-interno';
   const allMopLessons = useMemo(() =>
     isMopCourse ? mopCourseContent.modules.flatMap(m => m.lessons) : [],
     [isMopCourse]);
@@ -81,19 +83,16 @@ export function CourseDetails() {
       return;
     }
 
-    if (curso.tipo === 'interno') {
-      if (!canAccessInternalCourse(user)) {
-        toast.error(INTERNAL_DENIED_MSG, 7000);
-        return;
-      }
-      // If already enrolled — go straight to classroom
-      if (isAlreadyEnrolled) {
-        navigate(`/cursos/${id}/sala-de-aula`);
-        return;
-      }
+    // Cursos restritos (empresa parceira, funcionários Conatus, usuários liberados)
+    // são controlados pelo BACKEND (accessControl.js). Se o curso chegou até aqui,
+    // o acesso já foi liberado. NÃO reaplicamos regra de cargo no frontend — era
+    // isso que ignorava o vínculo de empresa parceira e barrava alunos autorizados.
+    if (isMopCourse && isAlreadyEnrolled) {
+      navigate(`/cursos/${id}/sala-de-aula`);
+      return;
     }
 
-    if (curso.id === 'mop-interno' || curso.id === 6) {
+    if (isMopCourse) {
       const staticEnrollments = getStaticEnrollments();
       if (!staticEnrollments[curso.id]) {
         staticEnrollments[curso.id] = {
@@ -144,13 +143,15 @@ export function CourseDetails() {
   if (!curso) return <PageLoader message="Carregando informações do curso..." />;
 
   const isFree = curso.gratuito;
-  const isInternal = curso.tipo === 'interno';
+  const isRestrito = curso.restrito;
 
-  if (isInternal && !user) {
+  // Curso restrito exige login. O acesso em si é decidido pelo BACKEND: o curso só
+  // é carregado por api.getCurso se o usuário puder acessá-lo (público, empresa
+  // parceira, funcionário ou liberação individual). Se chegamos aqui, pode acessar.
+  if (isRestrito && !user) {
     navigate('/login', { state: { from: `/cursos/${id}` } });
     return null;
   }
-  const canAccess = !isInternal || canAccessInternalCourse(user);
 
   return (
     <div className="curso-detalhe-body">
@@ -161,7 +162,7 @@ export function CourseDetails() {
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '15px' }}>
               {isFree && <Badge variant="free">Gratuito</Badge>}
-              {isInternal && <Badge variant="internal">Uso Interno</Badge>}
+              {isRestrito && <Badge variant="internal">Acesso Restrito</Badge>}
             </div>
 
             <h1>{curso.nome}</h1>
@@ -182,21 +183,14 @@ export function CourseDetails() {
 
             <p>{curso.descricao}</p>
 
-            {isInternal && canAccess && (
+            {isRestrito && curso.regrasAcesso && (
               <div style={{ background: 'rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', marginTop: '15px', borderLeft: '4px solid var(--secondary)' }}>
                 <strong>Acesso Restrito:</strong> {curso.regrasAcesso}
               </div>
             )}
 
-            {isInternal && !canAccess && (
-              <div style={{ background: 'rgba(139,0,0,0.35)', padding: '18px', borderRadius: '8px', marginTop: '15px', borderLeft: '4px solid #ffb3b3' }}>
-                <strong>🔒 Acesso Restrito</strong>
-                <p style={{ marginTop: '6px', fontSize: '0.97rem' }}>{INTERNAL_DENIED_MSG}</p>
-              </div>
-            )}
-
             {/* MOP requirements box */}
-            {isMopCourse && canAccess && (
+            {isMopCourse && (
               <div className="cd-requirements-box">
                 <h4>Requisitos para Certificado</h4>
                 <div className="cd-req-item">
@@ -223,23 +217,15 @@ export function CourseDetails() {
               </div>
             )}
 
-            {canAccess ? (
-              <button
-                className="btn-matricular"
-                onClick={handleMatricular}
-                style={{ marginTop: '30px' }}
-              >
-                {isMopCourse && isAlreadyEnrolled
-                  ? 'Continuar Curso →'
-                  : isInternal
-                    ? 'Acessar Curso →'
-                    : 'Matricule-se Agora'}
-              </button>
-            ) : (
-              <Link to="/cursos" className="btn-matricular" style={{ marginTop: '30px', opacity: 0.9 }}>
-                ← Voltar ao Catálogo
-              </Link>
-            )}
+            <button
+              className="btn-matricular"
+              onClick={handleMatricular}
+              style={{ marginTop: '30px' }}
+            >
+              {isMopCourse
+                ? (isAlreadyEnrolled ? 'Continuar Curso →' : 'Acessar Curso →')
+                : 'Matricule-se Agora'}
+            </button>
           </div>
 
           <img

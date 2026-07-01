@@ -4,7 +4,7 @@ import { Badge } from './Badge';
 /** Nível padrão quando o curso não define um. */
 function courseLevel(curso) {
   if (curso.nivel) return curso.nivel;
-  if (curso.tipo === 'interno') return 'Avançado';
+  if (curso.restrito) return 'Avançado';
   return curso.gratuito ? 'Introdutório' : 'Profissional';
 }
 
@@ -15,7 +15,7 @@ function courseLevel(curso) {
  */
 export function CourseCard({ curso, variant = 'catalog', enrollment = null }) {
   const isFree = curso.gratuito;
-  const isInternal = curso.tipo === 'interno';
+  const isInternal = curso.restrito;
   const nivel = courseLevel(curso);
   const progresso = enrollment ? Math.min(100, enrollment.progresso || 0) : null;
   const concluido = progresso === 100;
@@ -33,7 +33,7 @@ export function CourseCard({ curso, variant = 'catalog', enrollment = null }) {
   const badges = (
     <div className="ccard-badges">
       {isFree && <Badge variant="free">Gratuito</Badge>}
-      {isInternal && <Badge variant="internal">Interno</Badge>}
+      {isInternal && <Badge variant="internal">Restrito</Badge>}
       {enrollment && (
         <span className={`ccard-status ${concluido ? 'done' : 'progress'}`}>
           {concluido ? '✓ Concluído' : 'Em andamento'}

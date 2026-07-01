@@ -3,11 +3,9 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../../db/connection');
 const { authMiddleware } = require('../middlewares/auth');
+const { podeAcessarCurso, MSG_ACESSO_NEGADO } = require('../services/accessControl');
 
 const router = express.Router();
-
-const MSG_INTERNO_NEGADO =
-  'Este curso é exclusivo para funcionários autorizados da Conatus. Solicite liberação ao administrador.';
 
 /** Auth opcional: identifica o usuário se houver token válido, sem bloquear. */
 function optionalAuth(req, _res, next) {
@@ -22,32 +20,14 @@ function optionalAuth(req, _res, next) {
   next();
 }
 
-/** Usuário pode acessar curso interno? (admin, funcionário ou autorizado manualmente) */
-const ROLES_INTERNOS = ['admin', 'superadmin', 'conatus_employee'];
-
-async function podeAcessarInterno(alunoId, role, cursoId) {
-  if (!alunoId) return false;
-  if (ROLES_INTERNOS.includes(role)) return true;
-  const r = await pool.query(
-    'SELECT 1 FROM curso_autorizacoes WHERE curso_id = $1 AND aluno_id = $2',
-    [cursoId, alunoId]
-  );
-  if (r.rows.length > 0) return true;
-  // role pode estar desatualizado no token — confere no banco
-  const aluno = await pool.query('SELECT role FROM alunos WHERE id = $1', [alunoId]);
-  return ROLES_INTERNOS.includes(aluno.rows[0]?.role);
-}
-
 /** Curso visível/acessível para este usuário? Retorna { ok, status, erro }. */
 async function checarAcessoCurso(curso, req) {
   const isAdmin = req.userRole === 'admin' || req.userRole === 'superadmin';
   if (curso.status !== 'publicado' && !isAdmin) {
     return { ok: false, status: 404, erro: 'Curso não encontrado' };
   }
-  if (curso.tipo === 'interno' && !isAdmin) {
-    const autorizado = await podeAcessarInterno(req.alunoId, req.userRole, curso.id);
-    if (!autorizado) return { ok: false, status: 403, erro: MSG_INTERNO_NEGADO };
-  }
+  const autorizado = await podeAcessarCurso(req.alunoId, curso);
+  if (!autorizado) return { ok: false, status: 403, erro: MSG_ACESSO_NEGADO };
   return { ok: true };
 }
 
@@ -61,11 +41,24 @@ router.get('/', optionalAuth, async (req, res) => {
 
     const cursos = [];
     for (const curso of resultado.rows) {
-      if (curso.tipo === 'interno') {
-        const autorizado = await podeAcessarInterno(req.alunoId, req.userRole, curso.id);
-        if (!autorizado) continue;
+      if (await podeAcessarCurso(req.alunoId, curso)) cursos.push(curso);
+    }
+
+    // Anexa os fabricantes (empresas) de cada curso, para a seção "Fabricantes"
+    if (cursos.length > 0) {
+      const ids = cursos.map(c => c.id);
+      const emp = await pool.query(
+        `SELECT r.curso_id, e.id, e.nome, e.slug
+           FROM curso_acesso_regras r
+           JOIN empresas e ON e.id = r.empresa_id
+          WHERE r.tipo = 'empresa' AND r.curso_id = ANY($1)`,
+        [ids]
+      );
+      const porCurso = {};
+      for (const row of emp.rows) {
+        (porCurso[row.curso_id] ||= []).push({ id: row.id, nome: row.nome, slug: row.slug });
       }
-      cursos.push(curso);
+      for (const c of cursos) c.empresas = porCurso[c.id] || [];
     }
 
     res.json(cursos);
@@ -81,7 +74,7 @@ router.get('/aluno/matriculas', authMiddleware, async (req, res) => {
 
     const resultado = await pool.query(
       `SELECT m.id, m.status, m.progresso, m.created_at as data_matricula,
-              c.id as curso_id, c.nome as nome_curso, c.duracao, c.image, c.nivel, c.tipo,
+              c.id as curso_id, c.nome as nome_curso, c.duracao, c.image, c.nivel, c.acesso,
               c.descricao_curta, c.descricao
        FROM matriculas m
        JOIN cursos c ON m.curso_id = c.id
@@ -241,7 +234,7 @@ router.get('/:cursoId/conteudo', authMiddleware, async (req, res) => {
     res.json({
       curso: {
         id: curso.id, nome: curso.nome, duracao: curso.duracao,
-        nivel: curso.nivel, tipo: curso.tipo, requisitos_certificado: curso.requisitos_certificado,
+        nivel: curso.nivel, acesso: curso.acesso, requisitos_certificado: curso.requisitos_certificado,
       },
       modulos: modulosComAulas,
     });
@@ -497,6 +490,74 @@ router.post('/:cursoId/avaliacao/submeter', authMiddleware, async (req, res) => 
     });
   } catch (error) {
     console.error('Erro ao submeter avaliação:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+/*
+ * GET /:cursoId/avaliacao/ultima-tentativa
+ * Recompõe a revisão da ÚLTIMA tentativa do aluno: para cada questão respondida,
+ * devolve enunciado, alternativas, resposta correta, explicação, o que o aluno
+ * marcou e se acertou. Como a tentativa já foi submetida, expor o gabarito aqui
+ * é seguro (não vaza nada antes do envio — o /iniciar continua sem `correta`).
+ */
+router.get('/:cursoId/avaliacao/ultima-tentativa', authMiddleware, async (req, res) => {
+  try {
+    const { cursoId } = req.params;
+    const alunoId = req.alunoId;
+
+    const r = await pool.query(
+      `SELECT nota, aprovado, respostas, created_at
+       FROM tentativas_avaliacao
+       WHERE aluno_id = $1 AND curso_id = $2
+       ORDER BY created_at DESC LIMIT 1`,
+      [alunoId, cursoId]
+    );
+    if (r.rows.length === 0) {
+      return res.json({ existe: false });
+    }
+
+    const tentativa = r.rows[0];
+    const respostas = tentativa.respostas || {}; // { questaoId: indice }
+    const ids = Object.keys(respostas).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+
+    const questoes = ids.length > 0
+      ? await pool.query(
+          'SELECT id, enunciado, alternativas, correta, explicacao FROM questoes WHERE curso_id = $1 AND id = ANY($2::int[])',
+          [cursoId, ids]
+        )
+      : { rows: [] };
+
+    const qMap = {};
+    for (const q of questoes.rows) qMap[q.id] = q;
+
+    // Preserva a ordem em que as questões foram respondidas.
+    const revisao = ids
+      .map(id => {
+        const q = qMap[id];
+        if (!q) return null; // questão excluída depois da tentativa
+        const sel = parseInt(respostas[id], 10);
+        return {
+          id: q.id,
+          enunciado: q.enunciado,
+          alternativas: q.alternativas,
+          correta: q.correta,
+          explicacao: q.explicacao,
+          resposta: isNaN(sel) ? null : sel,
+          acertou: sel === q.correta,
+        };
+      })
+      .filter(Boolean);
+
+    res.json({
+      existe: true,
+      nota: tentativa.nota,
+      aprovado: tentativa.aprovado,
+      data: tentativa.created_at,
+      revisao,
+    });
+  } catch (error) {
+    console.error('Erro ao buscar revisão da última tentativa:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
