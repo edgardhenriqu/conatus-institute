@@ -21,6 +21,25 @@ function shuffle(arr) {
   return a;
 }
 
+/* Embaralha as alternativas de UMA questão apenas para exibição, preservando
+   o índice original (`origIdx`) de cada opção. O índice original é o que vai
+   para `answers`/servidor — assim a correção (respostas[q.id] === q.correta) e
+   a revisão continuam válidas mesmo com a ordem visual trocada.
+   Reembaralha se sair idêntico à ordem original, para nunca repetir. */
+function shuffleAlternativas(alternativas) {
+  const opcoes = (Array.isArray(alternativas) ? alternativas : [])
+    .map((texto, origIdx) => ({ texto, origIdx }));
+  if (opcoes.length < 2) return opcoes;
+
+  let out;
+  let tentativas = 0;
+  do {
+    out = shuffle(opcoes);
+    tentativas++;
+  } while (tentativas < 6 && out.every((o, i) => o.origIdx === i));
+  return out;
+}
+
 export function CourseQuiz() {
   const { id } = useParams();
   // Só a rota estática legada usa o quiz MOP; id 6 hoje é um curso do banco (Huawei).
@@ -28,14 +47,28 @@ export function CourseQuiz() {
   return isMop ? <MopQuiz /> : <DbQuiz cursoId={id} />;
 }
 
+/* Reconstrói as opções na MESMA ordem que o aluno viu na prova, a partir das
+   alternativas originais e da permutação salva (`ordem` = array de origIdx por
+   posição). Sem permutação (tentativas antigas), usa a ordem canônica. */
+function opcoesNaOrdemExibida(alternativas, ordem) {
+  const alts = Array.isArray(alternativas) ? alternativas : [];
+  if (Array.isArray(ordem) && ordem.length === alts.length) {
+    return ordem.map((origIdx) => ({ texto: alts[origIdx], origIdx }));
+  }
+  return alts.map((texto, origIdx) => ({ texto, origIdx }));
+}
+
 /* Lista de revisão reutilizável (correção pós-prova e revisão persistida).
-   Recebe itens já normalizados:
-   { id, enunciado, alternativas, correta, explicacao, resposta, acertou }. */
+   Recebe itens já normalizados, com as opções na ordem exibida:
+   { id, enunciado, opcoes: [{ texto, origIdx }], correta, explicacao, resposta, acertou }.
+   As comparações usam `origIdx` (índice original), então batem com `correta`
+   e `resposta`, que estão sempre no espaço original das alternativas. */
 function QuizReviewList({ itens }) {
   return (
     <>
       {itens.map((it, i) => {
         const sel = it.resposta;
+        const opcoes = it.opcoes || opcoesNaOrdemExibida(it.alternativas, it.ordem);
         return (
           <div key={it.id ?? i} className="quiz-review-item">
             <div className="quiz-review-q">
@@ -45,18 +78,18 @@ function QuizReviewList({ itens }) {
               <span>{i + 1}. {it.enunciado}</span>
             </div>
             <div className="quiz-options">
-              {(Array.isArray(it.alternativas) ? it.alternativas : []).map((alt, idx) => {
+              {opcoes.map((op, idx) => {
                 let cls = 'quiz-option';
-                if (idx === it.correta) cls += ' correct';
-                else if (idx === sel) cls += ' wrong';
+                if (op.origIdx === it.correta) cls += ' correct';
+                else if (op.origIdx === sel) cls += ' wrong';
                 else cls += ' dimmed';
                 return (
                   <div key={idx} className={cls}>
                     <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
-                    <span>{alt}</span>
-                    {idx === sel && idx === it.correta && <span className="review-tag ok">sua resposta ✓</span>}
-                    {idx === sel && idx !== it.correta && <span className="review-tag fail">sua resposta ✗</span>}
-                    {idx === it.correta && idx !== sel && <span className="review-tag ok">resposta correta</span>}
+                    <span>{op.texto}</span>
+                    {op.origIdx === sel && op.origIdx === it.correta && <span className="review-tag ok">sua resposta ✓</span>}
+                    {op.origIdx === sel && op.origIdx !== it.correta && <span className="review-tag fail">sua resposta ✗</span>}
+                    {op.origIdx === it.correta && op.origIdx !== sel && <span className="review-tag ok">resposta correta</span>}
                   </div>
                 );
               })}
@@ -113,7 +146,12 @@ function DbQuiz({ cursoId }) {
     try {
       const data = await api.iniciarAvaliacao(cursoId);
       if (data.erro) { setError(data.erro); return; }
-      setQuestions(data.questoes || []);
+      // Embaralha as alternativas de cada questão (só exibição; origIdx preservado)
+      const qs = (data.questoes || []).map(q => ({
+        ...q,
+        opcoes: shuffleAlternativas(q.alternativas),
+      }));
+      setQuestions(qs);
       setAnswers({});
       setCurrent(0);
       setError('');
@@ -133,6 +171,11 @@ function DbQuiz({ cursoId }) {
         setError('Não há tentativa anterior para revisar.');
         return;
       }
+      // Reconstrói as opções na ordem que o aluno viu na tentativa.
+      data.revisao = (data.revisao || []).map((it) => ({
+        ...it,
+        opcoes: opcoesNaOrdemExibida(it.alternativas, it.ordem),
+      }));
       setReviewData(data);
       setPhase('review');
     } catch (err) {
@@ -145,7 +188,12 @@ function DbQuiz({ cursoId }) {
   async function handleSubmit() {
     setSubmitting(true);
     try {
-      const data = await api.submeterAvaliacao(cursoId, answers);
+      // Envia a ordem em que as alternativas foram exibidas (p/ a revisão futura).
+      const ordens = {};
+      for (const q of questions) {
+        ordens[q.id] = (q.opcoes || []).map((op) => op.origIdx);
+      }
+      const data = await api.submeterAvaliacao(cursoId, answers, ordens);
       if (data.erro) { setError(data.erro); setPhase('intro'); return; }
       setResult(data);
       setPhase('result');
@@ -334,12 +382,12 @@ function DbQuiz({ cursoId }) {
           <h2 className="quiz-question">{q.enunciado}</h2>
 
           <div className="quiz-options">
-            {(Array.isArray(q.alternativas) ? q.alternativas : []).map((alt, idx) => (
+            {(q.opcoes || []).map((op, idx) => (
               <button key={idx}
-                className={`quiz-option ${selected === idx ? 'correct' : ''}`}
-                onClick={() => setAnswers(a => ({ ...a, [q.id]: idx }))}>
+                className={`quiz-option ${selected === op.origIdx ? 'correct' : ''}`}
+                onClick={() => setAnswers(a => ({ ...a, [q.id]: op.origIdx }))}>
                 <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
-                <span>{alt}</span>
+                <span>{op.texto}</span>
               </button>
             ))}
           </div>
@@ -382,7 +430,8 @@ function DbQuiz({ cursoId }) {
     const reviewItens = questions.map(q => {
       const corr = correcaoMap[q.id] || {};
       return {
-        id: q.id, enunciado: q.enunciado, alternativas: q.alternativas,
+        id: q.id, enunciado: q.enunciado,
+        opcoes: q.opcoes, // mesma ordem embaralhada exibida na prova
         correta: corr.correta, explicacao: corr.explicacao,
         resposta: answers[q.id], acertou: !!corr.acertou,
       };
@@ -497,7 +546,8 @@ function MopQuiz() {
   }, [user, navigate]);
 
   function startQuiz() {
-    const picked = shuffle(mopQuestions).slice(0, QUESTIONS_PER);
+    const picked = shuffle(mopQuestions).slice(0, QUESTIONS_PER)
+      .map(q => ({ ...q, opcoes: shuffleAlternativas(q.alternativas) }));
     setQuestions(picked);
     setCurrent(0);
     setSelected(null);
@@ -648,17 +698,17 @@ function MopQuiz() {
           <h2 className="quiz-question">{q.enunciado}</h2>
 
           <div className="quiz-options">
-            {q.alternativas.map((alt, idx) => {
+            {q.opcoes.map((op, idx) => {
               let cls = 'quiz-option';
               if (selected !== null) {
-                if (idx === q.correta)  cls += ' correct';
-                else if (idx === selected && !isCorrect) cls += ' wrong';
+                if (op.origIdx === q.correta)  cls += ' correct';
+                else if (op.origIdx === selected && !isCorrect) cls += ' wrong';
                 else cls += ' dimmed';
               }
               return (
-                <button key={idx} className={cls} onClick={() => handleSelect(idx)} disabled={selected !== null}>
+                <button key={idx} className={cls} onClick={() => handleSelect(op.origIdx)} disabled={selected !== null}>
                   <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
-                  <span>{alt}</span>
+                  <span>{op.texto}</span>
                 </button>
               );
             })}

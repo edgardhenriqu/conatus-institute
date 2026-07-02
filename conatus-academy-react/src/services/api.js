@@ -102,10 +102,10 @@ export const api = {
   iniciarAvaliacao: async (cursoId) =>
     request(`${API_URL}/cursos/${cursoId}/avaliacao/iniciar`, { method: 'POST' }),
 
-  submeterAvaliacao: async (cursoId, respostas) =>
+  submeterAvaliacao: async (cursoId, respostas, ordens) =>
     request(`${API_URL}/cursos/${cursoId}/avaliacao/submeter`, {
       method: 'POST',
-      body: JSON.stringify({ respostas }),
+      body: JSON.stringify({ respostas, ordens }),
     }),
 
   // Revisão persistida: recompõe a correção da última tentativa do aluno.

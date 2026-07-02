@@ -45,7 +45,7 @@ const PADROES = ['Uptime Institute', 'BICSI', 'ASHRAE'];
 export function MethodologySection() {
   return (
     <section id="metodologia" className="section methodology-section">
-      <div className="section-header">
+      <div className="section-header" data-reveal>
         <h2>Nossa Metodologia</h2>
         <p>Como formamos profissionais prontos para operar a infraestrutura mais crítica do mundo.</p>
       </div>
@@ -53,7 +53,12 @@ export function MethodologySection() {
       {/* Pilares */}
       <div className="methodology-grid">
         {PILARES.map((p, i) => (
-          <article className="methodology-card" key={i}>
+          <article
+            className="methodology-card"
+            key={i}
+            data-reveal
+            style={{ '--reveal-delay': `${i * 90}ms` }}
+          >
             <div className="methodology-card__icon" aria-hidden="true">{p.icone}</div>
             <h3>{p.titulo}</h3>
             <p>{p.texto}</p>
@@ -62,12 +67,17 @@ export function MethodologySection() {
       </div>
 
       {/* Ciclo de aprendizagem */}
-      <div className="methodology-cycle">
+      <div className="methodology-cycle" data-reveal>
         <h3 className="methodology-cycle__title">O Ciclo de Aprendizagem Conatus</h3>
         <p className="methodology-cycle__lead">Padronização · Confiabilidade · Excelência Operacional</p>
         <div className="methodology-steps">
           {ETAPAS.map((e, i) => (
-            <div className="methodology-step" key={i}>
+            <div
+              className="methodology-step"
+              key={i}
+              data-reveal
+              style={{ '--reveal-delay': `${i * 100}ms` }}
+            >
               <span className="methodology-step__num">{i + 1}</span>
               <h4>{e.titulo}</h4>
               <p>{e.texto}</p>
@@ -77,7 +87,7 @@ export function MethodologySection() {
       </div>
 
       {/* Padrões internacionais */}
-      <div className="methodology-standards">
+      <div className="methodology-standards" data-reveal="fade">
         <span className="methodology-standards__label">Alinhado aos padrões internacionais</span>
         <div className="methodology-standards__list">
           {PADROES.map((nome) => (

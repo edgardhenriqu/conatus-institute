@@ -10,10 +10,13 @@ import { NewsSection } from '../components/sections/NewsSection';
 import { api } from '../services/api';
 import { staticCourses, normalizeDbCourse } from '../data/courses';
 import { canAccessInternalCourse } from '../utils/permissions';
+import { useScrollReveal } from '../hooks/useScrollReveal';
 
 export function Home() {
   const { user } = useAuth();
   const [courses, setCourses] = useState([]);
+
+  useScrollReveal([courses]);
 
   useEffect(() => {
     async function loadCourses() {
@@ -37,7 +40,7 @@ export function Home() {
       
       <section id="sobre" className="section about-section">
         <div className="section-container">
-          <div className="about-content">
+          <div className="about-content" data-reveal="left">
             <h2>Por que o Conatus Institute?</h2>
             <p>Fundado com a missão de elevar o padrão da educação técnica em infraestrutura de TI, o Conatus é referência global em ensino prático e pesquisa aplicada.</p>
             <ul className="academic-list">
@@ -46,7 +49,7 @@ export function Home() {
               <li>🌍 <strong>Reconhecimento Internacional:</strong> Certificações alinhadas aos padrões Uptime Institute, BICSI e ASHRAE.</li>
             </ul>
           </div>
-          <div className="about-image">
+          <div className="about-image" data-reveal="right">
             <img src="/images/institute-background.png" alt="Conatus Institute" className="about-logo" />
           </div>
         </div>

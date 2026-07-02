@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { Carousel } from '../ui/Carousel';
+import { useScrollReveal } from '../../hooks/useScrollReveal';
 
 function formatarData(iso) {
   if (!iso) return '';
@@ -25,9 +26,11 @@ export function NewsSection() {
     return () => { ativo = false; };
   }, []);
 
+  useScrollReveal([carregando]);
+
   return (
     <section id="news" className="section news-section">
-      <div className="section-header">
+      <div className="section-header" data-reveal>
         <h2>Notícias & Eventos Acadêmicos</h2>
         <p>Atualizado automaticamente a partir de portais especializados em data centers.</p>
       </div>
@@ -37,6 +40,7 @@ export function NewsSection() {
       ) : feed.length === 0 ? (
         <p className="news-feed__loading">Nenhuma notícia disponível no momento.</p>
       ) : (
+        <div data-reveal="fade" style={{ '--reveal-delay': '120ms' }}>
         <Carousel
           items={feed}
           variant="home-carousel"
@@ -52,6 +56,7 @@ export function NewsSection() {
             </a>
           )}
         />
+        </div>
       )}
     </section>
   );

@@ -70,6 +70,7 @@ function CertificateSheet({ studentName, courseName, duration, score, issuedDate
   const inkColor = useInkColor(assinaturaSrc);
   return (
     <div className="certificate" id="certificate">
+      <img src="/images/logo-institute.svg" alt="Conatus Institute" className="cert-logo" />
       <div className="cert-brand">Conatus Institute</div>
       <div className="cert-brand-sub">Educação e Pesquisa em Infraestrutura Crítica</div>
 
@@ -179,7 +180,7 @@ ${appStyles}
   /* Não imprime o aviso de autenticidade / emissão digital */
   .cert-validation-extra { display: none !important; }
   .certificate {
-    position: static !important;
+    position: relative !important;
     visibility: visible !important;
     max-width: 100% !important;
     margin: 0 !important;
@@ -188,6 +189,7 @@ ${appStyles}
     padding: 28px 48px !important;
     page-break-inside: avoid;
   }
+  .cert-logo { top: 10mm !important; left: 12mm !important; width: 28mm !important; }
   .cert-brand-sub { margin-bottom: 18px !important; }
   .cert-title { margin-bottom: 14px !important; }
   .cert-course { margin-bottom: 18px !important; }

@@ -48,13 +48,13 @@ export function ProfessorsSection() {
 
   return (
     <section id="professores" className="section professors-section">
-      <div className="section-header">
+      <div className="section-header" data-reveal>
         <h2>Professores</h2>
         <p>Quem ensina na Conatus opera de verdade. Conheça o especialista por trás dos nossos cursos.</p>
       </div>
 
       <div className="professor-feature">
-        <div className="professor-feature__media">
+        <div className="professor-feature__media" data-reveal="left">
           {p.foto ? (
             <img className="professor-feature__photo" src={p.foto} alt={p.nome} />
           ) : (
@@ -62,7 +62,7 @@ export function ProfessorsSection() {
           )}
         </div>
 
-        <div className="professor-feature__info">
+        <div className="professor-feature__info" data-reveal="right">
           <h3>{p.nome}</h3>
           <span className="professor-feature__role">{p.cargo}</span>
           {p.subtitulo && <span className="professor-feature__sub">{p.subtitulo}</span>}
@@ -90,21 +90,21 @@ export function ProfessorsSection() {
       </div>
 
       <div className="professor-extra">
-        <article className="professor-extra__card">
+        <article className="professor-extra__card" data-reveal>
           <h4>Atuação atual</h4>
           <ul>
             {p.atuacao.map((item, i) => <li key={i}>{item}</li>)}
           </ul>
         </article>
 
-        <article className="professor-extra__card">
+        <article className="professor-extra__card" data-reveal style={{ '--reveal-delay': '100ms' }}>
           <h4>Formação</h4>
           <ul>
             {p.formacao.map((item, i) => <li key={i}>{item}</li>)}
           </ul>
         </article>
 
-        <article className="professor-extra__card">
+        <article className="professor-extra__card" data-reveal style={{ '--reveal-delay': '200ms' }}>
           <h4>Certificações</h4>
           <ul>
             {p.certificacoes.map((item, i) => <li key={i}>{item}</li>)}

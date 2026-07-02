@@ -1,22 +1,24 @@
+const STATS = [
+  { valor: '98%', rotulo: 'Taxa de Empregabilidade' },
+  { valor: '150+', rotulo: 'Parceiros da Indústria' },
+  { valor: '100%', rotulo: 'Online & Interativo' },
+];
+
 export function StatsSection() {
   return (
     <section id="stats" className="stats-section">
       <div className="stats-container">
-        <div className="stat-item">
-          <h3>98%</h3>
-          <p>Taxa de Empregabilidade</p>
-        </div>
-        <div className="stat-item">
-          <h3>150+</h3>
-          <p>Parceiros da Indústria</p>
-        </div>
-        <div className="stat-item">
-          <h3>100%</h3>
-          <p>Online & Interativo</p>
-        </div>
-        <div className="stat-item">
-          {/* Vazio mantido do HTML original */}
-        </div>
+        {STATS.map((s, i) => (
+          <div
+            className="stat-item"
+            key={s.rotulo}
+            data-reveal
+            style={{ '--reveal-delay': `${i * 100}ms` }}
+          >
+            <h3>{s.valor}</h3>
+            <p>{s.rotulo}</p>
+          </div>
+        ))}
       </div>
     </section>
   );

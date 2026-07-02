@@ -171,7 +171,7 @@ export function AdminAlunos() {
       <div className="admin-body">
         <div className="admin-container">
           <header className="admin-header">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <h1>{editando ? 'Editando Aluno' : 'Detalhes do Aluno'}</h1>
                 <RoleBadge role={alunoSelecionado.role} />
@@ -201,7 +201,7 @@ export function AdminAlunos() {
               <h3 style={{ marginBottom: '16px', color: 'var(--primary)', borderBottom: '2px solid var(--border)', paddingBottom: '8px' }}>
                 Dados Pessoais
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
+              <div className="admin-form-grid" style={{ marginBottom: '30px' }}>
                 <div>
                   <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Nome *</label>
                   <input type="text" value={formData.nome || ''} required
@@ -278,7 +278,7 @@ export function AdminAlunos() {
                 <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '18px' }}>
                   Define o perfil e as permissões de acesso do usuário na plataforma.
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="admin-form-grid">
                   <div>
                     <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Perfil / Função</label>
                     <select value={formData.role || 'aluno'}
@@ -431,7 +431,7 @@ export function AdminAlunos() {
     <div className="admin-body">
       <div className="admin-container">
         <header className="admin-header">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div>
               <h1>Gerenciar Alunos</h1>
               <p>Visualize, edite e gerencie permissões dos usuários</p>
@@ -457,6 +457,7 @@ export function AdminAlunos() {
           {loading ? (
             <div style={{ padding: '40px', textAlign: 'center' }}>Carregando...</div>
           ) : (
+            <div className="admin-table-scroll">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -512,6 +513,7 @@ export function AdminAlunos() {
                 )}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

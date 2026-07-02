@@ -78,6 +78,10 @@ const STATEMENTS = [
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_tentativas_aluno_curso ON tentativas_avaliacao(aluno_id, curso_id)`,
+  // ordem de exibição das alternativas por questão na tentativa (embaralhamento):
+  // { questaoId: [origIdx por posição] } — usada para a revisão mostrar a mesma
+  // ordem que o aluno viu. Nulo em tentativas antigas (cai na ordem canônica).
+  `ALTER TABLE tentativas_avaliacao ADD COLUMN IF NOT EXISTS ordens JSONB`,
   // autorizações de cursos internos
   `CREATE TABLE IF NOT EXISTS curso_autorizacoes (
     curso_id INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,

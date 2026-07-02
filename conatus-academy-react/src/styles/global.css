@@ -89,6 +89,17 @@ header[id] {
     margin-bottom: 15px;
 }
 
+/* Traço de marca sob os títulos de seção — reforça hierarquia visual */
+.section-header h2::after {
+    content: '';
+    display: block;
+    width: 56px;
+    height: 3px;
+    margin: 14px auto 0;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--gold), var(--dc-electric));
+}
+
 .section-header p {
     font-size: 1.2rem;
     color: var(--text-muted);
@@ -284,6 +295,22 @@ header[id] {
     transform: translateY(-2px);
 }
 
+/* Em fundos claros (fora do hero) o secundário vira outline institucional,
+   garantindo contraste — a versão translúcida branca só funciona sobre imagem. */
+.section-footer .btn-secondary {
+    background: transparent;
+    color: var(--primary);
+    border-color: var(--primary);
+    backdrop-filter: none;
+}
+
+.section-footer .btn-secondary:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: var(--shadow);
+}
+
 .btn-free-courses {
     background: linear-gradient(135deg, #00c853, #00e676);
     color: #1a1a2e;
@@ -468,7 +495,8 @@ header[id] {
 }
 
 .hero h1 {
-    font-size: 3.5rem;
+    /* Fluido: acompanha a largura da tela sem saltos entre breakpoints */
+    font-size: clamp(2.2rem, 5vw, 3.5rem);
     color: white;
     margin-bottom: 20px;
     font-weight: 900;
@@ -476,7 +504,7 @@ header[id] {
 }
 
 .hero p {
-    font-size: 1.3rem;
+    font-size: clamp(1.05rem, 1.5vw, 1.3rem);
     color: rgba(255, 255, 255, 0.90);
     margin-bottom: 40px;
     max-width: 700px;
@@ -1235,6 +1263,13 @@ header[id] {
 /* ============================================
    NEWS SECTION
    ============================================ */
+
+/* Fundo claro alterna o ritmo visual com as seções vizinhas (brancas)
+   e destaca os cards de notícia, que são brancos. */
+.news-section {
+    background: var(--bg-light);
+    border-top: 1px solid var(--border);
+}
 
 .news-grid {
     display: grid;
@@ -3519,6 +3554,20 @@ header[id] {
     background: #f0f7ff;
 }
 
+/* Rolagem horizontal da tabela em telas estreitas — mantém o cabeçalho do
+   painel (título + busca) fixo e só a tabela desliza. */
+.admin-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Grid de campos do formulário admin (2 colunas → 1 no mobile). */
+.admin-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
 .admin-btn {
     padding: 6px 14px;
     border-radius: var(--radius-sm);
@@ -3747,6 +3796,32 @@ header[id] {
 
     .admin-nav {
         flex-wrap: wrap;
+    }
+
+    /* Painel admin: cabeçalho da tabela empilha e busca ocupa a largura toda. */
+    .admin-table-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .admin-table-header form {
+        width: 100%;
+    }
+
+    .admin-search {
+        width: 100%;
+        flex: 1;
+    }
+
+    /* Preserva a largura das colunas e ativa o scroll horizontal no wrapper. */
+    .admin-table {
+        min-width: 720px;
+    }
+
+    /* Formulário de edição do aluno: uma coluna no mobile. */
+    .admin-form-grid {
+        grid-template-columns: 1fr;
     }
 
     .cursos-header h1 {

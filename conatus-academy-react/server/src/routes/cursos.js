@@ -430,7 +430,8 @@ router.post('/:cursoId/avaliacao/submeter', authMiddleware, async (req, res) => 
   try {
     const { cursoId } = req.params;
     const alunoId = req.alunoId;
-    const { respostas } = req.body; // { [questaoId]: indiceAlternativa }
+    const { respostas, ordens } = req.body; // respostas: { questaoId: indiceAlternativa (original) }
+    // ordens: { questaoId: [origIdx por posição exibida] } — opcional, só p/ revisão
 
     if (!respostas || typeof respostas !== 'object') {
       return res.status(400).json({ erro: 'Formato inválido. Envie { respostas: { questaoId: indice } }' });
@@ -472,10 +473,11 @@ router.post('/:cursoId/avaliacao/submeter', authMiddleware, async (req, res) => 
     const nota = totalProva > 0 ? Math.round((acertos / totalProva) * 100) : 0;
     const aprovado = nota >= config.nota_minima;
 
+    const ordensValidas = ordens && typeof ordens === 'object' ? ordens : null;
     await pool.query(
-      `INSERT INTO tentativas_avaliacao (aluno_id, curso_id, nota, aprovado, respostas)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [alunoId, cursoId, nota, aprovado, JSON.stringify(respostas)]
+      `INSERT INTO tentativas_avaliacao (aluno_id, curso_id, nota, aprovado, respostas, ordens)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [alunoId, cursoId, nota, aprovado, JSON.stringify(respostas), ordensValidas ? JSON.stringify(ordensValidas) : null]
     );
 
     res.json({
@@ -507,7 +509,7 @@ router.get('/:cursoId/avaliacao/ultima-tentativa', authMiddleware, async (req, r
     const alunoId = req.alunoId;
 
     const r = await pool.query(
-      `SELECT nota, aprovado, respostas, created_at
+      `SELECT nota, aprovado, respostas, ordens, created_at
        FROM tentativas_avaliacao
        WHERE aluno_id = $1 AND curso_id = $2
        ORDER BY created_at DESC LIMIT 1`,
@@ -519,6 +521,7 @@ router.get('/:cursoId/avaliacao/ultima-tentativa', authMiddleware, async (req, r
 
     const tentativa = r.rows[0];
     const respostas = tentativa.respostas || {}; // { questaoId: indice }
+    const ordens = tentativa.ordens || {};       // { questaoId: [origIdx por posição] }
     const ids = Object.keys(respostas).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
 
     const questoes = ids.length > 0
@@ -541,6 +544,9 @@ router.get('/:cursoId/avaliacao/ultima-tentativa', authMiddleware, async (req, r
           id: q.id,
           enunciado: q.enunciado,
           alternativas: q.alternativas,
+          // ordem de exibição desta questão na tentativa (origIdx por posição);
+          // null em tentativas antigas → cliente usa a ordem canônica.
+          ordem: Array.isArray(ordens[id]) ? ordens[id] : null,
           correta: q.correta,
           explicacao: q.explicacao,
           resposta: isNaN(sel) ? null : sel,
