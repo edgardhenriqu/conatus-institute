@@ -4,6 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const pool = require('../../db/connection');
 const { contentMiddleware } = require('../middlewares/auth');
+const { ADMIN_ROLES, canManage, rank, rolesAtOrAbove } = require('../utils/roles');
 
 const router = express.Router();
 
@@ -62,14 +63,14 @@ router.post('/upload/imagem', (req, res) => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function onlyAdmin(req, res, next) {
-  if (!['admin', 'superadmin'].includes(req.userRole)) {
+  if (!ADMIN_ROLES.includes(req.userRole)) {
     return res.status(403).json({ erro: 'Apenas administradores podem realizar esta ação.' });
   }
   next();
 }
 
 async function checkCourseAccess(req, cursoId) {
-  if (['admin', 'superadmin'].includes(req.userRole)) return true;
+  if (ADMIN_ROLES.includes(req.userRole)) return true;
   const r = await pool.query('SELECT instrutor_id FROM cursos WHERE id = $1', [cursoId]);
   if (!r.rows.length) return false;
   return String(r.rows[0].instrutor_id) === String(req.alunoId);
@@ -98,18 +99,18 @@ async function getCursoIdFromQuestao(questaoId) {
 router.get('/dashboard', onlyAdmin, async (req, res) => {
   try {
     const [alunos, cursos, matriculas, certificados, publicados, rascunhos, emAndamento, aprovados] = await Promise.all([
-      pool.query("SELECT COUNT(*) as total FROM alunos WHERE role NOT IN ('admin', 'superadmin')"),
+      pool.query("SELECT COUNT(*) as total FROM alunos WHERE role NOT IN ('admin', 'superadmin', 'diretor')"),
       pool.query('SELECT COUNT(*) as total FROM cursos'),
-      pool.query("SELECT COUNT(*) as total FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE a.role NOT IN ('admin', 'superadmin')"),
-      pool.query("SELECT COUNT(*) as total FROM certificados c JOIN alunos a ON a.id = c.aluno_id WHERE a.role NOT IN ('admin', 'superadmin')"),
+      pool.query("SELECT COUNT(*) as total FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE a.role NOT IN ('admin', 'superadmin', 'diretor')"),
+      pool.query("SELECT COUNT(*) as total FROM certificados c JOIN alunos a ON a.id = c.aluno_id WHERE a.role NOT IN ('admin', 'superadmin', 'diretor')"),
       pool.query("SELECT COUNT(*) as total FROM cursos WHERE status = 'publicado'"),
       pool.query("SELECT COUNT(*) as total FROM cursos WHERE status = 'rascunho'"),
-      pool.query("SELECT COUNT(*) as total FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE a.role NOT IN ('admin', 'superadmin') AND m.progresso < 100"),
-      pool.query("SELECT COUNT(DISTINCT (t.aluno_id, t.curso_id)) as total FROM tentativas_avaliacao t JOIN alunos a ON a.id = t.aluno_id WHERE a.role NOT IN ('admin', 'superadmin') AND t.aprovado = true")
+      pool.query("SELECT COUNT(*) as total FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE a.role NOT IN ('admin', 'superadmin', 'diretor') AND m.progresso < 100"),
+      pool.query("SELECT COUNT(DISTINCT (t.aluno_id, t.curso_id)) as total FROM tentativas_avaliacao t JOIN alunos a ON a.id = t.aluno_id WHERE a.role NOT IN ('admin', 'superadmin', 'diretor') AND t.aprovado = true")
     ]);
 
     const ultimosAlunos = await pool.query(
-      "SELECT id, nome, email, created_at FROM alunos WHERE role NOT IN ('admin', 'superadmin') ORDER BY created_at DESC LIMIT 5"
+      "SELECT id, nome, email, created_at FROM alunos WHERE role NOT IN ('admin', 'superadmin', 'diretor') ORDER BY created_at DESC LIMIT 5"
     );
 
     res.json({
@@ -134,11 +135,13 @@ router.get('/dashboard', onlyAdmin, async (req, res) => {
 router.get('/alunos', onlyAdmin, async (req, res) => {
   try {
     const { busca } = req.query;
-    const filtroVisibilidade = req.userRole === 'superadmin'
-      ? `a.role != 'superadmin'`
-      : `a.role NOT IN ('admin', 'superadmin')`;
+    // Cada usuário só enxerga quem está ABAIXO dele na hierarquia — oculta
+    // pares e superiores (ex.: admin não vê admins/superadmins/diretor; o
+    // superadmin não vê outros superadmins nem o diretor; o diretor vê todos).
+    const ocultos = rolesAtOrAbove(req.userRole).map(r => `'${r}'`).join(', ');
+    const filtroVisibilidade = `a.role NOT IN (${ocultos})`;
     let query = `
-      SELECT a.id, a.nome, a.email, a.cpf, a.data_nascimento, a.telefone, a.cidade, a.estado, a.empresa, a.role, a.ativo, a.created_at,
+      SELECT a.id, a.nome, a.email, a.cpf, a.data_nascimento, a.telefone, a.cidade, a.estado, a.empresa, a.cargo, a.role, a.ativo, a.created_at,
         (SELECT COUNT(*) FROM matriculas m WHERE m.aluno_id = a.id) as total_matriculas,
         (SELECT COUNT(*) FROM certificados c WHERE c.aluno_id = a.id) as total_certificados
       FROM alunos a
@@ -167,7 +170,7 @@ router.get('/alunos/:id', onlyAdmin, async (req, res) => {
 
     const aluno = await pool.query(
       `SELECT a.id, a.nome, a.email, a.cpf, a.data_nascimento, a.telefone, a.endereco, a.cidade, a.estado,
-              a.empresa, a.empresa_id, e.nome AS empresa_parceira_nome, a.role, a.ativo, a.created_at
+              a.empresa, a.cargo, a.empresa_id, e.nome AS empresa_parceira_nome, a.role, a.ativo, a.created_at
        FROM alunos a
        LEFT JOIN empresas e ON e.id = a.empresa_id
        WHERE a.id = $1`,
@@ -178,8 +181,10 @@ router.get('/alunos/:id', onlyAdmin, async (req, res) => {
       return res.status(404).json({ erro: 'Aluno não encontrado' });
     }
 
-    if (['admin', 'superadmin'].includes(aluno.rows[0].role) && req.userRole !== 'superadmin') {
-      return res.status(403).json({ erro: 'Apenas o Super Administrador pode acessar perfis de administradores.' });
+    // Perfis de nível admin-tier só podem ser abertos por quem está acima deles
+    // na hierarquia (o diretor pode ver superadmins/admins; ninguém abre o diretor).
+    if (ADMIN_ROLES.includes(aluno.rows[0].role) && !canManage(req.userRole, aluno.rows[0].role)) {
+      return res.status(403).json({ erro: 'Você não tem permissão para acessar o perfil deste usuário.' });
     }
 
     const matriculas = await pool.query(
@@ -214,12 +219,15 @@ router.get('/alunos/:id', onlyAdmin, async (req, res) => {
 router.put('/alunos/:id', onlyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, email, telefone, endereco, cidade, estado, empresa, empresa_id, ativo, role } = req.body;
+    const { nome, email, telefone, endereco, cidade, estado, empresa, cargo, empresa_id, ativo, role } = req.body;
 
-    // Empresa é opcional: string vazia limpa (null); undefined preserva o valor atual.
+    // Empresa/cargo: string vazia limpa (null); undefined preserva o valor atual.
     const empresaParam = empresa === undefined
       ? null
       : (typeof empresa === 'string' && empresa.trim() ? empresa.trim() : '');
+    const cargoParam = cargo === undefined
+      ? null
+      : (typeof cargo === 'string' && cargo.trim() ? cargo.trim() : '');
 
     // Vínculo com empresa PARCEIRA (empresa_id) — controla o acesso a cursos
     // restritos. Só o admin (onlyAdmin) chega aqui. undefined preserva o valor
@@ -241,6 +249,9 @@ router.put('/alunos/:id', onlyAdmin, async (req, res) => {
       empresaIdParam = String(n);
     }
 
+    // Papéis atribuíveis pelo painel. 'superadmin' e 'diretor' NÃO são
+    // atribuíveis aqui: o superadmin é fixado por e-mail e o diretor é
+    // exclusivo do Giovanni (também fixado por e-mail no boot).
     const validRoles = ['aluno', 'conatus_employee', 'admin', 'instrutor'];
     if (role !== undefined && !validRoles.includes(role)) {
       return res.status(400).json({ erro: 'Perfil inválido. Use: aluno, conatus_employee, instrutor ou admin.' });
@@ -252,17 +263,16 @@ router.put('/alunos/:id', onlyAdmin, async (req, res) => {
     }
     const roleAlvo = alvo.rows[0].role;
 
-    if (roleAlvo === 'superadmin') {
-      return res.status(403).json({ erro: 'O perfil do Super Administrador não pode ser alterado por esta rota.' });
+    // Só é possível editar quem está ESTRITAMENTE abaixo na hierarquia.
+    // (diretor edita todos; ninguém edita o diretor; superadmin não edita superadmin.)
+    if (!canManage(req.userRole, roleAlvo)) {
+      return res.status(403).json({ erro: 'Você não pode editar um usuário de nível igual ou superior ao seu.' });
     }
 
-    if (roleAlvo === 'admin' && req.userRole !== 'superadmin') {
-      return res.status(403).json({ erro: 'Apenas o Super Administrador pode editar perfis de administradores.' });
-    }
-
-    // Admins podem alterar cargos, mas NÃO podem conceder admin/superadmin.
-    if (role !== undefined && ['admin', 'superadmin'].includes(role) && req.userRole !== 'superadmin') {
-      return res.status(403).json({ erro: 'Apenas o Super Administrador pode conceder o perfil de Administrador.' });
+    // Não é possível conceder um papel de nível igual ou superior ao seu.
+    // (admin não cria admin; superadmin pode conceder admin, mas não superadmin.)
+    if (role !== undefined && rank(role) >= rank(req.userRole)) {
+      return res.status(403).json({ erro: 'Você não pode conceder um papel de nível igual ou superior ao seu.' });
     }
 
     const newRole = validRoles.includes(role) ? role : null;
@@ -283,10 +293,13 @@ router.put('/alunos/:id', onlyAdmin, async (req, res) => {
            empresa_id = CASE WHEN $10::text IS NULL THEN empresa_id
                              WHEN $10 = '' THEN NULL
                              ELSE $10::integer END,
+           cargo     = CASE WHEN $12::text IS NULL THEN cargo
+                            WHEN $12 = '' THEN NULL
+                            ELSE $12 END,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $11
-       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, empresa_id, role, ativo, created_at, updated_at`,
-      [nome, email, telefone, endereco, cidade, estado, empresaParam, ativo, newRole, empresaIdParam, id]
+       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, cargo, empresa_id, role, ativo, created_at, updated_at`,
+      [nome, email, telefone, endereco, cidade, estado, empresaParam, ativo, newRole, empresaIdParam, id, cargoParam]
     );
 
     if (resultado.rows.length === 0) {
@@ -309,11 +322,10 @@ router.delete('/alunos/:id', onlyAdmin, async (req, res) => {
     if (alvo.rows.length === 0) {
       return res.status(404).json({ erro: 'Aluno não encontrado' });
     }
-    if (alvo.rows[0].role === 'superadmin') {
-      return res.status(403).json({ erro: 'O Super Administrador não pode ser excluído.' });
-    }
-    if (alvo.rows[0].role === 'admin' && req.userRole !== 'superadmin') {
-      return res.status(403).json({ erro: 'Apenas o Super Administrador pode excluir administradores.' });
+    // Só é possível excluir quem está ESTRITAMENTE abaixo na hierarquia.
+    // (o diretor nunca pode ser excluído; superadmin só por um diretor.)
+    if (!canManage(req.userRole, alvo.rows[0].role)) {
+      return res.status(403).json({ erro: 'Você não pode excluir um usuário de nível igual ou superior ao seu.' });
     }
 
     await client.query('BEGIN');
@@ -357,7 +369,7 @@ router.get('/cursos', async (req, res) => {
 
     const resultado = await pool.query(
       `SELECT c.*,
-        (SELECT COUNT(*) FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE m.curso_id = c.id AND a.role NOT IN ('admin', 'superadmin')) as total_matriculas,
+        (SELECT COUNT(*) FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE m.curso_id = c.id AND a.role NOT IN ('admin', 'superadmin', 'diretor')) as total_matriculas,
         (SELECT COUNT(*) FROM modulos mo WHERE mo.curso_id = c.id) as total_modulos,
         (SELECT COUNT(*) FROM aulas au JOIN modulos mo ON mo.id = au.modulo_id WHERE mo.curso_id = c.id) as total_aulas,
         (SELECT COUNT(*) FROM questoes q WHERE q.curso_id = c.id) as total_questoes
@@ -407,7 +419,7 @@ router.get('/cursos/:id', async (req, res) => {
 
     const curso = await pool.query(
       `SELECT c.*,
-        (SELECT COUNT(*) FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE m.curso_id = c.id AND a.role NOT IN ('admin', 'superadmin')) as total_matriculas
+        (SELECT COUNT(*) FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE m.curso_id = c.id AND a.role NOT IN ('admin', 'superadmin', 'diretor')) as total_matriculas
        FROM cursos c
        WHERE c.id = $1`,
       [id]
@@ -485,7 +497,7 @@ router.put('/cursos/:id', async (req, res) => {
     }
 
     // Apenas admins podem mudar o instrutor vinculado
-    if (['admin', 'superadmin'].includes(req.userRole) && req.body.instrutor_id !== undefined) {
+    if (ADMIN_ROLES.includes(req.userRole) && req.body.instrutor_id !== undefined) {
       values.push(req.body.instrutor_id || null);
       sets.push(`instrutor_id = $${values.length}`);
     }
@@ -629,7 +641,7 @@ router.get('/cursos/:id/matriculados', async (req, res) => {
         (SELECT codigo FROM certificados cert WHERE cert.aluno_id = a.id AND cert.curso_id = m.curso_id) as certificado_codigo
        FROM matriculas m
        JOIN alunos a ON a.id = m.aluno_id
-       WHERE m.curso_id = $1 AND a.role NOT IN ('admin', 'superadmin')
+       WHERE m.curso_id = $1 AND a.role NOT IN ('admin', 'superadmin', 'diretor')
        ORDER BY a.nome`,
       [id]
     );

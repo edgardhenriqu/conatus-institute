@@ -166,14 +166,16 @@ function isValidPhone(phone) {
 
 router.post('/cadastrar', async (req, res) => {
   try {
-    const { nome, email, senha, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa } = req.body;
+    const { nome, email, senha, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, cargo } = req.body;
 
-    if (!nome || !email || !senha || !cpf || !data_nascimento || !telefone || !endereco || !cidade || !estado) {
+    if (!nome || !email || !senha || !cpf || !data_nascimento || !telefone || !endereco || !cidade || !estado
+        || !empresa?.trim() || !cargo?.trim()) {
       return res.status(400).json({ erro: 'Todos os campos são obrigatórios.' });
     }
 
-    // Empresa é opcional (texto livre). Normaliza para null quando vazia.
-    const empresaNorm = typeof empresa === 'string' && empresa.trim() ? empresa.trim() : null;
+    // Empresa e cargo (texto livre) são obrigatórios no cadastro.
+    const empresaNorm = empresa.trim();
+    const cargoNorm   = cargo.trim();
 
     if (!senhaForte(senha)) {
       return res.status(400).json({ erro: 'A senha deve ter no mínimo 8 caracteres, letra maiúscula, minúscula, número e caractere especial.' });
@@ -201,10 +203,10 @@ router.post('/cadastrar', async (req, res) => {
     const senhaHash = await bcrypt.hash(senha, salt);
 
     const resultado = await pool.query(
-      `INSERT INTO alunos (nome, email, senha, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, role)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'aluno')
-       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, role, created_at`,
-      [nome, email, senhaHash, cpf, data_nascimento, telefone, endereco, cidade, estado, empresaNorm]
+      `INSERT INTO alunos (nome, email, senha, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, cargo, role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'aluno')
+       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, cargo, role, created_at`,
+      [nome, email, senhaHash, cpf, data_nascimento, telefone, endereco, cidade, estado, empresaNorm, cargoNorm]
     );
 
     const aluno = resultado.rows[0];
@@ -539,7 +541,7 @@ router.post('/redefinir-senha', async (req, res) => {
 router.get('/perfil', authMiddleware, async (req, res) => {
   try {
     const resultado = await pool.query(
-      'SELECT id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, role, created_at FROM alunos WHERE id = $1',
+      'SELECT id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, cargo, role, created_at FROM alunos WHERE id = $1',
       [req.alunoId]
     );
 
@@ -556,12 +558,15 @@ router.get('/perfil', authMiddleware, async (req, res) => {
 
 router.put('/perfil', authMiddleware, async (req, res) => {
   try {
-    const { nome, telefone, endereco, cidade, estado, empresa } = req.body;
+    const { nome, telefone, endereco, cidade, estado, empresa, cargo } = req.body;
 
-    // Empresa é opcional: string vazia limpa o campo (vira null); undefined preserva.
+    // Empresa/cargo: string vazia limpa o campo (vira null); undefined preserva.
     const empresaParam = empresa === undefined
       ? null
       : (typeof empresa === 'string' && empresa.trim() ? empresa.trim() : '');
+    const cargoParam = cargo === undefined
+      ? null
+      : (typeof cargo === 'string' && cargo.trim() ? cargo.trim() : '');
 
     const resultado = await pool.query(
       `UPDATE alunos
@@ -573,10 +578,13 @@ router.put('/perfil', authMiddleware, async (req, res) => {
            empresa = CASE WHEN $6::text IS NULL THEN empresa
                           WHEN $6 = '' THEN NULL
                           ELSE $6 END,
+           cargo = CASE WHEN $7::text IS NULL THEN cargo
+                        WHEN $7 = '' THEN NULL
+                        ELSE $7 END,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7
-       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, created_at, updated_at`,
-      [nome || null, telefone || null, endereco || null, cidade || null, estado || null, empresaParam, req.alunoId]
+       WHERE id = $8
+       RETURNING id, nome, email, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, cargo, created_at, updated_at`,
+      [nome || null, telefone || null, endereco || null, cidade || null, estado || null, empresaParam, cargoParam, req.alunoId]
     );
 
     res.json({ aluno: resultado.rows[0] });

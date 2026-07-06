@@ -42,6 +42,9 @@ const STATEMENTS = [
   // empregador declarado, NÃO confundir com empresa_id (vínculo com empresa
   // parceira usado no controle de acesso a cursos).
   `ALTER TABLE alunos ADD COLUMN IF NOT EXISTS empresa VARCHAR(150)`,
+  // cargo (texto livre) — informado pelo aluno no cadastro (função/posição
+  // que ocupa na empresa declarada). Nasce NULL para contas já existentes.
+  `ALTER TABLE alunos ADD COLUMN IF NOT EXISTS cargo VARCHAR(120)`,
   // updated_at em matriculas — sem ela o salvar progresso (recalcularProgresso) dá erro 500
   `ALTER TABLE matriculas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
   // avaliação (config por curso)
@@ -160,6 +163,10 @@ const STATEMENTS = [
   `INSERT INTO schema_flags (chave) VALUES ('acesso_migrado') ON CONFLICT DO NOTHING`,
   // admin@conatus.com é o superadmin: único perfil que pode alterar cargos
   `UPDATE alunos SET role = 'superadmin' WHERE email = 'admin@conatus.com' AND role != 'superadmin'`,
+  // Diretor — topo absoluto da hierarquia, acima do superadmin. Exclusivo do
+  // Giovanni Henrique da Silva, fixado por e-mail e reaplicado a cada boot.
+  // Aplica-se assim que a conta com esse e-mail existir.
+  `UPDATE alunos SET role = 'diretor' WHERE email = 'giovanni.silva@conatusprocedures.com' AND role != 'diretor'`,
   // verificação de e-mail no cadastro.
   // A coluna nasce com DEFAULT true para que contas JÁ existentes não sejam
   // bloqueadas; em seguida o default vira false, de modo que apenas novos

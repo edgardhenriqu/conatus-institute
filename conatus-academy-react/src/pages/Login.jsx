@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
+import { isAdmin } from '../utils/permissions';
 import { CaptchaVerification } from './CaptchaVerification';
 
 const UF_OPTIONS = [
@@ -104,6 +105,7 @@ export function Login() {
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const [cepLoading, setCepLoading]   = useState(false);
   const [cepError, setCepError]       = useState('');
   const [cpfStatus, setCpfStatus]     = useState(null); // null | true | false
@@ -181,9 +183,10 @@ export function Login() {
   /* Register state */
   const [cep, setCep] = useState('');
   const [confirmSenha, setConfirmSenha] = useState('');
+  const [aceitouTermos, setAceitouTermos] = useState(false);
   const [regData, setRegData] = useState({
     nome: '', email: '', senha: '', cpf: '',
-    data_nascimento: '', telefone: '', empresa: '',
+    data_nascimento: '', telefone: '', empresa: '', cargo: '',
     endereco: '', cidade: '', estado: '',
   });
 
@@ -199,6 +202,7 @@ export function Login() {
     setError('');
     setShowPass(false);
     setConfirmSenha('');
+    setAceitouTermos(false);
     setCepError('');
     setCpfStatus(null);
     setPhoneStatus(null);
@@ -242,7 +246,7 @@ export function Login() {
   /* Conclui a sessão e redireciona conforme o papel do usuário. */
   const finishLogin = (data) => {
     login(data.aluno, data.token);
-    navigate(['admin', 'superadmin'].includes(data.aluno.role) ? '/admin/dashboard' : '/dashboard');
+    navigate(isAdmin(data.aluno) ? '/admin/dashboard' : '/dashboard');
   };
 
   /* ── Login submit ───────────────────────────────────────────── */
@@ -315,6 +319,8 @@ export function Login() {
       ['cpf',             'CPF'],
       ['data_nascimento', 'Data de Nascimento'],
       ['telefone',        'Telefone'],
+      ['empresa',         'Empresa'],
+      ['cargo',           'Cargo'],
       ['endereco',        'Endereço'],
       ['cidade',          'Cidade'],
       ['estado',          'Estado'],
@@ -352,6 +358,11 @@ export function Login() {
 
     if (regData.senha !== confirmSenha) {
       setError('As senhas não coincidem. Verifique a confirmação de senha.');
+      return;
+    }
+
+    if (!aceitouTermos) {
+      setError('Para concluir o cadastro, aceite os Termos de Serviço e a Política de Privacidade.');
       return;
     }
 
@@ -506,7 +517,11 @@ export function Login() {
                       id="login-senha" type={showPass ? 'text' : 'password'}
                       className="auth-input" placeholder="Sua senha" value={senha}
                       autoComplete="current-password" required aria-required="true"
+                      aria-describedby={capsLock ? 'login-senha-caps' : undefined}
                       onChange={e => { setError(''); setSenha(e.target.value); }}
+                      onKeyUp={e => setCapsLock(e.getModifierState('CapsLock'))}
+                      onKeyDown={e => setCapsLock(e.getModifierState('CapsLock'))}
+                      onBlur={() => setCapsLock(false)}
                     />
                     <button type="button" className="auth-toggle-pass"
                       onClick={() => setShowPass(v => !v)}
@@ -514,6 +529,11 @@ export function Login() {
                       {showPass ? '🙈' : '👁️'}
                     </button>
                   </div>
+                  {capsLock && (
+                    <p id="login-senha-caps" className="auth-caps-warning" role="alert">
+                      <span aria-hidden="true">⇪</span> Caps Lock está ativado.
+                    </p>
+                  )}
                 </div>
 
                 <div className="auth-forgot-row" style={{ textAlign: 'right', marginBottom: 12 }}>
@@ -604,13 +624,21 @@ export function Login() {
                         className="auth-input" placeholder="Mínimo 6 caracteres"
                         value={regData.senha} autoComplete="new-password"
                         minLength={6} required aria-required="true" aria-describedby="senha-hint"
-                        onChange={e => setReg('senha', e.target.value)} />
+                        onChange={e => setReg('senha', e.target.value)}
+                        onKeyUp={e => setCapsLock(e.getModifierState('CapsLock'))}
+                        onKeyDown={e => setCapsLock(e.getModifierState('CapsLock'))}
+                        onBlur={() => setCapsLock(false)} />
                       <button type="button" className="auth-toggle-pass"
                         onClick={() => setShowPass(v => !v)}
                         aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}>
                         {showPass ? '🙈' : '👁️'}
                       </button>
                     </div>
+                    {capsLock && (
+                      <p className="auth-caps-warning" role="alert">
+                        <span aria-hidden="true">⇪</span> Caps Lock está ativado.
+                      </p>
+                    )}
                     {regData.senha.length > 0 && (() => {
                       const checks = checkPassword(regData.senha);
                       const strength = strengthLevel(checks);
@@ -657,13 +685,21 @@ export function Login() {
                         required aria-required="true"
                         aria-describedby={confirmSenha && regData.senha !== confirmSenha ? 'confirma-senha-error' : undefined}
                         aria-invalid={!!confirmSenha && regData.senha !== confirmSenha}
-                        onChange={e => { setError(''); setConfirmSenha(e.target.value); }} />
+                        onChange={e => { setError(''); setConfirmSenha(e.target.value); }}
+                        onKeyUp={e => setCapsLock(e.getModifierState('CapsLock'))}
+                        onKeyDown={e => setCapsLock(e.getModifierState('CapsLock'))}
+                        onBlur={() => setCapsLock(false)} />
                       <button type="button" className="auth-toggle-pass"
                         onClick={() => setShowPass(v => !v)}
                         aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}>
                         {showPass ? '🙈' : '👁️'}
                       </button>
                     </div>
+                    {capsLock && (
+                      <p className="auth-caps-warning" role="alert">
+                        <span aria-hidden="true">⇪</span> Caps Lock está ativado.
+                      </p>
+                    )}
                     {confirmSenha && regData.senha !== confirmSenha && (
                       <p id="confirma-senha-error" className="auth-field-error" role="alert">
                         As senhas não coincidem.
@@ -740,14 +776,28 @@ export function Login() {
                     )}
                   </div>
 
-                  <div className="auth-form-group">
-                    <label htmlFor="reg-empresa" className="auth-label">
-                      Empresa <span className="auth-optional">(opcional)</span>
-                    </label>
-                    <input id="reg-empresa" type="text" className="auth-input"
-                      placeholder="Empresa onde você trabalha"
-                      value={regData.empresa} autoComplete="organization" maxLength={150}
-                      onChange={e => setReg('empresa', e.target.value)} />
+                  <div className="auth-row">
+                    <div className="auth-form-group">
+                      <label htmlFor="reg-empresa" className="auth-label">
+                        Empresa <span className="auth-required" aria-hidden="true">*</span>
+                      </label>
+                      <input id="reg-empresa" type="text" className="auth-input"
+                        placeholder="Empresa onde você trabalha"
+                        value={regData.empresa} autoComplete="organization" maxLength={150}
+                        required aria-required="true"
+                        onChange={e => setReg('empresa', e.target.value)} />
+                    </div>
+
+                    <div className="auth-form-group">
+                      <label htmlFor="reg-cargo" className="auth-label">
+                        Cargo <span className="auth-required" aria-hidden="true">*</span>
+                      </label>
+                      <input id="reg-cargo" type="text" className="auth-input"
+                        placeholder="Sua função na empresa"
+                        value={regData.cargo} autoComplete="organization-title" maxLength={120}
+                        required aria-required="true"
+                        onChange={e => setReg('cargo', e.target.value)} />
+                    </div>
                   </div>
                 </fieldset>
 
@@ -823,9 +873,28 @@ export function Login() {
                   </div>
                 </fieldset>
 
+                <div className="auth-terms">
+                  <input
+                    id="reg-aceite" type="checkbox" className="auth-terms-check"
+                    checked={aceitouTermos} required aria-required="true"
+                    onChange={e => { setError(''); setAceitouTermos(e.target.checked); }}
+                  />
+                  <label htmlFor="reg-aceite" className="auth-terms-label">
+                    Li e aceito os{' '}
+                    <Link to="/termos-de-servico" target="_blank" rel="noopener noreferrer">
+                      Termos de Serviço
+                    </Link>{' '}
+                    e a{' '}
+                    <Link to="/politica-de-privacidade" target="_blank" rel="noopener noreferrer">
+                      Política de Privacidade
+                    </Link>. <span className="auth-required" aria-hidden="true">*</span>
+                  </label>
+                </div>
+
                 {error && <div className="auth-error" role="alert">{error}</div>}
 
-                <button type="submit" className="auth-btn-primary" disabled={loading} aria-busy={loading}>
+                <button type="submit" className="auth-btn-primary"
+                  disabled={loading || !aceitouTermos} aria-busy={loading}>
                   {loading && <span className="auth-spinner" aria-hidden="true" />}
                   {loading ? 'Criando conta...' : 'Criar Minha Conta'}
                 </button>

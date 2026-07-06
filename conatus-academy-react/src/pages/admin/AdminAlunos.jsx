@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import { adminApi } from '../../services/adminApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
-import { ROLE_LABELS, ROLE_COLORS } from '../../utils/permissions';
+import { ROLE_LABELS, ROLE_COLORS, roleRank } from '../../utils/permissions';
 
 const ROLE_OPTIONS = [
   { value: 'aluno',            label: 'Aluno' },
@@ -36,6 +36,7 @@ function emptyForm(aluno = null) {
     cidade:   aluno?.cidade   || '',
     estado:   aluno?.estado   || '',
     empresa:  aluno?.empresa  || '',
+    cargo:    aluno?.cargo    || '',
     empresa_id: aluno?.empresa_id != null ? String(aluno.empresa_id) : '',
     ativo:    aluno?.ativo !== false,
     role:     aluno?.role     || 'aluno',
@@ -44,9 +45,11 @@ function emptyForm(aluno = null) {
 
 export function AdminAlunos() {
   const toast = useToast();
-  const { isAdmin, isSuperAdmin } = useAuth();
-  // Admins podem alterar cargos; só o superadmin pode conceder o perfil "admin".
-  const roleOptions = isSuperAdmin ? ROLE_OPTIONS : ROLE_OPTIONS.filter(o => o.value !== 'admin');
+  const { user, isAdmin } = useAuth();
+  // Papéis que este usuário pode ATRIBUIR: só os de rank abaixo do seu.
+  // (admin: até instrutor; superadmin: até admin; diretor: idem — superadmin/
+  //  diretor não são atribuíveis pelo painel, são fixados por e-mail.)
+  const roleOptions = ROLE_OPTIONS.filter(o => roleRank(o.value) < roleRank(user?.role));
   const [alunos, setAlunos]                 = useState([]);
   const [loading, setLoading]               = useState(true);
   const [busca, setBusca]                   = useState('');
@@ -102,10 +105,13 @@ export function AdminAlunos() {
     e.preventDefault();
     try {
       const payload = { ...formData };
-      if (isAdmin) {
-        payload.role = formData.role || 'aluno';
+      // Só envia o papel quando é um valor que este usuário pode atribuir.
+      // Assim, editar os dados de um superadmin (papel não atribuível) preserva
+      // o papel dele em vez de rebaixá-lo por engano.
+      if (isAdmin && roleOptions.some(o => o.value === formData.role)) {
+        payload.role = formData.role;
       } else {
-        delete payload.role; // sem permissão para alterar cargos
+        delete payload.role;
       }
       const data = await api.updateAdminAluno(alunoSelecionado.id, payload);
       if (data.erro) {
@@ -167,6 +173,13 @@ export function AdminAlunos() {
 
   /* ── Tela de detalhes/edição ────────────────────────────────── */
   if (alunoSelecionado) {
+    // O papel atual é atribuível por este usuário? (superadmin/diretor não são).
+    const roleAtribuivel = roleOptions.some(o => o.value === formData.role);
+    // Garante que o <select> exiba o papel atual mesmo quando não for atribuível.
+    const roleSelectOptions = roleAtribuivel
+      ? roleOptions
+      : [{ value: formData.role, label: ROLE_LABELS[formData.role] || formData.role }, ...roleOptions];
+
     return (
       <div className="admin-body">
         <div className="admin-container">
@@ -257,6 +270,12 @@ export function AdminAlunos() {
                     onChange={e => setFormData({ ...formData, empresa: e.target.value })} />
                 </div>
                 <div>
+                  <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Cargo</label>
+                  <input type="text" value={formData.cargo || ''} disabled={!editando}
+                    placeholder="—" style={inputStyle(editando)}
+                    onChange={e => setFormData({ ...formData, cargo: e.target.value })} />
+                </div>
+                <div>
                   <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Status da Conta</label>
                   <select value={formData.ativo ? 'true' : 'false'}
                     disabled={!editando} style={inputStyle(editando)}
@@ -282,10 +301,10 @@ export function AdminAlunos() {
                   <div>
                     <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Perfil / Função</label>
                     <select value={formData.role || 'aluno'}
-                      disabled={!editando || !isAdmin}
-                      style={inputStyle(editando && isAdmin)}
+                      disabled={!editando || !isAdmin || !roleAtribuivel}
+                      style={inputStyle(editando && isAdmin && roleAtribuivel)}
                       onChange={e => setFormData({ ...formData, role: e.target.value })}>
-                      {roleOptions.map(o => (
+                      {roleSelectOptions.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
@@ -293,11 +312,15 @@ export function AdminAlunos() {
                       <p style={{ fontSize: '0.8rem', color: '#b91c1c', marginTop: '6px' }}>
                         Você não tem permissão para alterar cargos.
                       </p>
+                    ) : !roleAtribuivel ? (
+                      <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
+                        Este perfil é fixado pelo sistema e não pode ser alterado pelo painel.
+                      </p>
                     ) : !editando ? (
                       <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
                         Clique em "Editar" para alterar o perfil.
                       </p>
-                    ) : !isSuperAdmin && (
+                    ) : roleRank(user?.role) <= roleRank('admin') && (
                       <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '6px' }}>
                         Apenas o Super Administrador pode conceder o perfil de Administrador.
                       </p>
@@ -307,11 +330,11 @@ export function AdminAlunos() {
                     <label style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>Acesso ao Curso Interno (MOP)</label>
                     <div style={{
                       padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border)',
-                      background: ['admin', 'superadmin', 'conatus_employee'].includes(formData.role) ? '#d1fae5' : '#f3f4f6',
-                      color: ['admin', 'superadmin', 'conatus_employee'].includes(formData.role) ? '#065f46' : '#9ca3af',
+                      background: ['admin', 'superadmin', 'diretor', 'conatus_employee'].includes(formData.role) ? '#d1fae5' : '#f3f4f6',
+                      color: ['admin', 'superadmin', 'diretor', 'conatus_employee'].includes(formData.role) ? '#065f46' : '#9ca3af',
                       fontWeight: 600, fontSize: '0.9rem',
                     }}>
-                      {['admin', 'superadmin', 'conatus_employee'].includes(formData.role)
+                      {['admin', 'superadmin', 'diretor', 'conatus_employee'].includes(formData.role)
                         ? '✓ Autorizado'
                         : '✗ Sem acesso'}
                     </div>

@@ -18,6 +18,8 @@ import { CourseViewer } from './pages/CourseViewer';
 import { CourseQuiz } from './pages/CourseQuiz';
 import { Certificate } from './pages/Certificate';
 import { ValidarCertificado } from './pages/ValidarCertificado';
+import { TermosDeServico } from './pages/legal/TermosDeServico';
+import { PoliticaDePrivacidade } from './pages/legal/PoliticaDePrivacidade';
 import { Dashboard } from './pages/Dashboard';
 import { Perfil } from './pages/Perfil';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -74,6 +76,8 @@ function App() {
             <Route path="/cursos/:id" element={<CourseDetails />} />
             <Route path="/validar-certificado" element={<ValidarCertificado />} />
             <Route path="/validar-certificado/:codigo" element={<ValidarCertificado />} />
+            <Route path="/termos-de-servico" element={<TermosDeServico />} />
+            <Route path="/politica-de-privacidade" element={<PoliticaDePrivacidade />} />
 
             <Route
               path="/dashboard"

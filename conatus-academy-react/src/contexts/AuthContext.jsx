@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import { initMopProgress } from '../utils/mopProgress';
+import { isAdmin as isAdminRole, isSuperAdmin as isSuperAdminRole, isInstrutor as isInstrutorRole, isStaff as isStaffRole, isDiretor as isDiretorRole } from '../utils/permissions';
 
 const AuthContext = createContext();
 
@@ -62,13 +63,15 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
-  const isSuperAdmin = user?.role === 'superadmin';
-  const isInstrutor = user?.role === 'instrutor';
-  const isStaff = isAdmin || isInstrutor;
+  // Regras vêm da fonte única (utils/permissions.js) — não reimplementar aqui.
+  const isAdmin = isAdminRole(user);
+  const isSuperAdmin = isSuperAdminRole(user);
+  const isInstrutor = isInstrutorRole(user);
+  const isStaff = isStaffRole(user);
+  const isDiretor = isDiretorRole(user);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin, isSuperAdmin, isInstrutor, isStaff }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin, isSuperAdmin, isInstrutor, isStaff, isDiretor }}>
       {children}
     </AuthContext.Provider>
   );

@@ -9,6 +9,7 @@ export const ROLES = {
   INSTRUTOR:  'instrutor',
   ADMIN:      'admin',
   SUPERADMIN: 'superadmin',
+  DIRETOR:    'diretor',
 };
 
 export const ROLE_LABELS = {
@@ -17,6 +18,7 @@ export const ROLE_LABELS = {
   instrutor:         'Instrutor',
   admin:             'Administrador',
   superadmin:        'Super Administrador',
+  diretor:           'Diretor',
 };
 
 export const ROLE_COLORS = {
@@ -25,9 +27,33 @@ export const ROLE_COLORS = {
   instrutor:         '#059669',
   admin:             '#7c3aed',
   superadmin:        '#b91c1c',
+  diretor:           '#111827',
 };
 
-export const VALID_ROLES = [ROLES.ALUNO, ROLES.EMPLOYEE, ROLES.INSTRUTOR, ROLES.ADMIN, ROLES.SUPERADMIN];
+/**
+ * Hierarquia (rank crescente = mais privilégio). Espelha server/src/utils/roles.js.
+ * O diretor é o topo absoluto: mesmas autorizações do superadmin + poder sobre ele.
+ */
+export const ROLE_RANK = {
+  aluno:            0,
+  conatus_employee: 1,
+  instrutor:        1,
+  admin:            2,
+  superadmin:       3,
+  diretor:          4,
+};
+
+export const VALID_ROLES = [ROLES.ALUNO, ROLES.EMPLOYEE, ROLES.INSTRUTOR, ROLES.ADMIN, ROLES.SUPERADMIN, ROLES.DIRETOR];
+
+/** Rank hierárquico de um papel (-1 se desconhecido). */
+export function roleRank(role) {
+  return Object.prototype.hasOwnProperty.call(ROLE_RANK, role) ? ROLE_RANK[role] : -1;
+}
+
+/** Um ator pode gerenciar (editar/excluir/alterar cargo) um alvo? Só quem está abaixo. */
+export function canManageRole(actorRole, targetRole) {
+  return roleRank(actorRole) > roleRank(targetRole);
+}
 
 /** Retorna true se o usuário pode acessar cursos internos (MOP). */
 export function canAccessInternalCourse(user) {
@@ -40,14 +66,19 @@ export function canAccessInternalCourse(user) {
   );
 }
 
-/** True para administradores (inclui o superadmin). */
+/** True para administradores — inclui superadmin e diretor (acesso ao painel). */
 export function isAdmin(user) {
-  return user?.role === ROLES.ADMIN || user?.role === ROLES.SUPERADMIN;
+  return user?.role === ROLES.ADMIN || user?.role === ROLES.SUPERADMIN || user?.role === ROLES.DIRETOR;
 }
 
-/** True apenas para o superadmin — único que pode alterar cargos e gerenciar admins. */
+/** True para quem tem poderes de superadmin (alterar cargos, gerenciar admins): superadmin ou diretor. */
 export function isSuperAdmin(user) {
-  return user?.role === ROLES.SUPERADMIN;
+  return user?.role === ROLES.SUPERADMIN || user?.role === ROLES.DIRETOR;
+}
+
+/** True apenas para o diretor — topo absoluto da hierarquia, acima do superadmin. */
+export function isDiretor(user) {
+  return user?.role === ROLES.DIRETOR;
 }
 
 /** True para instrutores — podem gerenciar conteúdo dos seus próprios cursos. */

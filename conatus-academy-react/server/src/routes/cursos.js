@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const pool = require('../../db/connection');
 const { authMiddleware } = require('../middlewares/auth');
 const { podeAcessarCurso, MSG_ACESSO_NEGADO } = require('../services/accessControl');
+const { ADMIN_ROLES } = require('../utils/roles');
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ function optionalAuth(req, _res, next) {
 
 /** Curso visível/acessível para este usuário? Retorna { ok, status, erro }. */
 async function checarAcessoCurso(curso, req) {
-  const isAdmin = req.userRole === 'admin' || req.userRole === 'superadmin';
+  const isAdmin = ADMIN_ROLES.includes(req.userRole);
   if (curso.status !== 'publicado' && !isAdmin) {
     return { ok: false, status: 404, erro: 'Curso não encontrado' };
   }

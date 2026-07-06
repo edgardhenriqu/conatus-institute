@@ -20,6 +20,14 @@ export function Footer() {
           <p>+55 (11) 91230-1413</p>
         </div>
       </div>
+
+      <div className="footer-legal">
+        <nav className="footer-legal-links" aria-label="Links institucionais">
+          <Link to="/termos-de-servico">Termos de Serviço</Link>
+          <span aria-hidden="true">•</span>
+          <Link to="/politica-de-privacidade">Política de Privacidade</Link>
+        </nav>
+      </div>
     </footer>
   );
 }

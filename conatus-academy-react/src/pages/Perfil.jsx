@@ -30,7 +30,7 @@ function senhaForte(senha) {
 // (sem min-height/background próprios) para se encaixar na área de conteúdo.
 export function Perfil({ embedded = false }) {
   const { user, login } = useAuth();
-  const [form, setForm] = useState({ nome: '', telefone: '', endereco: '', cidade: '', estado: '', empresa: '' });
+  const [form, setForm] = useState({ nome: '', telefone: '', endereco: '', cidade: '', estado: '', empresa: '', cargo: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null); // { type: 'success'|'error', text }
@@ -91,6 +91,7 @@ export function Perfil({ embedded = false }) {
           cidade: a.cidade || '',
           estado: a.estado || '',
           empresa: a.empresa || '',
+          cargo: a.cargo || '',
         });
       })
       .catch(() => {
@@ -102,6 +103,7 @@ export function Perfil({ embedded = false }) {
             cidade: user.cidade || '',
             estado: user.estado || '',
             empresa: user.empresa || '',
+            cargo: user.cargo || '',
           });
         }
       })
@@ -179,7 +181,8 @@ export function Perfil({ embedded = false }) {
           <Field label="Telefone" name="telefone" value={form.telefone} onChange={handleChange} placeholder="(11) 99999-9999" />
           <Field label="Endereço" name="endereco" value={form.endereco} onChange={handleChange} />
           <Field label="Cidade" name="cidade" value={form.cidade} onChange={handleChange} />
-          <Field label="Empresa (opcional)" name="empresa" value={form.empresa} onChange={handleChange} placeholder="Empresa onde você trabalha" />
+          <Field label="Empresa" name="empresa" value={form.empresa} onChange={handleChange} placeholder="Empresa onde você trabalha" />
+          <Field label="Cargo" name="cargo" value={form.cargo} onChange={handleChange} placeholder="Sua função na empresa" />
 
           <div>
             <label style={labelStyle}>Estado</label>

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../../db/connection');
+const { ADMIN_ROLES, CONTENT_ROLES } = require('../utils/roles');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -19,9 +20,6 @@ function authMiddleware(req, res, next) {
     return res.status(401).json({ erro: 'Token inválido ou expirado' });
   }
 }
-
-const ADMIN_ROLES = ['admin', 'superadmin'];
-const CONTENT_ROLES = ['admin', 'superadmin', 'instrutor'];
 
 async function adminMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];

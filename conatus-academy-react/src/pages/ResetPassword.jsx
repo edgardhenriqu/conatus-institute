@@ -34,6 +34,7 @@ export function ResetPassword() {
   const [senha, setSenha]       = useState('');
   const [confirma, setConfirma] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
   const [done, setDone]         = useState(false);
@@ -107,7 +108,11 @@ export function ResetPassword() {
                         id="reset-senha" type={showPass ? 'text' : 'password'}
                         className="auth-input" placeholder="Sua nova senha" value={senha}
                         autoComplete="new-password" required aria-required="true"
+                        aria-describedby={capsLock ? 'reset-senha-caps' : undefined}
                         onChange={e => { setError(''); setSenha(e.target.value); }}
+                        onKeyUp={e => setCapsLock(e.getModifierState('CapsLock'))}
+                        onKeyDown={e => setCapsLock(e.getModifierState('CapsLock'))}
+                        onBlur={() => setCapsLock(false)}
                       />
                       <button type="button" className="auth-toggle-pass"
                         onClick={() => setShowPass(v => !v)}
@@ -115,6 +120,11 @@ export function ResetPassword() {
                         {showPass ? '🙈' : '👁️'}
                       </button>
                     </div>
+                    {capsLock && (
+                      <p id="reset-senha-caps" className="auth-caps-warning" role="alert">
+                        <span aria-hidden="true">⇪</span> Caps Lock está ativado.
+                      </p>
+                    )}
                     {senha.length > 0 && (
                       <ul className="auth-pass-checklist" role="list" style={{ marginTop: 8 }}>
                         {PASS_RULES.map(r => (
@@ -136,7 +146,15 @@ export function ResetPassword() {
                       className="auth-input" placeholder="Repita a nova senha" value={confirma}
                       autoComplete="new-password" required aria-required="true"
                       onChange={e => { setError(''); setConfirma(e.target.value); }}
+                      onKeyUp={e => setCapsLock(e.getModifierState('CapsLock'))}
+                      onKeyDown={e => setCapsLock(e.getModifierState('CapsLock'))}
+                      onBlur={() => setCapsLock(false)}
                     />
+                    {capsLock && (
+                      <p className="auth-caps-warning" role="alert">
+                        <span aria-hidden="true">⇪</span> Caps Lock está ativado.
+                      </p>
+                    )}
                   </div>
 
                   {error && <div className="auth-error" role="alert">{error}</div>}

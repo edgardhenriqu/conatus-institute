@@ -1410,6 +1410,39 @@ header[id] {
     text-decoration: underline;
 }
 
+/* Barra inferior de links institucionais (Termos / Privacidade) */
+.footer-legal {
+    max-width: var(--container-max);
+    margin: 40px auto 0;
+    padding: 24px 20px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.footer-legal-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+}
+
+.footer-legal-links a {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    transition: color var(--transition);
+}
+
+.footer-legal-links a:hover {
+    color: white;
+    text-decoration: underline;
+}
+
+.footer-legal-links span {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.8rem;
+}
+
 /* ============================================
    AUTH PAGES (Login & Cadastro)
    ============================================ */
@@ -1665,6 +1698,66 @@ header[id] {
     color: var(--danger);
     margin-top: 5px;
     font-weight: 600;
+}
+
+/* Aceite de Termos de Serviço e Política de Privacidade (cadastro) */
+.auth-terms {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 4px 0 20px;
+}
+
+.auth-terms-check {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.auth-terms-check:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: 3px;
+}
+
+.auth-terms-label {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.auth-terms-label a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.auth-terms-label a:hover {
+    color: var(--dc-electric);
+}
+
+.auth-caps-warning {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: #b45309;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-top: 8px;
+    font-weight: 600;
+}
+
+.auth-caps-warning span {
+    font-size: 1rem;
+    line-height: 1;
 }
 
 .auth-field-hint {

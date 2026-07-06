@@ -15,8 +15,8 @@
  */
 const pool = require('../../db/connection');
 
-const STAFF_ROLES = ['admin', 'superadmin'];
-const EMPLOYEE_ROLES = ['admin', 'superadmin', 'conatus_employee'];
+const STAFF_ROLES = ['admin', 'superadmin', 'diretor'];
+const EMPLOYEE_ROLES = ['admin', 'superadmin', 'diretor', 'conatus_employee'];
 
 // Domínios corporativos da Conatus (compatibilidade retroativa com contas
 // antigas cujo perfil de funcionário só é inferível pelo e-mail corporativo).
