@@ -2,7 +2,8 @@
 # O código da aplicação fica em ./conatus-academy-react (React + Express).
 # Os scripts do package.json na raiz orquestram o build e a execução.
 
-modules = ["nodejs-20", "postgresql-16"]
+# Banco é externo (Supabase), então NÃO usamos o módulo postgresql do Replit.
+modules = ["nodejs-20", "web"]
 
 # Botão "Run": compila o frontend e sobe o servidor Express (API + site) numa
 # única porta. É intencional recompilar aqui para o dist/ existir na primeira vez.
@@ -10,8 +11,11 @@ run = "npm run build && npm start"
 
 hidden = [".config", "dist", "node_modules"]
 
+[agent]
+expertMode = true
+
 [nix]
-channel = "stable-24_05"
+channel = "stable-25_05"
 
 [env]
 NODE_ENV = "production"
