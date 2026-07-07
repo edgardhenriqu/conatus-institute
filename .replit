@@ -1,0 +1,30 @@
+# Configuração do Replit — Conatus Institute
+# O código da aplicação fica em ./conatus-academy-react (React + Express).
+# Os scripts do package.json na raiz orquestram o build e a execução.
+
+modules = ["nodejs-20", "postgresql-16"]
+
+# Botão "Run": compila o frontend e sobe o servidor Express (API + site) numa
+# única porta. É intencional recompilar aqui para o dist/ existir na primeira vez.
+run = "npm run build && npm start"
+
+hidden = [".config", "dist", "node_modules"]
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+NODE_ENV = "production"
+
+# Mapeamento de porta: o Express escuta em process.env.PORT (fornecido pelo
+# Replit) e é exposto externamente na 80/443.
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+# Deploy (Reserved VM / Autoscale): build separado do run para não recompilar
+# a cada requisição.
+[deployment]
+deploymentTarget = "autoscale"
+build = ["sh", "-c", "npm run build"]
+run = ["sh", "-c", "npm start"]

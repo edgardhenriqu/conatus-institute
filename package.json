@@ -1,0 +1,15 @@
+{
+  "name": "conatus-institute",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plataforma de cursos Conatus Institute (React + Express + PostgreSQL). Wrapper de build/execução para deploy no Replit.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "install:app": "cd conatus-academy-react && npm install",
+    "build": "cd conatus-academy-react && npm install && npm run build",
+    "start": "cd conatus-academy-react && npm start",
+    "dev": "cd conatus-academy-react && npm install && npm run dev"
+  }
+}

@@ -1,2 +1,42 @@
+# Dependências
 node_modules/
+**/node_modules/
+
+# Build do frontend
+dist/
+**/dist/
+dist-ssr/
+
+# Variáveis de ambiente — NUNCA versionar credenciais reais
 .env
+.env.*
+!.env.example
+*.bak
+
+# Uploads gerados em runtime (capas de curso, etc.)
+conatus-academy-react/server/uploads/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Replit
+.upm/
+.config/
+.breakpoints
+
+# Material de origem pesado (não versionar)
+extracted_pptx/
+*.pptx
+
+# Editores / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.sw?
