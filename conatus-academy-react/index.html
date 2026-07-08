@@ -1,10 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR" translate="no">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icone.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>conatus-academy-react</title>
+    <!-- Página é 100% em português. A tradução automática do navegador (Google
+         Tradutor) reescreve os nós de texto do DOM e faz o React quebrar com
+         "Failed to execute 'insertBefore' on 'Node'". Declarar o idioma correto
+         e desativar a tradução evita esse crash. -->
+    <meta name="google" content="notranslate" />
+    <title>Conatus Institute</title>
   </head>
   <body>
     <div id="root"></div>
