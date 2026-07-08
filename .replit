@@ -26,3 +26,21 @@ NODE_ENV = "production"
 deploymentTarget = "autoscale"
 build = ["sh", "-c", "npm run build"]
 run = ["sh", "-c", "npm start"]
+
+[userenv]
+
+[userenv.production]
+APP_URL = "https://conatus-institute-deploy--edgardhenriqu.replit.app"
+CORS_ORIGIN = "https://conatus-institute-deploy--edgardhenriqu.replit.app"
+DB_HOST = "aws-1-sa-east-1.pooler.supabase.com"
+DB_NAME = "postgres"
+DB_PORT = "5432"
+DB_SSL = "true"
+DB_SSL_CA = "./supabase-ca.crt"
+DB_USER = "postgres.zatmhjfpjutimscfxtny"
+MAIL_FROM = "suporte.conatus.institute@gmail.com"
+NODE_ENV = "production"
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = "465"
+SMTP_SECURE = "true"
+SMTP_USER = "suporte.conatus.institute@gmail.com"
