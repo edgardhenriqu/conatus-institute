@@ -20,12 +20,6 @@ channel = "stable-25_05"
 [env]
 NODE_ENV = "production"
 
-# Mapeamento de porta: o Express escuta em process.env.PORT (fornecido pelo
-# Replit) e é exposto externamente na 80/443.
-[[ports]]
-localPort = 3000
-externalPort = 80
-
 # Deploy (Reserved VM / Autoscale): build separado do run para não recompilar
 # a cada requisição.
 [deployment]
