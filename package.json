@@ -8,7 +8,7 @@
   },
   "scripts": {
     "install:app": "cd conatus-academy-react && npm install",
-    "build": "cd conatus-academy-react && npm install && npm run build",
+    "build": "cd conatus-academy-react && npm install --include=dev && npm run build",
     "start": "cd conatus-academy-react && npm start",
     "dev": "cd conatus-academy-react && npm install && npm run dev"
   }
