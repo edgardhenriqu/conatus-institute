@@ -45,6 +45,16 @@ export function CourseViewer() {
   const [accessDenied, setAccessDenied]     = useState(false);
   const [deniedMsg, setDeniedMsg]           = useState('');
   const [loadError, setLoadError]           = useState('');
+  const [focusMode, setFocusMode]           = useState(false); // esconde a lista de aulas
+
+  // Esc sai do modo foco: sem isso o aluno que expandiu com o teclado fica sem
+  // saída óbvia, já que a lista de aulas some da tela.
+  useEffect(() => {
+    if (!focusMode) return undefined;
+    const onKeyDown = (e) => { if (e.key === 'Escape') setFocusMode(false); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [focusMode]);
 
   // Chave de progresso da aula: MOP usa o id estático; DB usa "aula-<id>"
   const lessonKey = useCallback(
@@ -256,9 +266,11 @@ export function CourseViewer() {
   const embedUrl = toEmbedUrl(activeLesson.video_url);
 
   return (
-    <div className="viewer-layout">
+    <div className={`viewer-layout ${focusMode ? 'focus-mode' : ''}`}>
 
       {/* ── Sidebar ─────────────────────────────────────────────── */}
+      {/* No modo foco ela é ocultada por CSS (display:none), o que também a
+          tira da ordem de tabulação, mas preserva a rolagem e o estado. */}
       <div className="viewer-sidebar">
         <div className="viewer-sidebar-header">
           <Link to={`/cursos/${id}`} className="viewer-back-link">← Detalhes do Curso</Link>
@@ -337,14 +349,25 @@ export function CourseViewer() {
 
           <div className="viewer-title-row">
             <h1>{activeLesson.titulo || activeLesson.title}</h1>
-            {isCurrentDone
-              ? <span className="lesson-done-badge">✓ Concluída</span>
-              : (
-                <button className="btn-mark-done" onClick={handleMarkDone}>
-                  Marcar como Concluída
-                </button>
-              )
-            }
+            <div className="viewer-title-actions">
+              <button
+                type="button"
+                className="btn-focus-mode"
+                onClick={() => setFocusMode(v => !v)}
+                aria-pressed={focusMode}
+                title={focusMode ? 'Sair do modo foco (Esc)' : 'Expandir a aula e ocultar a lista'}
+              >
+                {focusMode ? '⤡ Sair do foco' : '⛶ Expandir aula'}
+              </button>
+              {isCurrentDone
+                ? <span className="lesson-done-badge">✓ Concluída</span>
+                : (
+                  <button className="btn-mark-done" onClick={handleMarkDone}>
+                    Marcar como Concluída
+                  </button>
+                )
+              }
+            </div>
           </div>
 
           {activeLesson.descricao && (
@@ -382,7 +405,7 @@ export function CourseViewer() {
 
             {(activeLesson.content || activeLesson.conteudo) && (
               // normalizeQuillHtml: corrige aulas salvas com &nbsp; no lugar de espaços
-              <div dangerouslySetInnerHTML={{
+              <div className="lesson-html" dangerouslySetInnerHTML={{
                 __html: normalizeQuillHtml(activeLesson.content || activeLesson.conteudo),
               }} />
             )}

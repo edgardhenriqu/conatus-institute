@@ -1,20 +1,27 @@
 // react-quill-new: fork do react-quill compatível com React 19 (sem findDOMNode)
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import ReactQuill from 'react-quill-new';
+import ReactQuill, { Quill } from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { adminApi } from '../../services/adminApi';
 import { useToast } from '../ui/Toast';
+import ImageResize, { PositionedImage } from './quillImageResize';
+
+Quill.register('modules/imageResize', ImageResize, true);
+// Substitui o blot 'image' padrão por um que preserva o `style` (posição) ao
+// recarregar o HTML salvo. Sem isso o deslocamento se perde ao reabrir a aula.
+Quill.register(PositionedImage, true);
 
 const TOOLBAR = [
   [{ header: [1, 2, 3, false] }],
   ['bold', 'italic', 'underline', 'strike'],
   [{ list: 'ordered' }, { list: 'bullet' }],
+  [{ align: [] }],
   ['link', 'image'],
   ['clean'],
 ];
 
 // No Quill 2, 'list' cobre ordered e bullet — registrar 'bullet' separado causa erro
-const FORMATS = ['header', 'bold', 'italic', 'underline', 'strike', 'list', 'link', 'image'];
+const FORMATS = ['header', 'bold', 'italic', 'underline', 'strike', 'list', 'align', 'link', 'image'];
 
 // Mesmos tipos aceitos pelo multer em server/src/routes/admin.js (SVG fica de fora).
 const TIPOS_IMAGEM = 'image/png,image/jpeg,image/webp,image/gif';
@@ -53,9 +60,38 @@ export default function QuillEditor({ value, onChange, placeholder = 'Escreva o 
     input.click();
   }, []);
 
+  // Mesmo motivo do handler acima: o uploader padrão do Quill (usado quando a
+  // imagem é solta ou colada no editor) também embutia data URI base64.
+  const handleUpload = useCallback(async (range, files) => {
+    const editor = quillRef.current?.getEditor();
+    if (!editor) return;
+    let index = range.index;
+    for (const file of files) {
+      try {
+        const { url } = await adminApi.uploadCourseImage(file);
+        editor.insertEmbed(index, 'image', url, 'user');
+        index += 1;
+      } catch (err) {
+        toastRef.current.error(err.message || 'Erro ao enviar a imagem.');
+        return;
+      }
+    }
+    editor.setSelection(index, 0);
+  }, []);
+
   const modules = useMemo(() => ({
     toolbar: { container: TOOLBAR, handlers: { image: handleImage } },
-  }), [handleImage]);
+    uploader: { mimetypes: TIPOS_IMAGEM.split(','), handler: handleUpload },
+    imageResize: true,
+  }), [handleImage, handleUpload]);
+
+  // O módulo prende listeners em document/window; sem isso eles sobrevivem
+  // ao desmonte do editor. Guardamos a instância porque o ref já pode estar
+  // nulo quando a limpeza roda.
+  useEffect(() => {
+    const resize = quillRef.current?.getEditor()?.getModule('imageResize');
+    return () => resize?.destroy();
+  }, []);
 
   // A altura é controlada via CSS (.quill-editor .ql-container) para que o
   // texto role DENTRO da caixa em vez de transbordar sobre os botões abaixo.

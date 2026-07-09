@@ -2731,6 +2731,53 @@ header[id] {
 }
 .btn-mark-done:hover { background: var(--primary-light); }
 
+/* Modo foco — expande a aula e oculta a lista lateral */
+
+.viewer-title-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-focus-mode {
+    background: white;
+    color: var(--primary);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color var(--transition), background var(--transition);
+}
+
+.btn-focus-mode:hover {
+    border-color: var(--primary);
+    background: var(--bg-light);
+}
+
+.btn-focus-mode:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.viewer-layout.focus-mode {
+    grid-template-columns: 1fr;
+}
+
+.viewer-layout.focus-mode .viewer-sidebar {
+    display: none;
+}
+
+/* Sem a lista lateral sobra largura: o texto da aula pode respirar, mas não
+   tanto que a linha fique longa demais para ler. */
+.viewer-layout.focus-mode .viewer-content-wrap {
+    max-width: 1100px;
+}
+
 /* Lesson content */
 .lesson-content {
     background: white;

@@ -783,6 +783,67 @@ textarea:focus-visible {
 
 .quill-editor .ql-editor img {
     max-width: 100%;
+    height: auto;
+    cursor: grab;
+}
+
+/* Seleção, alças e arraste da imagem (modules/imageResize).
+   Nada aqui estiliza o <img> por classe: o Quill grava o outerHTML do nó na
+   aula, então o estado visual mora todo no overlay, que é irmão do editor. */
+
+/* Enquanto a imagem é arrastada, o texto por baixo não deve ser selecionado */
+.quill-editor .ql-editor.ql-image-moving {
+    user-select: none;
+}
+
+body.ql-image-grabbing,
+body.ql-image-grabbing * {
+    cursor: grabbing !important;
+}
+
+.ql-image-overlay {
+    position: absolute;
+    pointer-events: none;
+    z-index: 2;
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+}
+
+/* Escurece a imagem sem tocar no <img>: o overlay a cobre durante o arraste */
+.ql-image-overlay.is-dragging {
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.ql-image-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border: 2px solid var(--primary);
+    border-radius: 2px;
+    pointer-events: auto;
+}
+
+.ql-image-handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.ql-image-handle-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.ql-image-handle-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.ql-image-handle-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+.ql-image-size {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 0, 0, 0.65);
+    color: white;
+    font-size: 0.7rem;
+    opacity: 0;
+    transition: opacity var(--transition);
+}
+
+.ql-image-overlay.is-resizing .ql-image-size {
+    opacity: 1;
 }
 
 /* ============================================
@@ -837,6 +898,30 @@ textarea:focus-visible {
 .lesson-content iframe,
 .lesson-content video {
     max-width: 100%;
+}
+
+/* O HTML vem do Quill, mas é renderizado fora do .ql-editor: sem estas regras
+   o alinhamento (classes ql-align-*) e a largura escolhida no editor não
+   aparecem para o aluno. */
+
+.lesson-html img {
+    max-width: 100%;
+    height: auto;
+}
+
+.lesson-html .ql-align-center { text-align: center; }
+.lesson-html .ql-align-right { text-align: right; }
+.lesson-html .ql-align-justify { text-align: justify; }
+
+/* O deslocamento livre da imagem é gravado em pixels, medido numa tela larga.
+   No celular ele jogaria a imagem para fora do cartão (ou por cima do texto),
+   então a imagem volta ao fluxo. */
+@media (max-width: 640px) {
+    .lesson-html img {
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+    }
 }
 
 /* ============================================
