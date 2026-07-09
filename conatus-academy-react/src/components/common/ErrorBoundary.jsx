@@ -7,7 +7,7 @@ import { Component } from 'react';
 export class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { error: null };
+    this.state = { error: null, componentStack: null };
   }
 
   static getDerivedStateFromError(error) {
@@ -16,6 +16,7 @@ export class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('Erro de renderização capturado:', error, info);
+    this.setState({ componentStack: info?.componentStack || null });
   }
 
   handleReload = () => {

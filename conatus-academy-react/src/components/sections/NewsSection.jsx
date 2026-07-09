@@ -48,7 +48,7 @@ export function NewsSection() {
             <a className="news-card news-card--link"
               href={n.link} target="_blank" rel="noopener noreferrer">
               <div className="news-date">
-                {formatarData(n.data)}{n.data && n.fonte ? ' · ' : ''}{n.fonte}
+                {[formatarData(n.data), n.fonte].filter(Boolean).join(' · ')}
               </div>
               <h3>{n.titulo}</h3>
               {n.resumo && <p>{n.resumo}</p>}

@@ -4,7 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const pool = require('../../db/connection');
 const { contentMiddleware } = require('../middlewares/auth');
-const { ADMIN_ROLES, canManage, rank, rolesAtOrAbove } = require('../utils/roles');
+const { ADMIN_ROLES, canManage, canView, hiddenFrom, rank } = require('../utils/roles');
 
 const router = express.Router();
 
@@ -39,7 +39,7 @@ const uploadImagem = multer({
       cb(null, `${base}-${Date.now()}${ext}`);
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB — GIFs animados são pesados
   fileFilter: (req, file, cb) => {
     if (TIPOS_IMAGEM[file.mimetype]) return cb(null, true);
     cb(new Error('Formato inválido. Envie uma imagem JPG, PNG, WEBP ou GIF.'));
@@ -50,7 +50,7 @@ router.post('/upload/imagem', (req, res) => {
   uploadImagem.single('imagem')(req, res, (err) => {
     if (err) {
       const msg = err.code === 'LIMIT_FILE_SIZE'
-        ? 'Imagem muito grande. O tamanho máximo é 5 MB.'
+        ? 'Imagem muito grande. O tamanho máximo é 15 MB.'
         : err.message || 'Erro ao enviar a imagem.';
       return res.status(400).json({ erro: msg });
     }
@@ -135,11 +135,14 @@ router.get('/dashboard', onlyAdmin, async (req, res) => {
 router.get('/alunos', onlyAdmin, async (req, res) => {
   try {
     const { busca } = req.query;
-    // Cada usuário só enxerga quem está ABAIXO dele na hierarquia — oculta
-    // pares e superiores (ex.: admin não vê admins/superadmins/diretor; o
-    // superadmin não vê outros superadmins nem o diretor; o diretor vê todos).
-    const ocultos = rolesAtOrAbove(req.userRole).map(r => `'${r}'`).join(', ');
-    const filtroVisibilidade = `a.role NOT IN (${ocultos})`;
+    // O painel lista todos os usuários; só o superadmin é sigiloso e some para
+    // quem está abaixo dele (um admin vê os outros admins e o diretor, mas não
+    // o superadmin). Gerenciar continua restrito a quem está estritamente
+    // abaixo na hierarquia (canManage).
+    const ocultos = hiddenFrom(req.userRole);
+    const filtroVisibilidade = ocultos.length
+      ? `a.role NOT IN (${ocultos.map(r => `'${r}'`).join(', ')})`
+      : 'TRUE';
     let query = `
       SELECT a.id, a.nome, a.email, a.cpf, a.data_nascimento, a.telefone, a.cidade, a.estado, a.empresa, a.cargo, a.role, a.ativo, a.created_at,
         (SELECT COUNT(*) FROM matriculas m WHERE m.aluno_id = a.id) as total_matriculas,
@@ -181,11 +184,15 @@ router.get('/alunos/:id', onlyAdmin, async (req, res) => {
       return res.status(404).json({ erro: 'Aluno não encontrado' });
     }
 
-    // Perfis de nível admin-tier só podem ser abertos por quem está acima deles
-    // na hierarquia (o diretor pode ver superadmins/admins; ninguém abre o diretor).
-    if (ADMIN_ROLES.includes(aluno.rows[0].role) && !canManage(req.userRole, aluno.rows[0].role)) {
+    // O perfil do superadmin é o único que não abre para quem está abaixo dele.
+    // Os demais são consultáveis em somente leitura — editar e excluir
+    // continuam exigindo canManage.
+    if (!canView(req.userRole, aluno.rows[0].role)) {
       return res.status(403).json({ erro: 'Você não tem permissão para acessar o perfil deste usuário.' });
     }
+
+    // Sinaliza ao front se o solicitante pode editar/excluir este perfil.
+    const podeGerenciar = canManage(req.userRole, aluno.rows[0].role);
 
     const matriculas = await pool.query(
       `SELECT m.*, c.nome as curso_nome, c.duracao
@@ -207,6 +214,7 @@ router.get('/alunos/:id', onlyAdmin, async (req, res) => {
 
     res.json({
       aluno: aluno.rows[0],
+      pode_gerenciar: podeGerenciar,
       matriculas: matriculas.rows,
       certificados: certificados.rows
     });

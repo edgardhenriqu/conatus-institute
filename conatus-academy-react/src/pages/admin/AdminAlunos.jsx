@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import { adminApi } from '../../services/adminApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
-import { ROLE_LABELS, ROLE_COLORS, roleRank } from '../../utils/permissions';
+import { ROLE_LABELS, ROLE_COLORS, roleRank, canManageRole } from '../../utils/permissions';
 
 const ROLE_OPTIONS = [
   { value: 'aluno',            label: 'Aluno' },
@@ -55,6 +55,9 @@ export function AdminAlunos() {
   const [busca, setBusca]                   = useState('');
   const [alunoSelecionado, setAlunoSelecionado] = useState(null);
   const [detalhes, setDetalhes]             = useState(null); // { matriculas, certificados }
+  // Pares (mesmo rank, ex.: admin ↔ admin) aparecem na lista em modo leitura:
+  // dá para abrir o perfil, mas editar/excluir exige estar acima na hierarquia.
+  const [podeGerenciar, setPodeGerenciar]   = useState(true);
   const [editando, setEditando]             = useState(false);
   const [formData, setFormData]             = useState({});
   const [mensagem, setMensagem]             = useState('');
@@ -90,10 +93,12 @@ export function AdminAlunos() {
     try {
       const data = await api.getAdminAluno(id);
       if (data.aluno) {
+        const gerenciavel = data.pode_gerenciar !== false;
         setAlunoSelecionado(data.aluno);
+        setPodeGerenciar(gerenciavel);
         setDetalhes({ matriculas: data.matriculas || [], certificados: data.certificados || [] });
         setFormData(emptyForm(data.aluno));
-        setEditando(iniciarEditando);
+        setEditando(iniciarEditando && gerenciavel);
         setMensagem('');
       }
     } catch {
@@ -161,6 +166,7 @@ export function AdminAlunos() {
   function voltarParaLista() {
     setAlunoSelecionado(null);
     setDetalhes(null);
+    setPodeGerenciar(true);
     setEditando(false);
     setMensagem('');
   }
@@ -204,6 +210,17 @@ export function AdminAlunos() {
               border:     `1px solid ${mensagem.tipo === 'sucesso' ? '#c3e6cb' : '#f5c6cb'}`,
             }}>
               {mensagem.texto}
+            </div>
+          )}
+
+          {!podeGerenciar && (
+            <div style={{
+              padding: '12px 20px', borderRadius: '8px', marginBottom: '20px',
+              background: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa',
+            }}>
+              Somente leitura: este usuário tem nível hierárquico igual ou superior ao seu
+              ({ROLE_LABELS[alunoSelecionado.role] || alunoSelecionado.role}), então
+              o perfil dele não pode ser editado nem excluído por você.
             </div>
           )}
 
@@ -501,7 +518,11 @@ export function AdminAlunos() {
                     </td>
                   </tr>
                 ) : (
-                  alunos.map(aluno => (
+                  alunos.map(aluno => {
+                    // Pares (ex.: outro admin) e o próprio usuário aparecem na
+                    // lista, mas só podem ser consultados.
+                    const gerenciavel = canManageRole(user?.role, aluno.role);
+                    return (
                     <tr key={aluno.id}>
                       <td style={{ fontWeight: 500 }}>{aluno.nome}</td>
                       <td style={{ fontSize: '0.9rem' }}>{aluno.email}</td>
@@ -521,18 +542,23 @@ export function AdminAlunos() {
                             className="admin-btn admin-btn-view" title="Ver detalhes">
                             Ver
                           </button>
-                          <button onClick={() => handleVerDetalhes(aluno.id, true)}
-                            className="admin-btn admin-btn-edit" title="Editar e permissões">
-                            Editar
-                          </button>
-                          <button onClick={() => handleExcluir(aluno.id)}
-                            className="admin-btn admin-btn-delete" title="Excluir">
-                            Excluir
-                          </button>
+                          {gerenciavel && (
+                            <>
+                              <button onClick={() => handleVerDetalhes(aluno.id, true)}
+                                className="admin-btn admin-btn-edit" title="Editar e permissões">
+                                Editar
+                              </button>
+                              <button onClick={() => handleExcluir(aluno.id)}
+                                className="admin-btn admin-btn-delete" title="Excluir">
+                                Excluir
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

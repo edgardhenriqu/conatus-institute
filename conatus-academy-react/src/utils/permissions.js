@@ -55,6 +55,19 @@ export function canManageRole(actorRole, targetRole) {
   return roleRank(actorRole) > roleRank(targetRole);
 }
 
+/** Papéis sigilosos: só visíveis para quem está no mesmo nível ou acima. */
+export const HIDDEN_ROLES = [ROLES.SUPERADMIN];
+
+/**
+ * Um ator pode ver (listar / abrir o perfil de) um alvo? Todos, menos os
+ * papéis sigilosos. Um admin enxerga os outros admins e o diretor — em modo
+ * leitura, pois canManageRole é falso —, mas não o superadmin.
+ */
+export function canViewRole(actorRole, targetRole) {
+  if (!HIDDEN_ROLES.includes(targetRole)) return true;
+  return roleRank(actorRole) >= roleRank(targetRole);
+}
+
 /** Retorna true se o usuário pode acessar cursos internos (MOP). */
 export function canAccessInternalCourse(user) {
   if (!user) return false;

@@ -546,7 +546,7 @@ export default function CourseEditor() {
                   onChange={e => setField('image', e.target.value)}
                   placeholder="Ou cole uma URL/caminho: images/courses/nome.png" />
                 <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  JPG, PNG, WEBP, GIF ou SVG — até 5 MB.
+                  JPG, PNG, WEBP ou GIF — até 15 MB.
                 </small>
                 {form.image && (
                   <img src={form.image.startsWith('http') ? form.image : `/${form.image}`}
@@ -1049,7 +1049,7 @@ export default function CourseEditor() {
                   )}
                 </div>
                 <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  PNG com fundo transparente fica melhor — até 5 MB.
+                  PNG com fundo transparente fica melhor — até 15 MB.
                 </small>
                 {form.cert_assinatura && (
                   <img src={form.cert_assinatura.startsWith('http') ? form.cert_assinatura : `/${form.cert_assinatura}`}

@@ -11,6 +11,13 @@
  * O "diretor" é o topo absoluto: tem as mesmas autorizações do superadmin e,
  * além disso, pode gerenciar superadmins/admins — e ninguém pode editá-lo,
  * rebaixá-lo ou excluí-lo. É exclusivo (fixado por e-mail no boot).
+ *
+ * VER e GERENCIAR são regras distintas:
+ *   canView    → todos, exceto o superadmin, que só é visível a partir do
+ *                próprio nível (superadmin e diretor)
+ *   canManage  → rank estritamente maior (age apenas sobre subordinados)
+ * Ou seja: um admin vê os outros admins e o diretor — sem poder editá-los —,
+ * mas o superadmin permanece oculto para ele.
  */
 const ROLES = {
   ALUNO:      'aluno',
@@ -62,10 +69,27 @@ function canManage(actorRole, targetRole) {
   return rank(actorRole) > rank(targetRole);
 }
 
-/** Papéis com rank >= o do ator — usados para ocultar pares/superiores em listas. */
-function rolesAtOrAbove(role) {
-  const min = rank(role);
-  return Object.keys(ROLE_RANK).filter(r => rank(r) >= min);
+/**
+ * Papéis sigilosos: só aparecem para quem tem rank igual ou maior que o deles.
+ * Hoje apenas o superadmin — os demais papéis (inclusive o diretor) são
+ * visíveis a todo o painel administrativo.
+ */
+const HIDDEN_ROLES = [ROLES.SUPERADMIN];
+
+/**
+ * Um ator pode VER (listar / abrir o perfil de) um alvo?
+ * Todo perfil é visível, exceto os sigilosos (superadmin), reservados a quem
+ * está no mesmo nível ou acima. Ver ≠ gerenciar: um admin vê outro admin e o
+ * diretor, mas não pode editá-los (veja canManage).
+ */
+function canView(actorRole, targetRole) {
+  if (!HIDDEN_ROLES.includes(targetRole)) return true;
+  return rank(actorRole) >= rank(targetRole);
+}
+
+/** Papéis que este ator não enxerga nas listagens. */
+function hiddenFrom(role) {
+  return HIDDEN_ROLES.filter(r => !canView(role, r));
 }
 
 module.exports = {
@@ -77,6 +101,8 @@ module.exports = {
   rank,
   isAdminRole,
   hasSuperPowers,
+  HIDDEN_ROLES,
   canManage,
-  rolesAtOrAbove,
+  canView,
+  hiddenFrom,
 };

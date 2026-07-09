@@ -27,8 +27,11 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// O padrão de 100 KB é apertado para o HTML de uma aula longa (e estourava com
+// conteúdo antigo que trazia imagens embutidas em base64). Imagens novas sobem
+// como multipart por /admin/upload/imagem, então 1 MB de JSON sobra.
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Arquivos enviados pelo construtor de cursos (capas, etc.)
 // Cabeçalhos de segurança: impedem o navegador de "sniffar" o conteúdo e de
