@@ -18,12 +18,19 @@ app.set("trust proxy", 1);
 // Em produção no Replit o frontend é servido pelo próprio Express (mesma
 // origem), então o CORS é irrelevante para o SPA. Ele só importa se a API for
 // consumida por outra origem. CORS_ORIGIN aceita várias origens separadas por
-// vírgula; sem valor, reflete a origem da requisição (útil no Replit).
-const corsOrigin = process.env.CORS_ORIGIN;
+// vírgula; sem valor, vale só o Vite em desenvolvimento.
+//
+// A origem NUNCA é refletida de volta: com `credentials: true`, devolver
+// `Access-Control-Allow-Origin: <origem-do-atacante>` deixaria qualquer site
+// ler respostas autenticadas do usuário logado. É uma allowlist explícita.
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: corsOrigin
-    ? corsOrigin.split(",").map((o) => o.trim())
-    : true,
+  // origin ausente = mesma origem, curl, health check do deploy: sem CORS envolvido.
+  origin: (origin, cb) => cb(null, !origin || ALLOWED_ORIGINS.includes(origin)),
   credentials: true,
 }));
 
