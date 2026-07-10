@@ -206,6 +206,18 @@ const STATEMENTS = [
   // data de emissão dos certificados (db/migration-certificados-data-emissao.sql)
   `ALTER TABLE certificados ADD COLUMN IF NOT EXISTS data_emissao TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
   `UPDATE certificados SET data_emissao = created_at WHERE data_emissao IS NULL`,
+  // imagens enviadas pelo construtor de cursos (capas, imagens de aula, assinatura).
+  // Ficam no banco — e não no disco — porque o filesystem do Replit é efêmero e
+  // não é compartilhado com o ambiente local: um arquivo salvo em disco num
+  // ambiente aparecia "quebrado" no outro. O nome carrega timestamp (imutável),
+  // o que permite cache agressivo na rota que serve esses arquivos.
+  `CREATE TABLE IF NOT EXISTS arquivos_upload (
+    nome VARCHAR(255) PRIMARY KEY,
+    mime VARCHAR(60) NOT NULL,
+    dados BYTEA NOT NULL,
+    tamanho INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 
 async function ensureSchema() {

@@ -1,6 +1,5 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
 const pool = require('../../db/connection');
 const { contentMiddleware } = require('../middlewares/auth');
@@ -10,12 +9,12 @@ const router = express.Router();
 
 router.use(contentMiddleware);
 
-// ── Upload de imagens (capa de curso) ──────────────────────────────────────────
-// Os arquivos são gravados em server/uploads/courses e servidos estaticamente
-// pelo server.js em /api/uploads. O caminho salvo no banco fica
-// "api/uploads/courses/<arquivo>" (sem barra inicial, como as imagens do /public).
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'courses');
-fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// ── Upload de imagens (capa de curso, imagens de aula) ─────────────────────────
+// Os arquivos são gravados na tabela arquivos_upload (bytea) e servidos pelo
+// server.js em /api/uploads/courses/:nome. NÃO usar o disco: o filesystem do
+// Replit é efêmero e não é compartilhado com o ambiente local — uploads em
+// disco somem no redeploy e quebram no outro ambiente. O caminho salvo no
+// banco fica "api/uploads/courses/<arquivo>" (sem barra inicial, como /public).
 
 // SVG é deliberadamente omitido: pode conter <script> e abrir XSS armazenado.
 // A extensão gravada é derivada do mimetype verificado, nunca do nome original.
@@ -27,18 +26,7 @@ const TIPOS_IMAGEM = {
 };
 
 const uploadImagem = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-    filename: (req, file, cb) => {
-      const ext = TIPOS_IMAGEM[file.mimetype] || '.png';
-      const base = path.basename(file.originalname, path.extname(file.originalname))
-        .toLowerCase()
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')   // remove acentos
-        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-        .slice(0, 40) || 'capa';
-      cb(null, `${base}-${Date.now()}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB — GIFs animados são pesados
   fileFilter: (req, file, cb) => {
     if (TIPOS_IMAGEM[file.mimetype]) return cb(null, true);
@@ -47,7 +35,7 @@ const uploadImagem = multer({
 });
 
 router.post('/upload/imagem', (req, res) => {
-  uploadImagem.single('imagem')(req, res, (err) => {
+  uploadImagem.single('imagem')(req, res, async (err) => {
     if (err) {
       const msg = err.code === 'LIMIT_FILE_SIZE'
         ? 'Imagem muito grande. O tamanho máximo é 15 MB.'
@@ -55,7 +43,23 @@ router.post('/upload/imagem', (req, res) => {
       return res.status(400).json({ erro: msg });
     }
     if (!req.file) return res.status(400).json({ erro: 'Nenhuma imagem enviada.' });
-    const caminho = `api/uploads/courses/${req.file.filename}`;
+    const ext = TIPOS_IMAGEM[req.file.mimetype] || '.png';
+    const base = path.basename(req.file.originalname, path.extname(req.file.originalname))
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')   // remove acentos
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+      .slice(0, 40) || 'capa';
+    const nome = `${base}-${Date.now()}${ext}`;
+    try {
+      await pool.query(
+        'INSERT INTO arquivos_upload (nome, mime, dados, tamanho) VALUES ($1, $2, $3, $4)',
+        [nome, req.file.mimetype, req.file.buffer, req.file.size]
+      );
+    } catch (e) {
+      console.error('Erro ao gravar upload no banco:', e);
+      return res.status(500).json({ erro: 'Erro ao salvar a imagem.' });
+    }
+    const caminho = `api/uploads/courses/${nome}`;
     res.status(201).json({ path: caminho, url: `/${caminho}` });
   });
 });

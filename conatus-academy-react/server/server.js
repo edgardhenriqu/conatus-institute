@@ -40,15 +40,37 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// Arquivos enviados pelo construtor de cursos (capas, etc.)
+// Arquivos enviados pelo construtor de cursos (capas, imagens de aula, etc.)
+// Ficam na tabela arquivos_upload — o disco do Replit é efêmero e não é
+// compartilhado com o ambiente local, então uploads em disco quebravam no
+// outro ambiente e sumiam no redeploy.
 // Cabeçalhos de segurança: impedem o navegador de "sniffar" o conteúdo e de
 // executar um arquivo forjado como HTML/script (defesa contra XSS armazenado).
+const pool = require("./db/connection");
+const setUploadHeaders = (res) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+  res.setHeader("Content-Disposition", "inline");
+};
+app.get("/api/uploads/courses/:nome", async (req, res, next) => {
+  try {
+    const r = await pool.query(
+      "SELECT mime, dados FROM arquivos_upload WHERE nome = $1",
+      [req.params.nome]
+    );
+    if (!r.rows.length) return next(); // cai no express.static (arquivos antigos em disco)
+    setUploadHeaders(res);
+    // O nome inclui timestamp, então o conteúdo nunca muda: cache imutável.
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.type(r.rows[0].mime);
+    res.send(r.rows[0].dados);
+  } catch (err) {
+    next(err);
+  }
+});
+// Fallback em disco para instalações antigas que ainda tenham arquivos locais.
 app.use("/api/uploads", express.static(path.join(__dirname, "uploads"), {
-  setHeaders: (res) => {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
-    res.setHeader("Content-Disposition", "inline");
-  },
+  setHeaders: setUploadHeaders,
 }));
 
 // Health check (usado por monitores/deploys do Replit)
@@ -110,9 +132,11 @@ if (!process.env.DB_HOST) {
 
 const ensureSchema = require('./db/ensureSchema');
 const seedMopCourse = require('./db/seedMopCourse');
+const migrateUploads = require('./db/migrateUploads');
 
 ensureSchema()
   .then(() => seedMopCourse())
+  .then(() => migrateUploads())
   .catch(err => console.error('Aviso: não foi possível atualizar o schema/seed automaticamente:', err.message))
   .finally(() => {
     app.listen(PORT, HOST, () => {
