@@ -19,6 +19,8 @@ export function Button({
       case 'free': return 'btn-free-courses';
       case 'apply': return 'btn-apply';
       case 'submit': return 'btn-submit';
+      // Navegação compacta (ex.: aula anterior/próxima no player).
+      case 'nav': return 'btn-nav';
       default: return 'btn-primary-action';
     }
   };

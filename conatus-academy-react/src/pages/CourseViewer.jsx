@@ -18,6 +18,16 @@ import { canAccessInternalCourse } from '../utils/permissions';
 // para o banco (id 1) e é servido pelo fluxo normal de cursos.
 const isMopId = (id) => id === 'mop-interno';
 
+/** Seta dos botões de navegação. `dir` = -1 (esquerda) ou 1 (direita). */
+function Chevron({ dir }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points={dir === -1 ? '15 18 9 12 15 6' : '9 18 15 12 9 6'} />
+    </svg>
+  );
+}
+
 /** Converte URLs do YouTube/Vimeo em URL de embed. */
 function toEmbedUrl(url) {
   if (!url) return null;
@@ -422,12 +432,12 @@ export function CourseViewer() {
           {/* Navegação */}
           <div className="viewer-nav-footer">
             <Button
-              variant="outline"
+              variant="nav"
+              className="btn-nav--prev"
               onClick={goToPrev}
               disabled={currentIndex <= 0}
-              style={{ opacity: currentIndex <= 0 ? 0.4 : 1 }}
             >
-              ← Aula Anterior
+              <Chevron dir={-1} /> Aula anterior
             </Button>
 
             <span className="viewer-lesson-counter">
@@ -435,8 +445,8 @@ export function CourseViewer() {
             </span>
 
             {currentIndex < allLessons.length - 1 ? (
-              <Button variant="primary" onClick={goToNext}>
-                Próxima Aula →
+              <Button variant="nav" className="btn-nav--next" onClick={goToNext}>
+                Próxima aula <Chevron dir={1} />
               </Button>
             ) : quizCta ? (
               <Link to={quizCta.to} className={`btn-goto-quiz ${quizCta.enabled ? '' : 'disabled'}`}>

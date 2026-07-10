@@ -2823,31 +2823,85 @@ header[id] {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
-    padding: 20px 0;
+    gap: 16px;
+    padding: 16px 0;
     border-top: 1px solid var(--border);
 }
 
 .viewer-lesson-counter {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+/* Botão de navegação compacto (aula anterior / próxima).
+   Não herda de .btn-primary-action: aqui a hierarquia visual pede um controle
+   discreto, não o CTA dourado em caixa alta da home. */
+.btn-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg-white);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast),
+                color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.btn-nav:hover:not(:disabled) {
+    background: var(--bg-light);
+    border-color: var(--primary-light);
+    color: var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+.btn-nav:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn-nav:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* A seta desliza no hover — só ela se move, o botão fica parado. */
+.btn-nav svg {
+    flex-shrink: 0;
+    transition: transform var(--transition-fast);
+}
+.btn-nav--prev:hover:not(:disabled) svg { transform: translateX(-2px); }
+.btn-nav--next:hover:not(:disabled) svg { transform: translateX(2px); }
+
+/* Próxima aula: a ação primária do rodapé, sólida na cor da marca. */
+.btn-nav--next {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--bg-white);
+}
+.btn-nav--next:hover:not(:disabled) {
+    background: var(--primary-light);
+    border-color: var(--primary-light);
+    color: var(--bg-white);
 }
 
 .btn-goto-quiz {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     background: linear-gradient(135deg, var(--gold), var(--gold-hover));
     color: var(--primary);
-    padding: 10px 22px;
-    border-radius: var(--radius-sm);
-    font-size: 0.95rem;
+    padding: 9px 18px;
+    border-radius: var(--radius-pill);
+    font-size: 0.875rem;
     font-weight: 700;
+    line-height: 1;
     text-decoration: none;
-    transition: all var(--transition);
+    transition: box-shadow var(--transition-fast), transform var(--transition-fast);
 }
-.btn-goto-quiz:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.btn-goto-quiz:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn-goto-quiz:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .btn-goto-quiz.disabled {
     background: var(--bg-light);
     color: var(--text-muted);
