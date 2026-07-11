@@ -44,3 +44,7 @@ SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = "465"
 SMTP_SECURE = "true"
 SMTP_USER = "suporte.conatus.institute@gmail.com"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
