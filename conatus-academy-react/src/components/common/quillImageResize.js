@@ -3,22 +3,29 @@ import { Quill } from 'react-quill-new';
 /**
  * Módulo do Quill que deixa a imagem ser manipulada direto no editor:
  *
- *   • arrastar a imagem a desloca livremente, para qualquer ponto — inclusive
- *     por cima do texto (position:relative + left/top em pixels);
+ *   • arrastar a imagem a ANCORA no ponto do texto onde foi solta: ela é
+ *     movida para lá no fluxo e flutua (float) no lado em que foi solta —
+ *     o texto contorna a imagem sem nunca sobrepô-la e ela não ultrapassa
+ *     as bordas do cartão (o padding do cartão vira a margem das bordas);
  *   • arrastar as alças dos cantos redimensiona;
- *   • dois cliques devolvem a imagem à posição original (válvula de escape,
- *     já que um deslocamento grande pode jogá-la para fora da tela);
+ *   • dois cliques devolvem a imagem ao fluxo normal do texto (desfaz a
+ *     âncora e qualquer deslocamento em px de aulas antigas);
  *   • o botão de alinhamento da toolbar continua valendo para o parágrafo.
+ *
+ * O deslocamento livre em px (position:relative + left/top) foi abandonado:
+ * ele deixava a imagem cobrir o texto e sair do cartão. Aulas antigas que
+ * ainda o tenham gravado continuam renderizando; o próximo arraste (ou o
+ * duplo clique) converte para o modelo ancorado.
  *
  * O arraste é reimplementado aqui porque o módulo `uploader` do Quill 2 chama
  * preventDefault() em todo evento `drop` do editor, o que mata o
  * drag-and-drop nativo do contenteditable.
  *
  * A posição e o tamanho moram no próprio <img>: o tamanho no atributo `width`
- * e o deslocamento no `style`. O Quill 2 só preserva alt/height/width ao
- * recarregar o HTML salvo (formats/image.js), então PositionedImage abaixo
- * amplia essa lista para incluir `style` — sem isso, o deslocamento seria
- * silenciosamente descartado ao reabrir a aula.
+ * e a âncora (float/margin) no `style`. O Quill 2 só preserva alt/height/width
+ * ao recarregar o HTML salvo (formats/image.js), então PositionedImage abaixo
+ * amplia essa lista para incluir `style` — sem isso, a âncora seria
+ * silenciosamente descartada ao reabrir a aula.
  */
 
 const BaseImage = Quill.import('formats/image');
@@ -126,6 +133,8 @@ export default class ImageResize {
   onEditorDoubleClick(e) {
     if (e.target?.tagName !== 'IMG') return;
     this.setOffset(e.target, 0, 0);
+    e.target.style.removeProperty('float');
+    e.target.style.removeProperty('margin');
     this.commitStyle(e.target);
     this.reposition();
   }
@@ -174,6 +183,8 @@ export default class ImageResize {
     return { x: parseFloat(img.style.left) || 0, y: parseFloat(img.style.top) || 0 };
   }
 
+  // Usado só como PREVIEW durante o arraste (e para limpar deslocamentos de
+  // aulas antigas): o valor final nunca é gravado — o drop ancora via float.
   setOffset(img, x, y) {
     if (x === 0 && y === 0) {
       img.style.removeProperty('position');
@@ -181,9 +192,6 @@ export default class ImageResize {
       img.style.removeProperty('top');
       return;
     }
-    // relative (e não absolute) mantém a imagem ancorada no parágrafo: ela se
-    // desloca visualmente sem deixar o fluxo e sem depender de um ancestral
-    // posicionado no visualizador do curso.
     img.style.position = 'relative';
     img.style.left = `${Math.round(x)}px`;
     img.style.top = `${Math.round(y)}px`;
@@ -220,11 +228,11 @@ export default class ImageResize {
     this.reposition();
   }
 
-  onMoveMouseUp() {
+  onMoveMouseUp(e) {
     const move = this.move;
     const img = this.img;
     this.endMove();
-    if (move?.active && img) this.commitStyle(img);
+    if (move?.active && img) this.anchorAtPoint(img, e.clientX, e.clientY);
   }
 
   endMove() {
@@ -236,6 +244,80 @@ export default class ImageResize {
     this.move = null;
     document.removeEventListener('mousemove', this.onMoveMouseMove);
     document.removeEventListener('mouseup', this.onMoveMouseUp);
+  }
+
+  // ── Ancoragem ──────────────────────────────────────────────────────────────
+
+  // O drop move a imagem para o ponto do texto onde ela foi solta e a faz
+  // flutuar no lado correspondente. Float garante as invariantes que o
+  // deslocamento em px não garantia: o texto contorna a imagem (nunca por
+  // cima) e ela não ultrapassa as bordas do cartão.
+  anchorAtPoint(img, x, y) {
+    // Descarta o deslocamento de preview antes de medir o ponto do drop —
+    // com a imagem de volta ao fluxo, o caret hit-test enxerga o texto.
+    this.setOffset(img, 0, 0);
+
+    const blot = Quill.find(img);
+    if (!blot) return;
+    const from = this.quill.getIndex(blot);
+    let to = this.indexFromPoint(x, y);
+    if (to == null) to = from;
+
+    const rootRect = this.quill.root.getBoundingClientRect();
+    const side = x >= rootRect.left + rootRect.width / 2 ? 'right' : 'left';
+    img.style.float = side;
+    // Margem só nos lados voltados ao texto; o respiro em relação às bordas
+    // do cartão vem do padding do próprio cartão (30px no player).
+    img.style.margin = side === 'right' ? '4px 0 4px 18px' : '4px 18px 4px 0';
+
+    const formats = PositionedImage.formats(img);
+    const src = img.getAttribute('src');
+
+    // Não há "mover" no Delta: é apagar e reinserir com os mesmos formatos.
+    this.quill.deleteText(from, 1, 'user');
+    if (to > from) to -= 1;
+    to = Math.max(0, Math.min(to, this.quill.getLength() - 1));
+    this.quill.insertEmbed(to, 'image', src, 'user');
+    this.quill.formatText(to, 1, formats, 'user');
+    // Seleção na imagem: mantém o botão de alinhamento valendo para o
+    // parágrafo certo, como no clique simples.
+    this.quill.setSelection(to, 0, 'silent');
+
+    // O insertEmbed criou um <img> novo; religa a moldura de seleção nele.
+    const [leaf] = this.quill.getLeaf(to + 1);
+    if (leaf?.domNode?.tagName === 'IMG') this.show(leaf.domNode);
+    else this.hide();
+  }
+
+  // Converte o ponto do drop em índice do documento. null = sem alvo
+  // utilizável (a imagem permanece onde está no texto, só muda o float).
+  indexFromPoint(x, y) {
+    let node = null;
+    let offset = 0;
+    if (document.caretRangeFromPoint) {
+      const range = document.caretRangeFromPoint(x, y);
+      if (range) { node = range.startContainer; offset = range.startOffset; }
+    } else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(x, y);
+      if (pos) { node = pos.offsetNode; offset = pos.offset; }
+    }
+    if (!node) return null;
+    if (!this.quill.root.contains(node)) {
+      // Soltou abaixo do fim do texto: ancora no último parágrafo.
+      return y > this.quill.root.getBoundingClientRect().bottom
+        ? this.quill.getLength() - 1
+        : null;
+    }
+    // Elementos (raiz, <p>) apontam para um filho via offset; desce até um
+    // nó folha para que Quill.find resolva o blot mais próximo do ponto.
+    while (node.nodeType === Node.ELEMENT_NODE && node.childNodes.length > 0) {
+      node = node.childNodes[Math.min(offset, node.childNodes.length - 1)];
+      offset = 0;
+    }
+    const target = Quill.find(node, true);
+    if (!target || target === this.quill.scroll) return null;
+    const base = this.quill.getIndex(target);
+    return node.nodeType === Node.TEXT_NODE ? base + offset : base;
   }
 
   // ── Redimensionamento ──────────────────────────────────────────────────────

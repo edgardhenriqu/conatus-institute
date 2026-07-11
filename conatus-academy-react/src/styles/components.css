@@ -909,18 +909,29 @@ body.ql-image-grabbing * {
     height: auto;
 }
 
+/* A imagem ancorada (float) precisa ser "fechada" pelo contêiner: sem o
+   clearfix ela vazaria por baixo do cartão da aula e da caixa do editor. */
+.lesson-html::after,
+.quill-editor .ql-editor::after {
+    content: '';
+    display: table;
+    clear: both;
+}
+
 .lesson-html .ql-align-center { text-align: center; }
 .lesson-html .ql-align-right { text-align: right; }
 .lesson-html .ql-align-justify { text-align: justify; }
 
-/* O deslocamento livre da imagem é gravado em pixels, medido numa tela larga.
-   No celular ele jogaria a imagem para fora do cartão (ou por cima do texto),
-   então a imagem volta ao fluxo. */
+/* A âncora (float) e o deslocamento em px de aulas antigas foram medidos numa
+   tela larga. No celular não sobra coluna para o texto contornar — e o
+   deslocamento jogaria a imagem para fora do cartão —, então a imagem volta
+   ao fluxo. */
 @media (max-width: 640px) {
     .lesson-html img {
         position: static !important;
         left: auto !important;
         top: auto !important;
+        float: none !important;
     }
 }
 
