@@ -95,6 +95,13 @@ export const api = {
       body: JSON.stringify({ aulas }),
     }),
 
+  // Assistente RAG: tira dúvidas do aluno com base no conteúdo do curso.
+  perguntarAssistente: async (cursoId, pergunta) =>
+    request(`${API_URL}/cursos/${cursoId}/assistente`, {
+      method: 'POST',
+      body: JSON.stringify({ pergunta }),
+    }),
+
   // Avaliação final (aluno)
   getAvaliacaoStatus: async (cursoId) =>
     request(`${API_URL}/cursos/${cursoId}/avaliacao`),

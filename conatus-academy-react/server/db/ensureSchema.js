@@ -218,6 +218,27 @@ const STATEMENTS = [
     tamanho INTEGER NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+
+  // ── Assistente RAG (busca semântica sobre o conteúdo das aulas) ─────────────
+  // pgvector no Supabase (extensão no schema public — verificado). Cada aula é
+  // quebrada em pedaços de texto; o assistente busca os trechos mais próximos
+  // da pergunta, escopados por curso. Ver server/src/services/ragIndex.js.
+  // A dimensão 768 casa com outputDimensionality do gemini-embedding-001 e fica
+  // dentro do limite de índice do pgvector (~2000).
+  `CREATE EXTENSION IF NOT EXISTS vector`,
+  `CREATE TABLE IF NOT EXISTS aula_chunks (
+    id SERIAL PRIMARY KEY,
+    aula_id   INTEGER NOT NULL REFERENCES aulas(id)  ON DELETE CASCADE,
+    curso_id  INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+    ordem     INTEGER NOT NULL,
+    texto     TEXT NOT NULL,
+    embedding vector(768) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_aula_chunks_curso ON aula_chunks(curso_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_aula_chunks_aula ON aula_chunks(aula_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_aula_chunks_vec
+     ON aula_chunks USING hnsw (embedding vector_cosine_ops)`,
 ];
 
 async function ensureSchema() {

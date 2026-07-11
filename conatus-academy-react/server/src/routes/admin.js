@@ -4,8 +4,17 @@ const multer = require('multer');
 const pool = require('../../db/connection');
 const { contentMiddleware } = require('../middlewares/auth');
 const { ADMIN_ROLES, canManage, canView, hiddenFrom, rank } = require('../utils/roles');
+const { indexAulaById } = require('../services/ragIndex');
 
 const router = express.Router();
+
+// Reindexa a aula para o assistente RAG sem bloquear a resposta ao admin
+// (a chamada ao Gemini leva ~1-2s). Falhas são logadas; o backfill recupera.
+function reindexarAula(aulaId) {
+  indexAulaById(aulaId).catch((e) => {
+    console.error(`[RAG] Falha ao reindexar aula ${aulaId}:`, e.message);
+  });
+}
 
 router.use(contentMiddleware);
 
@@ -1426,6 +1435,7 @@ router.post('/aulas', async (req, res) => {
        duracao_minutos || null, obrigatoria !== false]
     );
 
+    reindexarAula(resultado.rows[0].id);
     res.status(201).json({ aula: resultado.rows[0] });
   } catch (error) {
     console.error('Erro ao criar aula:', error);
@@ -1474,6 +1484,7 @@ router.put('/aulas/:id', async (req, res) => {
       return res.status(404).json({ erro: 'Aula não encontrada' });
     }
 
+    reindexarAula(id);
     res.json({ aula: resultado.rows[0] });
   } catch (error) {
     console.error('Erro ao atualizar aula:', error);

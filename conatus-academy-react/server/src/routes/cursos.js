@@ -5,6 +5,8 @@ const pool = require('../../db/connection');
 const { authMiddleware } = require('../middlewares/auth');
 const { podeAcessarCurso, MSG_ACESSO_NEGADO } = require('../services/accessControl');
 const { ADMIN_ROLES } = require('../utils/roles');
+const { embedQuery, generate, toVectorLiteral } = require('../services/ragGemini');
+const { MOP_NOME } = require('../../db/seedMopCourse');
 
 const router = express.Router();
 
@@ -242,6 +244,89 @@ router.get('/:cursoId/conteudo', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Erro ao buscar conteúdo do curso:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// ── Assistente RAG (tutor de dúvidas do curso) ───────────────────────────────
+
+const ASSISTENTE_SYSTEM = `Você é o tutor virtual da Conatus Academy, ajudando alunos com dúvidas sobre o conteúdo do curso.
+Regras:
+- Responda SOMENTE com base no MATERIAL fornecido. Não use conhecimento externo.
+- Se a resposta não estiver no material, diga que não encontrou isso no conteúdo do curso e sugira procurar o instrutor. Nunca invente.
+- Responda em português do Brasil, de forma clara e didática.
+- Cada trecho começa com "Aula: <título>". Ao usar um trecho, cite de qual aula veio.
+- Seja conciso e foque na dúvida do aluno.`;
+
+// Resolve o curso pelo id numérico (cursos DB) ou pelo slug 'mop-interno'
+// (viewer estático do MOP, semeado no banco sob MOP_NOME). Outros valores → null.
+async function carregarCursoAssistente(cursoId) {
+  if (/^\d+$/.test(cursoId)) {
+    const r = await pool.query('SELECT * FROM cursos WHERE id = $1', [cursoId]);
+    return r.rows[0] || null;
+  }
+  if (cursoId === 'mop-interno') {
+    const r = await pool.query(
+      'SELECT * FROM cursos WHERE nome = $1 ORDER BY id LIMIT 1', [MOP_NOME]);
+    return r.rows[0] || null;
+  }
+  return null;
+}
+
+router.post('/:cursoId/assistente', authMiddleware, async (req, res) => {
+  try {
+    const { cursoId } = req.params;
+    const pergunta = (req.body?.pergunta || '').toString().trim();
+
+    if (!pergunta) return res.status(400).json({ erro: 'Envie { pergunta }.' });
+    if (pergunta.length > 1000) {
+      return res.status(400).json({ erro: 'Pergunta muito longa (máx. 1000 caracteres).' });
+    }
+
+    const curso = await carregarCursoAssistente(cursoId);
+    if (!curso) return res.status(404).json({ erro: 'Curso não encontrado' });
+
+    // Mesmo controle de acesso do player: aluno só pergunta sobre curso liberado.
+    const acesso = await checarAcessoCurso(curso, req);
+    if (!acesso.ok) {
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
+    }
+
+    // Busca semântica escopada ao curso (top-K trechos mais próximos da pergunta).
+    // Usa o id numérico resolvido (curso.id), não o slug da URL.
+    const qvec = await embedQuery(pergunta);
+    const trechos = await pool.query(
+      `SELECT texto, aula_id FROM aula_chunks
+        WHERE curso_id = $2
+        ORDER BY embedding <=> $1::vector
+        LIMIT 6`,
+      [toVectorLiteral(qvec), curso.id]
+    );
+
+    if (trechos.rows.length === 0) {
+      return res.json({
+        resposta: 'Ainda não há conteúdo indexado para este curso, então não consigo responder com base no material. Procure o instrutor.',
+        fontes: [],
+      });
+    }
+
+    const material = trechos.rows
+      .map((r, i) => `[Trecho ${i + 1}]\n${r.texto}`)
+      .join('\n\n---\n\n');
+    const prompt = `MATERIAL DO CURSO:\n\n${material}\n\n---\n\nPERGUNTA DO ALUNO:\n${pergunta}`;
+
+    const resposta = await generate({ system: ASSISTENTE_SYSTEM, prompt });
+
+    // Aulas consultadas, para exibir como "fontes" ao aluno.
+    const aulaIds = [...new Set(trechos.rows.map(r => r.aula_id))];
+    const fontes = await pool.query(
+      'SELECT id, titulo FROM aulas WHERE id = ANY($1::int[]) ORDER BY id',
+      [aulaIds]
+    );
+
+    res.json({ resposta, fontes: fontes.rows });
+  } catch (error) {
+    console.error('Erro no assistente RAG:', error);
+    res.status(500).json({ erro: 'Não foi possível responder agora. Tente novamente.' });
   }
 });
 

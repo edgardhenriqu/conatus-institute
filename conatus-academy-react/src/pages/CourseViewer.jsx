@@ -12,6 +12,7 @@ import {
   setTotalLessons, canTakeQuiz, isCertEligible, quizStatus,
 } from '../utils/mopProgress';
 import { canAccessInternalCourse } from '../utils/permissions';
+import { CourseAssistant } from '../components/course/CourseAssistant';
 
 // Só a rota estática legada 'mop-interno' usa o fluxo MOP em localStorage.
 // NÃO incluir o id 6 (hoje é o curso do banco Huawei Module800); o MOP migrou
@@ -483,6 +484,8 @@ export function CourseViewer() {
 
         </div>
       </div>
+
+      <CourseAssistant cursoId={id} />
     </div>
   );
 }

@@ -128,3 +128,7 @@ async function seedMopCourse() {
 }
 
 module.exports = seedMopCourse;
+// Nome estável do curso MOP no banco — usado para resolver o slug 'mop-interno'
+// (viewer estático) para o curso DB no assistente RAG. Anexado à função para
+// não quebrar quem faz require(...)() esperando a função.
+module.exports.MOP_NOME = MOP_NOME;
