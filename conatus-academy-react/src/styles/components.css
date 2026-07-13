@@ -955,6 +955,187 @@ body.ql-image-grabbing * {
 }
 
 /* ============================================
+   NARRAÇÃO — trechos marcados com o megafone
+   Não há caixa de narração acima da aula: o botão é a própria figura do
+   megafone que o instrutor anexou ao parágrafo, e o único controle flutuante
+   (.narration-dock) aparece apenas enquanto a voz fala.
+   ============================================ */
+
+.narration-icon-img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    flex-shrink: 0;
+    border-radius: 8px;
+    transition: transform 0.3s ease;
+}
+
+.narration-dock--falando .narration-icon-img {
+    animation: narration-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes narration-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+}
+
+/* ── O trecho narrado ──────────────────────────────────────────────────────
+   O bloco marcado com o megafone é o que será falado, então ele se destaca do
+   texto comum: negrito sempre, e um realce enquanto a voz o está lendo — o
+   aluno acompanha com os olhos o que ouve. */
+.lesson-html .narration-block {
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition), box-shadow var(--transition);
+}
+
+.lesson-html .narration-block--tocando {
+    background: var(--tint-info, rgba(37, 99, 235, 0.08));
+    box-shadow: 0 0 0 8px var(--tint-info, rgba(37, 99, 235, 0.08));
+}
+
+/* ── O megafone como botão ─────────────────────────────────────────────────
+   O <img> vem do HTML do Quill: estas classes são penduradas nele por JS
+   (CourseViewer) — não existe JSX onde declará-las. */
+.lesson-html img.narration-trigger {
+    cursor: pointer;
+    border-radius: var(--radius-round);
+    outline: 2px solid transparent;
+    outline-offset: 3px;
+    transition: transform var(--transition), outline-color var(--transition),
+                filter var(--transition);
+}
+
+.lesson-html img.narration-trigger:hover,
+.lesson-html img.narration-trigger:focus-visible {
+    transform: scale(1.1);
+    outline-color: var(--gold);
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.18));
+}
+
+/* Falando agora: pulsa, para o aluno saber de qual trecho é a voz. */
+.lesson-html img.narration-trigger--tocando {
+    outline-color: var(--primary);
+    animation: narration-pulse 1.2s ease-in-out infinite;
+}
+
+.lesson-html img.narration-trigger--ouvido { outline-color: var(--success); }
+
+/* ── Mini-player ───────────────────────────────────────────────────────────
+   Não há caixa fixa acima da aula: o controle só existe enquanto há voz. Ele
+   flutua no rodapé, some ao terminar e deixa o conteúdo respirar. */
+.narration-dock {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: min(460px, calc(100vw - 32px));
+    padding: 12px 16px;
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 14px);
+    box-shadow: var(--shadow-lg);
+    animation: narrationDockIn 0.25s ease;
+}
+
+@keyframes narrationDockIn {
+    from { opacity: 0; transform: translate(-50%, 12px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.narration-dock .narration-icon-img { width: 36px; height: 36px; }
+
+.narration-dock-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.narration-dock-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* A fala não tem duração conhecida de antemão: o progresso é contado em frases
+   já ditas, não em segundos. */
+.narration-dock-progress {
+    height: 5px;
+    border-radius: 999px;   /* pílula — --radius-round é 50%, deformaria a barra */
+    background: var(--bg-light);
+    overflow: hidden;
+}
+
+.narration-dock-bar {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--gold);
+    transition: width 0.35s ease;
+}
+
+.narration-dock-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: var(--radius-round);
+    background: var(--primary);
+    color: #fff;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background var(--transition), transform var(--transition);
+}
+
+.narration-dock-btn:hover { background: var(--primary-light); transform: scale(1.06); }
+
+.narration-dock-btn--fechar {
+    background: transparent;
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+}
+.narration-dock-btn--fechar:hover { background: var(--bg-light); color: var(--text-main); }
+
+/* Botão de concluir travado pela narração. `disabled` já impede o clique; isto
+   é o sinal visual de que a trava existe (o title explica o porquê). */
+.btn-mark-done--bloqueado,
+.btn-mark-done:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+}
+
+@media (max-width: 600px) {
+    .narration-dock {
+        bottom: 12px;
+        gap: 10px;
+        padding: 10px 12px;
+    }
+    .narration-dock .narration-icon-img { width: 30px; height: 30px; }
+}
+
+/* Quem prefere menos movimento não perde informação: o estado continua no
+   contorno e na barra de progresso. */
+@media (prefers-reduced-motion: reduce) {
+    .lesson-html img.narration-trigger--tocando,
+    .narration--falando .narration-icon-img { animation: none; }
+    .narration-dock { animation: none; }
+}
+
+/* ============================================
    TUTOR VIRTUAL — assistente RAG do curso
    ============================================ */
 .assistant-fab {

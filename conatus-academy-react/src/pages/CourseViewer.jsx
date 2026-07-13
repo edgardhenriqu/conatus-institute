@@ -13,6 +13,8 @@ import {
 } from '../utils/mopProgress';
 import { canAccessInternalCourse } from '../utils/permissions';
 import { CourseAssistant } from '../components/course/CourseAssistant';
+import { NarrationDock } from '../components/course/NarrationDock';
+import { useNarracao } from '../hooks/useNarracao';
 
 // Só a rota estática legada 'mop-interno' usa o fluxo MOP em localStorage.
 // NÃO incluir o id 6 (hoje é o curso do banco Huawei Module800); o MOP migrou
@@ -83,6 +85,30 @@ export function CourseViewer() {
   const [deniedMsg, setDeniedMsg]           = useState('');
   const [loadError, setLoadError]           = useState('');
   const [focusMode, setFocusMode]           = useState(false); // aula em tela cheia
+  const [narracaoOuvida, setNarracaoOuvida] = useState(false); // narração chegou ao fim
+  const lessonHtmlRef = useRef(null);                          // HTML da aula já renderizado
+
+  // Aulas com blocos marcados pela imagem do megafone (server/services/narracao.js)
+  // só podem ser concluídas depois que a narração terminar. Sem blocos narrados,
+  // nada muda — o botão segue como sempre foi.
+  const narracoes = useMemo(() => activeLesson?.narracoes || [], [activeLesson]);
+  const narracaoPendente = narracoes.length > 0 && !narracaoOuvida;
+
+  // Cada aula tem a sua narração: trocar de aula zera o que já foi ouvido, senão
+  // a primeira narração ouvida liberaria o botão de todas as aulas seguintes.
+  useEffect(() => {
+    setNarracaoOuvida(false);
+  }, [activeLesson?.id]);
+
+  const handleNarracaoConcluida = useCallback(() => setNarracaoOuvida(true), []);
+
+  const narracao = useNarracao({
+    narracoes,
+    aulaId: activeLesson?.id,
+    onConcluir: handleNarracaoConcluida,
+  });
+
+  const { tocarBloco, blocoAtivo, ouvidos, suportado: narracaoSuportada } = narracao;
 
   // Modo foco = overlay em tela cheia. Pedimos também a tela cheia do navegador
   // para cobrir a barra do sistema; se o navegador negar, o overlay sozinho já
@@ -167,6 +193,122 @@ export function CourseViewer() {
     const hasVideo = activeLesson.tipo_conteudo === 'video' && !!activeLesson.video_url;
     return !hasVideo && !activeLesson.material_url && isGifOnlyHtml(lessonHtml);
   }, [activeLesson, lessonHtml]);
+
+  /* ── Narração: a imagem do megafone vira botão ────────────────── */
+
+  // Estado da narração lido pelo MutationObserver, que é criado uma única vez e
+  // capturaria um valor velho se lesse as variáveis de render direto.
+  const estadoNarracaoRef = useRef({ blocoAtivo: null, ouvidos: new Set() });
+
+  const pintarEstado = useCallback(() => {
+    const raiz = lessonHtmlRef.current;
+    if (!raiz) return;
+    const { blocoAtivo: ativo, ouvidos: jaOuvidos } = estadoNarracaoRef.current;
+    [...raiz.querySelectorAll('img.narration-trigger')].forEach((img, i) => {
+      img.classList.toggle('narration-trigger--tocando', i === ativo);
+      img.classList.toggle('narration-trigger--ouvido', jaOuvidos.has(i));
+      img.closest('.narration-block')
+        ?.classList.toggle('narration-block--tocando', i === ativo);
+    });
+  }, []);
+
+  // A figura do megafone que o instrutor anexou ao parágrafo VIRA o botão de
+  // ouvir aquele trecho. O conteúdo da aula é HTML cru (dangerouslySetInnerHTML),
+  // então não há JSX onde pendurar um onClick: marcamos os <img> no DOM.
+  //
+  // Duas decisões que parecem exageradas e não são — sem elas o botão não funciona:
+  //
+  // 1. CLIQUE POR DELEGAÇÃO, no contêiner. Pendurar o listener no <img> não
+  //    sobrevive: o React reescreve o innerHTML da div (mesma div, filhos novos)
+  //    depois que o efeito roda, e o <img> equipado vira um nó órfão — verificado
+  //    no navegador (isConnected: false, com a classe aplicada nele).
+  // 2. MutationObserver. Pelo mesmo motivo, as classes visuais precisam ser
+  //    reaplicadas toda vez que o React troca os filhos, sem depender de o efeito
+  //    rodar de novo (ele não roda: `lessonHtml` continua igual).
+  //
+  // O pareamento é POSICIONAL: o servidor numera os trechos na ordem do documento,
+  // logo o i-ésimo megafone do HTML é o i-ésimo trecho narrado. Casar por src não
+  // serviria — o mesmo arquivo pode marcar dois parágrafos da mesma aula.
+  useEffect(() => {
+    const raiz = lessonHtmlRef.current;
+    if (!raiz || !narracoes.length || !narracaoSuportada) return;
+
+    const marcadores = new Set(narracoes.map((n) => n.imgSrc).filter(Boolean));
+
+    const equipar = () => {
+      const gatilhos = [...raiz.querySelectorAll('img')]
+        .filter((img) => marcadores.has(img.getAttribute('src')))
+        .slice(0, narracoes.length);
+
+      gatilhos.forEach((img) => {
+        img.classList.add('narration-trigger');
+        img.setAttribute('role', 'button');
+        img.setAttribute('tabindex', '0');
+        img.setAttribute('title', 'Clique para ouvir a narração deste trecho');
+        img.setAttribute('alt', 'Ouvir a narração deste trecho');
+
+        // O parágrafo do megafone é o que será falado: negrito, para o aluno
+        // reconhecer de longe o que tem narração.
+        const bloco = img.closest('p, li, h1, h2, h3, h4, h5, h6, blockquote, div');
+        if (bloco && bloco !== raiz) bloco.classList.add('narration-block');
+      });
+
+      // Repinta o estado junto: quando o React reescreve os filhos no meio da
+      // narração, os nós voltam "crus" e o trecho em leitura perderia o realce.
+      pintarEstado();
+    };
+
+    equipar();
+
+    // Só childList: mudanças de atributo (as classes que nós mesmos aplicamos)
+    // não disparam o observer, então não há laço infinito.
+    const observer = new MutationObserver(equipar);
+    observer.observe(raiz, { childList: true, subtree: true });
+
+    const indiceDe = (img) =>
+      [...raiz.querySelectorAll('img.narration-trigger')].indexOf(img);
+
+    const aoClicar = (e) => {
+      const img = e.target.closest?.('img.narration-trigger');
+      if (!img) return;
+      const i = indiceDe(img);
+      if (i >= 0) tocarBloco(i);
+    };
+
+    const aoTeclar = (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const img = e.target.closest?.('img.narration-trigger');
+      if (!img) return;
+      e.preventDefault();
+      const i = indiceDe(img);
+      if (i >= 0) tocarBloco(i);
+    };
+
+    raiz.addEventListener('click', aoClicar);
+    raiz.addEventListener('keydown', aoTeclar);
+
+    return () => {
+      observer.disconnect();
+      raiz.removeEventListener('click', aoClicar);
+      raiz.removeEventListener('keydown', aoTeclar);
+      raiz.querySelectorAll('img.narration-trigger').forEach((img) => {
+        img.classList.remove('narration-trigger', 'narration-trigger--tocando',
+          'narration-trigger--ouvido');
+      });
+      raiz.querySelectorAll('.narration-block').forEach((b) => {
+        b.classList.remove('narration-block', 'narration-block--tocando');
+      });
+    };
+  }, [narracoes, lessonHtml, narracaoSuportada, tocarBloco, pintarEstado]);
+
+  // Aplica o estado atual da narração aos gatilhos já montados. Roda em dois
+  // momentos: quando o estado muda (efeito abaixo) e quando o React reescreve os
+  // filhos da aula (MutationObserver acima, via `equipar`). Lê de um ref porque o
+  // observer é criado uma vez e não pode capturar um estado velho.
+  useEffect(() => {
+    estadoNarracaoRef.current = { blocoAtivo, ouvidos };
+    pintarEstado();
+  }, [blocoAtivo, ouvidos, narracoes, lessonHtml, pintarEstado]);
 
   /* ── Carregamento ─────────────────────────────────────────────── */
 
@@ -256,6 +398,10 @@ export function CourseViewer() {
 
   const handleMarkDone = useCallback(async () => {
     if (!activeLesson) return;
+    // Trava de narração: o botão já vem desabilitado, mas a checagem também mora
+    // aqui — desabilitar no JSX é aparência, e o clique pode chegar por teclado
+    // ou por um estado que mudou entre o render e o clique.
+    if (narracaoPendente) return;
 
     if (isMop) {
       markLessonDone(activeLesson.id);
@@ -284,7 +430,7 @@ export function CourseViewer() {
     } catch {
       toast.error('Erro ao salvar progresso. Verifique sua conexão.');
     }
-  }, [activeLesson, isMop, allLessons, id, lessonKey, toast]);
+  }, [activeLesson, isMop, allLessons, id, lessonKey, toast, narracaoPendente]);
 
   /* ── Estados especiais ────────────────────────────────────────── */
 
@@ -444,8 +590,16 @@ export function CourseViewer() {
               {isCurrentDone
                 ? <span className="lesson-done-badge">✓ Concluída</span>
                 : (
-                  <button className="btn-mark-done" onClick={handleMarkDone}>
-                    Marcar como Concluída
+                  <button
+                    className={`btn-mark-done${narracaoPendente ? ' btn-mark-done--bloqueado' : ''}`}
+                    onClick={handleMarkDone}
+                    disabled={narracaoPendente}
+                    aria-disabled={narracaoPendente}
+                    title={narracaoPendente
+                      ? 'Ouça a narração até o fim para concluir esta aula'
+                      : 'Marcar esta aula como concluída'}
+                  >
+                    {narracaoPendente ? '🔒 Ouça a narração' : 'Marcar como Concluída'}
                   </button>
                 )
               }
@@ -489,7 +643,11 @@ export function CourseViewer() {
             )}
 
             {lessonHtml && (
-              <div className="lesson-html" dangerouslySetInnerHTML={{ __html: lessonHtml }} />
+              <div
+                className="lesson-html"
+                ref={lessonHtmlRef}
+                dangerouslySetInnerHTML={{ __html: lessonHtml }}
+              />
             )}
 
             {!activeLesson.content && !activeLesson.conteudo
@@ -556,6 +714,8 @@ export function CourseViewer() {
         </div>
       </div>
 
+      {/* Flutuantes: o mini-player só aparece enquanto há narração tocando. */}
+      <NarrationDock narracao={narracao} />
       <CourseAssistant cursoId={id} />
     </div>
   );

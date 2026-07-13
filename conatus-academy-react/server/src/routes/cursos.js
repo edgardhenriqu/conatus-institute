@@ -228,11 +228,36 @@ router.get('/:cursoId/conteudo', authMiddleware, async (req, res) => {
 
     const concluidasSet = new Set(progresso.rows.map(r => r.aula_titulo));
 
+    // Roteiros de narração dos blocos marcados com 📢 (services/narracao.js).
+    // Vêm junto com o conteúdo, e não numa rota à parte, porque o player precisa
+    // deles no mesmo instante em que monta a aula — é texto, cabe no payload.
+    const narracoes = await pool.query(
+      `SELECT n.aula_id, n.ordem, n.roteiro, n.img_src
+         FROM aula_narracoes n
+         JOIN aulas a   ON a.id = n.aula_id
+         JOIN modulos m ON m.id = a.modulo_id
+        WHERE m.curso_id = $1
+        ORDER BY n.aula_id, n.ordem`,
+      [cursoId]
+    );
+
+    const narracoesPorAula = new Map();
+    for (const n of narracoes.rows) {
+      if (!narracoesPorAula.has(n.aula_id)) narracoesPorAula.set(n.aula_id, []);
+      narracoesPorAula.get(n.aula_id).push({
+        ordem: n.ordem, roteiro: n.roteiro, imgSrc: n.img_src,
+      });
+    }
+
     const modulosComAulas = modulos.rows.map(m => ({
       ...m,
       aulas: aulas.rows
         .filter(a => a.modulo_id === m.id)
-        .map(a => ({ ...a, concluida: concluidasSet.has(`aula-${a.id}`) })),
+        .map(a => ({
+          ...a,
+          concluida: concluidasSet.has(`aula-${a.id}`),
+          narracoes: narracoesPorAula.get(a.id) || [],
+        })),
     }));
 
     res.json({

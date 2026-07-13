@@ -5,14 +5,20 @@ const pool = require('../../db/connection');
 const { contentMiddleware } = require('../middlewares/auth');
 const { ADMIN_ROLES, canManage, canView, hiddenFrom, rank } = require('../utils/roles');
 const { indexAulaById } = require('../services/ragIndex');
+const { sincronizarNarracoes } = require('../services/narracao');
 
 const router = express.Router();
 
-// Reindexa a aula para o assistente RAG sem bloquear a resposta ao admin
-// (a chamada ao Gemini leva ~1-2s). Falhas são logadas; o backfill recupera.
-function reindexarAula(aulaId) {
+// Reprocessa a aula em segundo plano, sem fazer o admin esperar: o índice do RAG
+// (embeddings) e os roteiros de narração dos blocos com 📢 dependem de chamadas
+// a LLM, que levam segundos. Falhas são logadas e não derrubam o salvamento —
+// o conteúdo da aula já está gravado; reindexar/renarrar é derivado dele.
+function reprocessarAula(aulaId) {
   indexAulaById(aulaId).catch((e) => {
     console.error(`[RAG] Falha ao reindexar aula ${aulaId}:`, e.message);
+  });
+  sincronizarNarracoes(aulaId).catch((e) => {
+    console.error(`[Narração] Falha ao gerar roteiro da aula ${aulaId}:`, e.message);
   });
 }
 
@@ -1435,7 +1441,7 @@ router.post('/aulas', async (req, res) => {
        duracao_minutos || null, obrigatoria !== false]
     );
 
-    reindexarAula(resultado.rows[0].id);
+    reprocessarAula(resultado.rows[0].id);
     res.status(201).json({ aula: resultado.rows[0] });
   } catch (error) {
     console.error('Erro ao criar aula:', error);
@@ -1484,7 +1490,7 @@ router.put('/aulas/:id', async (req, res) => {
       return res.status(404).json({ erro: 'Aula não encontrada' });
     }
 
-    reindexarAula(id);
+    reprocessarAula(id);
     res.json({ aula: resultado.rows[0] });
   } catch (error) {
     console.error('Erro ao atualizar aula:', error);

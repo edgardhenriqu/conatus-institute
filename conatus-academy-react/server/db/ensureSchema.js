@@ -239,6 +239,27 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_aula_chunks_aula ON aula_chunks(aula_id)`,
   `CREATE INDEX IF NOT EXISTS idx_aula_chunks_vec
      ON aula_chunks USING hnsw (embedding vector_cosine_ops)`,
+
+  // ── Narração dos blocos marcados com 📢 ────────────────────────────────────
+  // Cada bloco do conteúdo da aula que contém o megafone vira um roteiro falado,
+  // reescrito por LLM ao salvar a aula (ver services/narracao.js). Guardamos o
+  // roteiro, não áudio: quem fala é o navegador do aluno (Web Speech API).
+  // origem_hash é o hash do texto do bloco — se o instrutor não mexeu naquele
+  // bloco, não regeramos o roteiro (economiza chamada de LLM a cada salvamento).
+  `CREATE TABLE IF NOT EXISTS aula_narracoes (
+    id SERIAL PRIMARY KEY,
+    aula_id     INTEGER NOT NULL REFERENCES aulas(id) ON DELETE CASCADE,
+    ordem       INTEGER NOT NULL,
+    origem_hash VARCHAR(64) NOT NULL,
+    texto_origem TEXT NOT NULL,
+    roteiro     TEXT NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (aula_id, ordem)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_aula_narracoes_aula ON aula_narracoes(aula_id)`,
+  // src da imagem do megafone que dispara este trecho. É por ele que o player
+  // acha o <img> no HTML já renderizado e o transforma em botão de ouvir.
+  `ALTER TABLE aula_narracoes ADD COLUMN IF NOT EXISTS img_src TEXT`,
 ];
 
 async function ensureSchema() {
