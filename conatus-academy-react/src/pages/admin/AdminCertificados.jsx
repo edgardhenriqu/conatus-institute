@@ -67,7 +67,7 @@ export function AdminCertificados() {
     <div className="admin-body">
       <div className="admin-container">
         <header className="admin-header">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div>
               <h1>Gerenciar Certificados</h1>
               <p>Visualize, valide e exclua certificados emitidos</p>
@@ -81,14 +81,14 @@ export function AdminCertificados() {
         {/* Seção de Validação */}
         <div className="admin-table-container" style={{ marginBottom: '30px', padding: '25px' }}>
           <h2 style={{ marginBottom: '15px', fontSize: '1.3rem' }}>Validar Certificado</h2>
-          <form onSubmit={handleValidar} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+          <form onSubmit={handleValidar} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <input
               type="text"
               className="admin-search"
               placeholder="Digite o código (ex: CN-XXXXXXXX)"
               value={codigoValidacao}
               onChange={e => setCodigoValidacao(e.target.value)}
-              style={{ flex: 1 }}
+              style={{ flex: '1 1 220px', width: 'auto' }}
             />
             <button type="submit" className="admin-btn admin-btn-edit" style={{ padding: '10px 20px' }}>
               Validar
@@ -117,7 +117,7 @@ export function AdminCertificados() {
               border: '1px solid var(--border)'
             }}>
               <h3 style={{ marginBottom: '10px', color: 'var(--primary)' }}>Dados do Certificado</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: '10px' }}>
                 <p><strong>Código:</strong> {resultadoValidacao.codigo}</p>
                 <p><strong>Nota:</strong> {resultadoValidacao.nota_avaliacao}%</p>
                 <p><strong>Aluno:</strong> {resultadoValidacao.aluno_nome}</p>
@@ -139,6 +139,7 @@ export function AdminCertificados() {
           {loading ? (
             <div style={{ padding: '40px', textAlign: 'center' }}>Carregando...</div>
           ) : (
+            <div className="admin-table-scroll">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -177,6 +178,7 @@ export function AdminCertificados() {
                 )}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

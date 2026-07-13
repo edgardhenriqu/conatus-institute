@@ -227,6 +227,7 @@ export default function CourseAccessPanel({ courseId }) {
           {usuarios.length === 0 ? (
             <div className="ce-empty-small"><p>Nenhum usuário liberado individualmente.</p></div>
           ) : (
+            <div className="admin-table-scroll">
             <table className="admin-table">
               <thead>
                 <tr><th>Nome</th><th>E-mail</th><th>Autorizado em</th><th>Ações</th></tr>
@@ -247,6 +248,7 @@ export default function CourseAccessPanel({ courseId }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}

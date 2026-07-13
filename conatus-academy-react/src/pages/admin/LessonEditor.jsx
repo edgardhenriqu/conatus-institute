@@ -83,6 +83,7 @@ export default function LessonEditor() {
       {loading ? (
         <p>Carregando...</p>
       ) : (
+        <div className="admin-table-scroll">
         <table className="admin-table">
           <thead>
             <tr>
@@ -102,6 +103,7 @@ export default function LessonEditor() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       {/* Form */}
       <div className="lesson-form">

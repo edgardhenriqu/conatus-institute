@@ -256,7 +256,7 @@ export function Dashboard() {
 
         {/* Other courses list */}
         <section className="courses-section" style={{ marginTop: '30px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
             <h2>Meus Cursos</h2>
             <Button variant="outline" to="/cursos" style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
               Explorar mais cursos
@@ -291,8 +291,8 @@ export function Dashboard() {
                         </span>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <div style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px 20px', flexWrap: 'wrap' }}>
+                        <div style={{ textAlign: 'right', minWidth: 0 }}>
                           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                             Você concluiu {prog}% deste curso
                           </span>

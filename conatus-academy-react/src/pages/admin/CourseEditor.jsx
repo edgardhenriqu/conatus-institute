@@ -1122,7 +1122,8 @@ export default function CourseEditor() {
                 <p>Nenhum aluno matriculado neste curso ainda.</p>
               </div>
             ) : (
-              <table className="admin-table" style={{ marginTop: '16px' }}>
+              <div className="admin-table-scroll" style={{ marginTop: '16px' }}>
+              <table className="admin-table">
                 <thead>
                   <tr>
                     <th>Nome</th>
@@ -1170,6 +1171,7 @@ export default function CourseEditor() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>

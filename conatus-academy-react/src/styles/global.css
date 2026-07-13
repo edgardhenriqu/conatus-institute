@@ -17,11 +17,20 @@ html {
     scroll-behavior: smooth;
 }
 
+/* Nenhum elemento pode gerar rolagem horizontal na página.
+   `clip` não cria contêiner de rolagem (preserva position:sticky);
+   `hidden` fica como fallback para navegadores antigos. */
+html, body {
+    overflow-x: hidden;
+    overflow-x: clip;
+}
+
 body {
     font-family: var(--font-body);
     background: var(--bg-white);
     color: var(--text-main);
     line-height: 1.6;
+    min-width: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -41,6 +50,23 @@ img {
     max-width: 100%;
     height: auto;
     display: block;
+}
+
+/* Mídia incorporada nunca ultrapassa o contêiner (vídeos, iframes, SVGs) */
+iframe, video, embed, object, svg {
+    max-width: 100%;
+}
+
+/* Campos de formulário não estouram a largura do pai */
+input, select, textarea {
+    max-width: 100%;
+}
+
+/* Utilitário: some em telas de toque/estreitas (usado na navbar) */
+@media (max-width: 768px) {
+    .hidden-mobile {
+        display: none !important;
+    }
 }
 
 ul, ol {
@@ -85,7 +111,7 @@ header[id] {
 }
 
 .section-header h2 {
-    font-size: 2.5rem;
+    font-size: clamp(1.7rem, 4vw, 2.5rem);
     margin-bottom: 15px;
 }
 
@@ -101,7 +127,7 @@ header[id] {
 }
 
 .section-header p {
-    font-size: 1.2rem;
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
     color: var(--text-muted);
 }
 
@@ -228,6 +254,12 @@ header[id] {
     transform: rotate(-45deg) translate(6px, -6px);
 }
 
+/* Entrada suave do menu mobile (display:none → flex não anima sozinho) */
+@keyframes navMenuIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ---- Buttons ---- */
 .btn-apply {
     background: var(--secondary);
@@ -236,6 +268,7 @@ header[id] {
     border-radius: var(--radius-sm);
     transition: background var(--transition) !important;
     font-size: 0.95rem;
+    white-space: nowrap;
 }
 
 .btn-apply:hover {
@@ -327,6 +360,7 @@ header[id] {
     border: none;
     cursor: pointer;
     text-decoration: none;
+    white-space: nowrap;
     animation: pulseGlow 3s ease-in-out infinite;
 }
 
@@ -541,7 +575,7 @@ header[id] {
 }
 
 .stat-item h3 {
-    font-size: 2.8rem;
+    font-size: clamp(2.1rem, 4.5vw, 2.8rem);
     color: var(--secondary);
     margin-bottom: 5px;
     font-weight: 900;
@@ -569,7 +603,7 @@ header[id] {
 }
 
 .about-content h2 {
-    font-size: 2.5rem;
+    font-size: clamp(1.7rem, 4vw, 2.5rem);
     margin-bottom: 20px;
 }
 
@@ -668,7 +702,7 @@ header[id] {
 
 /* ---- Ciclo de aprendizagem ---- */
 .methodology-cycle {
-    max-width: var(--container-max);
+    max-width: min(var(--container-max), calc(100% - 32px));
     margin: 60px auto 0;
     padding: 50px 40px;
     background: var(--primary);
@@ -774,7 +808,8 @@ header[id] {
 
 /* ---- Professor em destaque (único) ---- */
 .professor-feature {
-    max-width: var(--container-max);
+    /* calc(100% - 32px): respiro lateral quando a tela é menor que o container */
+    max-width: min(var(--container-max), calc(100% - 32px));
     margin: 0 auto;
     padding: 56px 64px;
     display: grid;
@@ -792,16 +827,18 @@ header[id] {
 }
 
 .professor-feature__photo {
-    width: 320px;
-    height: 320px;
+    width: min(320px, 100%);
+    aspect-ratio: 1;
+    height: auto;
     object-fit: cover;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow);
 }
 
 .professor-feature__avatar {
-    width: 280px;
-    height: 280px;
+    width: min(280px, 100%);
+    aspect-ratio: 1;
+    height: auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -878,10 +915,10 @@ header[id] {
 
 /* ---- Blocos complementares (atuação / formação / certificações) ---- */
 .professor-extra {
-    max-width: var(--container-max);
+    max-width: min(var(--container-max), calc(100% - 32px));
     margin: 28px auto 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
     gap: 24px;
 }
 
@@ -943,6 +980,9 @@ header[id] {
 
 .carousel-track,
 .home-carousel-track {
+    /* Passo de 1 slide (largura + gap). O JS multiplica pelo índice; os
+       breakpoints abaixo ajustam quando passam a caber 2 ou 1 slides. */
+    --slide-step: calc(100% / 3 + 8px);
     display: flex;
     gap: 24px;
     transition: transform var(--transition-slow);
@@ -1177,7 +1217,7 @@ header[id] {
 
 .free-courses-cta h2 {
     color: white;
-    font-size: 2.5rem;
+    font-size: clamp(1.7rem, 4vw, 2.5rem);
     margin-bottom: 15px;
 }
 
@@ -1240,7 +1280,8 @@ header[id] {
 
 .free-courses-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    /* min(340px, 100%): em telas menores que 340px a coluna encolhe junto */
+    grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
     gap: 30px;
     max-width: var(--container-max);
     margin: 0 auto;
@@ -2126,12 +2167,12 @@ header[id] {
 }
 
 .cursos-header h1 {
-    font-size: 3rem;
+    font-size: clamp(2rem, 5vw, 3rem);
     margin-bottom: 10px;
 }
 
 .cursos-header p {
-    font-size: 1.2rem;
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
     color: var(--text-muted);
 }
 
@@ -2162,7 +2203,7 @@ header[id] {
 
 .curso-hero-info h1 {
     color: white;
-    font-size: 2.5rem;
+    font-size: clamp(1.7rem, 4vw, 2.5rem);
     margin-bottom: 15px;
 }
 
@@ -2252,7 +2293,7 @@ header[id] {
 
 .matriz-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
     gap: 20px;
 }
 
@@ -2345,7 +2386,7 @@ header[id] {
     color: white;
     margin-bottom: 8px;
     position: relative;
-    font-size: 2rem;
+    font-size: clamp(1.5rem, 3.5vw, 2rem);
     font-weight: 700;
     letter-spacing: -0.5px;
 }
@@ -2381,7 +2422,7 @@ header[id] {
 }
 
 .stat-card h3 {
-    font-size: 2.8rem;
+    font-size: clamp(2.1rem, 4.5vw, 2.8rem);
     color: var(--primary);
     margin-bottom: 4px;
     font-weight: 700;
@@ -2437,6 +2478,7 @@ header[id] {
 
 .progress-bar {
     width: 200px;
+    max-width: 100%;
     height: 8px;
     background: #e2e8f0;
     border-radius: 99px;
@@ -2994,7 +3036,7 @@ header[id] {
 }
 
 .quiz-header h1 {
-    font-size: 2rem;
+    font-size: clamp(1.5rem, 4vw, 2rem);
     margin-bottom: 6px;
 }
 
@@ -3640,7 +3682,7 @@ header[id] {
 
 .admin-header h1 {
     color: white;
-    font-size: 2rem;
+    font-size: clamp(1.5rem, 3.5vw, 2rem);
     margin-bottom: 5px;
 }
 
@@ -3854,19 +3896,10 @@ header[id] {
    RESPONSIVE
    ============================================ */
 
-@media (max-width: 992px) {
-    .carousel-slide,
-    .home-carousel-slide {
-        min-width: calc((100% - 24px) / 2);
-        max-width: calc((100% - 24px) / 2);
-    }
-
-    .admin-stats {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
+/* Navbar completa (logo + 4 links + 3 ações) só cabe acima de ~1100px.
+   Em tablets (820/912/1024) o menu recolhe para o hambúrguer — sem isso o
+   botão "Cursos Gratuitos" era espremido e quebrava em duas linhas. */
+@media (max-width: 1100px) {
     .nav-menu {
         display: none;
         position: fixed;
@@ -3875,18 +3908,86 @@ header[id] {
         right: 0;
         background: var(--bg-white);
         flex-direction: column;
-        padding: 20px;
-        gap: 15px;
+        padding: 12px 20px;
+        gap: 0;
         box-shadow: var(--shadow-lg);
         border-bottom: 1px solid var(--border);
+        z-index: 1000;
     }
 
     .nav-menu.active {
         display: flex;
+        animation: navMenuIn 0.22s ease;
+    }
+
+    /* Cada item vira uma linha inteira com área de toque confortável */
+    .nav-menu li a {
+        display: block;
+        padding: 12px 4px;
+        border-bottom: 1px solid var(--bg-light);
+    }
+
+    .nav-menu li:last-child a {
+        border-bottom: none;
     }
 
     .nav-hamburger {
         display: flex;
+        padding: 10px;
+        margin: -5px;
+    }
+
+    /* Saudação é cosmética — no tablet o espaço vai para os botões de ação */
+    .nav-user-greeting {
+        display: none;
+    }
+}
+
+@media (max-width: 992px) {
+    .carousel-slide,
+    .home-carousel-slide {
+        min-width: calc((100% - 24px) / 2);
+        max-width: calc((100% - 24px) / 2);
+    }
+
+    .carousel-track,
+    .home-carousel-track {
+        --slide-step: calc(100% / 2 + 12px);
+    }
+
+    .admin-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    /* Navbar mais baixa no mobile — todos os dependentes (sticky, âncoras,
+       sidebar do viewer) acompanham via variável. */
+    :root {
+        --navbar-height: 64px;
+    }
+
+    .nav-logo-img {
+        height: 44px;
+    }
+
+    .nav-container {
+        padding: 0 16px;
+        gap: 10px;
+    }
+
+    .nav-actions {
+        gap: 10px;
+    }
+
+    .nav-actions a,
+    .nav-actions button {
+        font-size: 0.9rem;
+    }
+
+    .btn-apply {
+        padding: 10px 16px;
+        font-size: 0.88rem;
     }
 
     .hero h1 {
@@ -3943,10 +4044,15 @@ header[id] {
         max-width: 100%;
     }
 
+    .carousel-track,
+    .home-carousel-track {
+        --slide-step: calc(100% + 24px);
+    }
+
     .carousel-btn,
     .home-carousel-btn {
-        width: 36px;
-        height: 36px;
+        width: 44px;
+        height: 44px;
         font-size: 1rem;
     }
 
@@ -3954,8 +4060,9 @@ header[id] {
         grid-template-columns: 1fr;
     }
 
-    .free-courses-cta h2 {
-        font-size: 1.8rem;
+    /* Colunas empilhadas: centraliza para leitura mais natural no celular */
+    .footer-container .footer-col {
+        text-align: center;
     }
 
     .free-courses-grid {
@@ -3964,10 +4071,6 @@ header[id] {
 
     .curso-hero-container {
         grid-template-columns: 1fr;
-    }
-
-    .curso-hero-info h1 {
-        font-size: 1.8rem;
     }
 
     .curso-section {
@@ -4018,10 +4121,6 @@ header[id] {
         grid-template-columns: 1fr;
     }
 
-    .cursos-header h1 {
-        font-size: 2rem;
-    }
-
     .login-page-wrapper {
         max-width: 100%;
     }
@@ -4047,11 +4146,126 @@ header[id] {
         font-size: 0.95rem;
     }
 
+    /* CTAs do hero ocupam a largura disponível e empilham com respiro */
+    .hero-buttons {
+        gap: 12px;
+    }
+
+    .hero-buttons .btn-primary-action,
+    .hero-buttons .btn-secondary {
+        width: min(100%, 340px);
+    }
+
     .card-buttons {
         flex-direction: column;
     }
 
     .form-row {
         flex-direction: column;
+    }
+
+    /* "Matricule-se" já leva ao portal de login; o link textual duplicado
+       não cabe ao lado do logo em telas mínimas. */
+    .nav-login-link {
+        display: none;
+    }
+
+    .welcome-header {
+        padding: 28px 20px;
+    }
+
+    .admin-header {
+        padding: 22px 18px;
+    }
+
+    .dashboard-container {
+        padding: 28px 14px;
+    }
+
+    .admin-container {
+        padding: 20px 12px;
+    }
+
+    .lesson-content {
+        padding: 20px 14px;
+    }
+
+    .curso-hero {
+        padding: 40px 16px;
+    }
+
+    .curso-section {
+        padding: 20px 16px;
+    }
+
+    .methodology-card {
+        padding: 26px 20px;
+    }
+}
+
+/* ============================================
+   CONTEÚDO LONGO — nunca estoura a tela
+   ============================================ */
+
+/* E-mails e URLs longos no rodapé quebram em vez de vazar */
+.footer-col p,
+.footer-col a {
+    overflow-wrap: anywhere;
+}
+
+/* Títulos e textos gerados por usuário quebram palavras compridas */
+.card h3,
+.ccard-desc,
+.program-info h3,
+.viewer-course-title,
+.lesson-name,
+.qbank-question,
+.quiz-question,
+.course-info h4 {
+    overflow-wrap: break-word;
+}
+
+/* ============================================
+   ALVOS DE TOQUE — mínimo 44px em telas de toque
+   ============================================ */
+
+@media (pointer: coarse) {
+    .admin-btn,
+    .btn-small,
+    .btn-card,
+    .btn-mark-done,
+    .btn-focus-mode,
+    .btn-certificate,
+    .btn-access-course,
+    .mop-status-action,
+    .viewer-cta-quiz,
+    .viewer-cta-cert,
+    .btn-nav,
+    .btn-goto-quiz,
+    .btn-quiz-primary,
+    .btn-quiz-secondary,
+    .btn-cert-print,
+    .admin-nav a,
+    .lesson-material-link {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .viewer-lesson-item {
+        min-height: 44px;
+        align-items: center;
+    }
+
+    .carousel-dot,
+    .home-carousel-dot {
+        width: 14px;
+        height: 14px;
+    }
+
+    .carousel-dots,
+    .home-carousel-dots {
+        gap: 14px;
     }
 }

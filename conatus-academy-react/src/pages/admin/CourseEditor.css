@@ -615,3 +615,96 @@
   transition: color .15s, background .15s;
 }
 .cap-empresa-del:hover { color: #dc2626; background: #fef2f2; }
+
+/* ── Responsivo ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .course-editor {
+    padding: 16px 12px;
+  }
+
+  /* Cabeçalho empilha: título + badge em cima, ações embaixo */
+  .ce-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .ce-header__left {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .ce-title {
+    font-size: 1.25rem;
+  }
+
+  /* Abas deslizam horizontalmente em vez de quebrar o layout */
+  .ce-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .ce-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ce-tab {
+    padding: 12px 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .ce-form,
+  .ce-modules {
+    padding: 20px 16px;
+  }
+
+  /* Campos lado a lado empilham em uma coluna */
+  .ce-grid--2 {
+    grid-template-columns: 1fr;
+  }
+
+  .ce-modules__header,
+  .ce-lessons__header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .ce-accordion__header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .ce-accordion__body {
+    padding: 16px 12px;
+  }
+
+  .ce-lesson-item {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .ce-inline-form {
+    padding: 16px 12px;
+  }
+
+  .ce-inline-form__actions {
+    flex-wrap: wrap;
+  }
+
+  .ce-toast {
+    left: 16px;
+    right: 16px;
+  }
+}
+
+/* Botões do editor com área de toque confortável em telas de toque */
+@media (pointer: coarse) {
+  .ce-btn {
+    min-height: 44px;
+  }
+
+  .ce-btn--sm {
+    min-height: 40px;
+  }
+}

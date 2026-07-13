@@ -64,3 +64,12 @@
   color: #94a3b8;
 }
 
+/* Links da navegação lateral com área de toque mínima em telas de toque */
+@media (pointer: coarse) {
+  .admin-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+

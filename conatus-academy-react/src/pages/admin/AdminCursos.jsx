@@ -178,6 +178,7 @@ export function AdminCursos() {
             <h2>Cursos da Plataforma ({cursos.length})</h2>
           </div>
 
+          <div className="admin-table-scroll">
           <table className="admin-table">
             <thead>
               <tr>
@@ -263,7 +264,8 @@ export function AdminCursos() {
                         ) : matriculados.length === 0 ? (
                           <p style={{ color: 'var(--text-muted)' }}>Nenhum aluno matriculado ainda.</p>
                         ) : (
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                          <table style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                             <thead>
                               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                                 <th style={{ textAlign: 'left', padding: '6px 8px' }}>Nome</th>
@@ -295,6 +297,7 @@ export function AdminCursos() {
                               ))}
                             </tbody>
                           </table>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -304,6 +307,7 @@ export function AdminCursos() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         <p style={{ marginTop: '16px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>

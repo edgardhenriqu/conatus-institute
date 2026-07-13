@@ -103,7 +103,7 @@ export function AdminAvaliacoes() {
               <select
                 id="curso-filter"
                 className="admin-search"
-                style={{ width: 'auto', minWidth: '320px', flex: 1, maxWidth: '600px', cursor: 'pointer' }}
+                style={{ width: 'auto', minWidth: 'min(320px, 100%)', flex: '1 1 240px', maxWidth: '600px', cursor: 'pointer' }}
                 value={cursoSelecionado || ''}
                 onChange={e => setCursoSelecionado(Number(e.target.value))}
               >

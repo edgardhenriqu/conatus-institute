@@ -50,7 +50,7 @@ export function Home() {
             </ul>
           </div>
           <div className="about-image" data-reveal="right">
-            <img src="/images/institute-background.png" alt="Conatus Institute" className="about-logo" />
+            <img src="/images/institute-background.png" alt="Conatus Institute" className="about-logo" loading="lazy" />
           </div>
         </div>
       </section>

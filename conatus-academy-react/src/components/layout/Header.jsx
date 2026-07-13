@@ -49,7 +49,7 @@ export function Header() {
             </>
           ) : (
             <>
-              <Link to="/login" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }} onClick={closeMenu}>
+              <Link to="/login" className="nav-login-link" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }} onClick={closeMenu}>
                 Portal do Aluno
               </Link>
               <Button variant="apply" to="/login" onClick={closeMenu}>

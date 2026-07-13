@@ -30,9 +30,11 @@ export function Carousel({ items, variant = 'carousel', renderItem }) {
       <div className={`${variant}-container`}>
         <button className={`${variant}-btn ${variant}-prev`} onClick={() => move(-1)}>&#10094;</button>
         <div className={`${variant}-wrapper`}>
+          {/* --slide-step vem do CSS e muda com os breakpoints (3/2/1 slides
+              visíveis); assim o deslocamento acompanha a largura real do slide. */}
           <div
             className={`${variant}-track`}
-            style={{ transform: `translateX(calc(${idx} * (-100% / 3 - 8px)))` }}
+            style={{ transform: `translateX(calc(${idx} * -1 * var(--slide-step)))` }}
           >
             {displayItems.map((item, index) => (
               <div key={`${item.id ?? index}-${index}`} className={`${variant}-slide`}>

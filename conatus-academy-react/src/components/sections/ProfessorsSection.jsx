@@ -56,7 +56,7 @@ export function ProfessorsSection() {
       <div className="professor-feature">
         <div className="professor-feature__media" data-reveal="left">
           {p.foto ? (
-            <img className="professor-feature__photo" src={p.foto} alt={p.nome} />
+            <img className="professor-feature__photo" src={p.foto} alt={p.nome} loading="lazy" />
           ) : (
             <div className="professor-feature__avatar" aria-hidden="true">{iniciais(p.nome)}</div>
           )}

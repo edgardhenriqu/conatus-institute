@@ -52,7 +52,8 @@
 
     /* Spacing */
     --container-max: 1200px;
-    --section-padding: 80px;
+    /* Fluido: 48px em telas estreitas até 80px no desktop, sem breakpoint */
+    --section-padding: clamp(48px, 8vw, 80px);
     --navbar-height: 80px;
 
     /* Transitions */

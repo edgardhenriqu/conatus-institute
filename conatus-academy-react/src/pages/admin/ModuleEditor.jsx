@@ -79,6 +79,7 @@ export default function ModuleEditor() {
       {loading ? (
         <p>Carregando...</p>
       ) : (
+        <div className="admin-table-scroll">
         <table className="admin-table">
           <thead>
             <tr>
@@ -103,6 +104,7 @@ export default function ModuleEditor() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       {/* Form */}
       <div className="module-form">

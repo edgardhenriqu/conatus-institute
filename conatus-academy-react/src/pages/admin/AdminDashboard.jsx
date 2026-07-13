@@ -104,6 +104,7 @@ export function AdminDashboard() {
             </Link>
           </div>
 
+          <div className="admin-table-scroll">
           <table className="admin-table">
             <thead>
               <tr>
@@ -136,6 +137,7 @@ export function AdminDashboard() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

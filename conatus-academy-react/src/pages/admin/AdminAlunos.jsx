@@ -443,7 +443,7 @@ export function AdminAlunos() {
               )}
 
               {editando && (
-                <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+                <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '20px', flexWrap: 'wrap' }}>
                   <button type="submit" className="admin-btn admin-btn-edit" style={{ padding: '10px 25px' }}>
                     Salvar Alterações
                   </button>
