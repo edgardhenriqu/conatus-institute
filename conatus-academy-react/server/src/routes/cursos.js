@@ -5,7 +5,8 @@ const pool = require('../../db/connection');
 const { authMiddleware } = require('../middlewares/auth');
 const { podeAcessarCurso, MSG_ACESSO_NEGADO } = require('../services/accessControl');
 const { ADMIN_ROLES } = require('../utils/roles');
-const { embedQuery, generate, toVectorLiteral } = require('../services/ragGemini');
+const { embedQuery, toVectorLiteral } = require('../services/ragGemini');
+const { generate } = require('../services/ragChat');
 const { MOP_NOME } = require('../../db/seedMopCourse');
 
 const router = express.Router();

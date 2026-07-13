@@ -1,17 +1,26 @@
 /**
  * Cliente fino do Gemini para o assistente RAG dos cursos.
  * Centraliza os IDs de modelo num único lugar — se o Google aposentar um ID
- * (como aconteceu com gemini-2.5-flash para contas novas), troca-se aqui.
+ * (como aconteceu com gemini-2.5-flash), troca-se aqui.
  *
- * Modelos verificados contra esta conta em 2026-07-11:
- *   - Embeddings: gemini-embedding-001 (outputDimensionality 768).
- *   - Geração:    gemini-flash-latest (alias que acompanha o flash atual).
+ * Modelos verificados contra esta conta em 2026-07-13:
+ *   - Embeddings: gemini-embedding-001 (outputDimensionality 768). É o caminho
+ *     principal e não deve mudar de provedor sem reindexar aula_chunks.
+ *   - Geração:    ver GEN_MODELS — hoje apenas RESERVA. Quem responde ao aluno
+ *     é o OpenRouter (ragChat.js); esta cascata só entra em cena sem
+ *     OPENROUTER_API_KEY. Cada ID do Gemini tem quota própria: em 2026-07-13
+ *     gemini-flash-latest e a família 2.0-flash devolviam 429 (quota estourada)
+ *     enquanto o lite respondia — daí a cascata em vez de um modelo único.
  */
 const { GoogleGenAI } = require('@google/genai');
 
 const EMBED_MODEL = 'gemini-embedding-001';
 const EMBED_DIMS = 768;                 // casa com aula_chunks.embedding vector(768)
-const GEN_MODEL = 'gemini-flash-latest';
+const GEN_MODELS = [
+  'gemini-flash-lite-latest',  // primário: é o que tem quota nesta conta
+  'gemini-flash-latest',       // melhor resposta quando há quota disponível
+  'gemini-3-flash-preview',
+];
 
 let client;
 function ai() {
@@ -62,21 +71,38 @@ async function embed(text, taskType) {
 const embedDocument = (text) => embed(text, 'RETRIEVAL_DOCUMENT'); // ao indexar
 const embedQuery = (text) => embed(text, 'RETRIEVAL_QUERY');      // ao perguntar
 
+// Erros do modelo, não da pergunta: aposentadoria (404), quota (429) e
+// sobrecarga (500/503). Qualquer um deles justifica tentar o próximo ID.
+const MODELO_INDISPONIVEL = new Set([404, 429, 500, 503]);
+
 async function generate({ system, prompt }) {
-  return withRetry(async () => {
-    const r = await ai().models.generateContent({
-      model: GEN_MODEL,
-      contents: prompt,
-      config: { systemInstruction: system },
-    });
-    return r.text || '';
-  });
+  let ultimoErro;
+  for (const model of GEN_MODELS) {
+    try {
+      // Poucas tentativas por modelo: insistir num ID sem quota só atrasa a
+      // resposta ao aluno — a cascata é que resolve.
+      return await withRetry(async () => {
+        const r = await ai().models.generateContent({
+          model,
+          contents: prompt,
+          config: { systemInstruction: system },
+        });
+        return r.text || '';
+      }, { tentativas: 2, base: 700 });
+    } catch (e) {
+      const status = e?.status || e?.code;
+      if (!MODELO_INDISPONIVEL.has(status)) throw e;   // erro real: não mascarar
+      console.warn(`Gemini indisponível em ${model} (${status}); tentando o próximo modelo.`);
+      ultimoErro = e;
+    }
+  }
+  throw ultimoErro;
 }
 
 // pgvector aceita o literal textual '[a,b,c]' e o cast ::vector faz o resto.
 const toVectorLiteral = (arr) => `[${arr.join(',')}]`;
 
 module.exports = {
-  EMBED_MODEL, EMBED_DIMS, GEN_MODEL,
-  embedDocument, embedQuery, generate, toVectorLiteral,
+  EMBED_MODEL, EMBED_DIMS, GEN_MODELS,
+  embedDocument, embedQuery, generate, toVectorLiteral, withRetry,
 };
