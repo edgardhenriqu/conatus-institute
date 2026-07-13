@@ -33,6 +33,17 @@
     --bg-white: #ffffff;
     --bg-dark: #0f172a;
 
+    /* Superfícies auxiliares e tintas de estado.
+       São estes tokens (e não hex soltos) que o tema escuro troca — por isso
+       fundos de card, hover de lista e caixas de aviso devem usá-los. */
+    --surface-2: #e2e8f0;      /* trilhos, barras, hover neutro */
+    --surface-hover: #f0f7ff;  /* hover azulado de listas e opções */
+    --surface-active: #e8f0fe; /* item selecionado */
+    --tint-info: #e3f2fd;
+    --tint-success: #e8f5e9;
+    --tint-danger: #fce4ec;
+    --tint-warning: #fff3cd;
+
     /* Text */
     --text-main: #0f172a;
     --text-muted: #64748b;
@@ -71,4 +82,44 @@
 
     /* Focus ring (acessibilidade) */
     --focus-ring: 0 0 0 3px rgba(14, 165, 233, 0.28);
+}
+
+/* ============================================
+   TEMA ESCURO
+   Ativado por data-theme="dark" no <html> (ThemeContext). Só redefine tokens:
+   nenhum componente precisa saber qual tema está ativo.
+   --primary continua escuro o bastante para levar texto branco em cima (é fundo
+   de botão em dezenas de lugares); quem clareia é o azul, não o contraste.
+   ============================================ */
+:root[data-theme='dark'] {
+    color-scheme: dark;
+
+    --primary: #1f6feb;
+    --primary-light: #388bfd;
+    --primary-dark: #164a9e;
+
+    --secondary: #c62828;
+    --secondary-hover: #a11d1d;
+
+    --bg-light: #0d1520;   /* fundo da página */
+    --bg-white: #151f2e;   /* superfície de cards, navbar, inputs */
+    --bg-dark: #060b13;
+
+    --surface-2: #223046;
+    --surface-hover: #1b2b40;
+    --surface-active: #223a55;
+    --tint-info: rgba(56, 189, 248, 0.14);
+    --tint-success: rgba(22, 163, 74, 0.18);
+    --tint-danger: rgba(220, 38, 38, 0.16);
+    --tint-warning: rgba(217, 119, 6, 0.18);
+    --success-light: rgba(22, 163, 74, 0.18);
+
+    --text-main: #e6edf5;
+    --text-muted: #94a3b8;
+
+    --border: #263244;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 10px 32px rgba(0, 0, 0, 0.6);
+    --shadow-xl: 0 20px 56px rgba(0, 0, 0, 0.65);
 }

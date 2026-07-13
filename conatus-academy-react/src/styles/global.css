@@ -83,7 +83,11 @@ button {
 input, textarea, select {
     font-family: inherit;
     font-size: 1rem;
+    /* Sem isto o texto digitado continua preto do UA no tema escuro. */
+    color: var(--text-main);
 }
+
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
 /* ---- Container ---- */
 .container {
@@ -1552,7 +1556,7 @@ header[id] {
 .auth-back-link:hover { color: white; }
 
 .auth-logo-wrap {
-    background: white;
+    background: var(--bg-white);
     border-radius: var(--radius);
     padding: 10px 22px;
     box-shadow: 0 2px 16px rgba(0,0,0,0.18);
@@ -1569,7 +1573,7 @@ header[id] {
 
 /* Card */
 .auth-card {
-    background: white;
+    background: var(--bg-white);
     width: 100%;
     border-radius: var(--radius-xl);
     box-shadow:
@@ -1689,12 +1693,12 @@ header[id] {
 
 .auth-input:hover:not(:focus) {
     border-color: #b0b8c8;
-    background: white;
+    background: var(--bg-white);
 }
 
 .auth-input:focus {
     border-color: var(--primary);
-    background: white;
+    background: var(--bg-white);
     box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.12);
 }
 
@@ -1919,7 +1923,7 @@ header[id] {
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    background: #fff5f5;
+    background: var(--tint-danger);
     border: 1px solid #fecaca;
     border-left: 4px solid var(--danger);
     color: #b91c1c;
@@ -2057,7 +2061,7 @@ header[id] {
     min-height: 86px;
     padding: 8px;
     margin-bottom: 10px;
-    background: #f1f4f8;
+    background: var(--bg-light);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     user-select: none;
@@ -2138,14 +2142,14 @@ header[id] {
 .form-row > .form-group { flex: 1; }
 .btn-submit { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; border: none; width: 100%; padding: 15px; font-weight: 700; border-radius: var(--radius-sm); cursor: pointer; font-size: 1rem; transition: all var(--transition); }
 .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0,51,102,0.3); }
-.error-message { display: none; color: var(--danger); font-size: 0.85rem; margin-bottom: 15px; padding: 8px 12px; background: #fff5f5; border-radius: var(--radius-sm); border-left: 3px solid var(--danger); }
+.error-message { display: none; color: var(--danger); font-size: 0.85rem; margin-bottom: 15px; padding: 8px 12px; background: var(--tint-danger); border-radius: var(--radius-sm); border-left: 3px solid var(--danger); }
 .error-message.visible { display: block; }
 .toggle-links { text-align: center; margin-top: 20px; }
 .toggle-links a { color: var(--primary); cursor: pointer; text-decoration: underline; font-weight: 600; }
 .login-page-wrapper { width: 100%; max-width: 480px; display: flex; flex-direction: column; align-items: center; }
-.login-header { background: white; padding: 30px 40px; border-radius: var(--radius) var(--radius) 0 0; width: 100%; display: flex; justify-content: center; align-items: center; position: relative; border: 1px solid var(--border); border-bottom: none; }
+.login-header { background: var(--bg-white); padding: 30px 40px; border-radius: var(--radius) var(--radius) 0 0; width: 100%; display: flex; justify-content: center; align-items: center; position: relative; border: 1px solid var(--border); border-bottom: none; }
 .login-logo { height: 80px; width: auto; }
-.login-container { background: white; padding: 40px; border-radius: 0 0 var(--radius) var(--radius); border: 1px solid var(--border); width: 100%; box-shadow: var(--shadow-xl); }
+.login-container { background: var(--bg-white); padding: 40px; border-radius: 0 0 var(--radius) var(--radius); border: 1px solid var(--border); width: 100%; box-shadow: var(--shadow-xl); }
 .login-subtitle { text-align: center; color: var(--text-muted); margin-bottom: 10px; font-size: 1rem; }
 .login-helper { text-align: center; color: var(--text-muted); font-size: 0.88rem; margin-bottom: 25px; padding: 10px 15px; background: var(--bg-light); border-radius: var(--radius-sm); border-left: 3px solid var(--gold); }
 .login-security { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.82rem; }
@@ -2238,7 +2242,7 @@ header[id] {
 }
 
 .curso-section {
-    background: white;
+    background: var(--bg-white);
     border-radius: var(--radius);
     padding: 40px;
     margin-bottom: 30px;
@@ -2406,7 +2410,7 @@ header[id] {
 }
 
 .stat-card {
-    background: white;
+    background: var(--bg-white);
     padding: 28px 24px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
@@ -2444,7 +2448,7 @@ header[id] {
 }
 
 .course-progress {
-    background: white;
+    background: var(--bg-white);
     padding: 18px 24px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
@@ -2480,7 +2484,7 @@ header[id] {
     width: 200px;
     max-width: 100%;
     height: 8px;
-    background: #e2e8f0;
+    background: var(--surface-2);
     border-radius: 99px;
     overflow: hidden;
 }
@@ -2522,7 +2526,7 @@ header[id] {
 
 /* Sidebar */
 .viewer-sidebar {
-    background: white;
+    background: var(--bg-white);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -2581,7 +2585,7 @@ header[id] {
 
 .viewer-progress-bar {
     height: 8px;
-    background: #dde4ef;
+    background: var(--surface-2);
     border-radius: 99px;
     overflow: hidden;
     margin-bottom: 5px;
@@ -2698,8 +2702,8 @@ header[id] {
     border-bottom: 1px solid var(--bg-light);
     transition: background var(--transition-fast);
 }
-.viewer-lesson-item:hover { background: #f0f7ff; }
-.viewer-lesson-item.active { background: #e8f0fe; }
+.viewer-lesson-item:hover { background: var(--surface-hover); }
+.viewer-lesson-item.active { background: var(--surface-active); }
 .viewer-lesson-item.done .lesson-name { color: var(--text-muted); }
 
 .lesson-check {
@@ -2783,7 +2787,7 @@ header[id] {
 }
 
 .btn-focus-mode {
-    background: white;
+    background: var(--bg-white);
     color: var(--primary);
     border: 1px solid var(--border);
     padding: 8px 14px;
@@ -2806,24 +2810,84 @@ header[id] {
     box-shadow: var(--focus-ring);
 }
 
+/* Modo foco: overlay em tela cheia por cima da navbar e do resto da página.
+   O CourseViewer ainda pede a tela cheia do navegador (Fullscreen API) para
+   cobrir a barra do sistema; se ela for negada, este overlay já cobre o site. */
 .viewer-layout.focus-mode {
+    position: fixed;
+    inset: 0;
+    z-index: 2000; /* navbar = 1000 */
     grid-template-columns: 1fr;
+    grid-template-rows: 100%; /* a coluna da aula é quem rola, não o overlay */
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--bg-light);
 }
+
+/* Trava a rolagem da página atrás do overlay. */
+body.focus-mode-open { overflow: hidden; }
 
 .viewer-layout.focus-mode .viewer-sidebar {
     display: none;
 }
 
+/* Em foco fica só o essencial: título, conteúdo e navegação entre aulas. */
+.viewer-layout.focus-mode .viewer-breadcrumb,
+.viewer-layout.focus-mode .viewer-lesson-desc,
+.viewer-layout.focus-mode .btn-mark-done,
+.viewer-layout.focus-mode .lesson-done-badge,
+.viewer-layout.focus-mode .viewer-lesson-counter,
+.viewer-layout.focus-mode .viewer-completion-box,
+.viewer-layout.focus-mode .assistant-fab,
+.viewer-layout.focus-mode .assistant-panel {
+    display: none;
+}
+
+.viewer-layout.focus-mode .viewer-main {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+}
+
 /* Sem a lista lateral sobra largura: o texto da aula pode respirar, mas não
-   tanto que a linha fique longa demais para ler. */
+   tanto que a linha fique longa demais para ler. As barras presas no topo e no
+   rodapé usam margem negativa para sangrar até as bordas da coluna. */
 .viewer-layout.focus-mode .viewer-content-wrap {
     max-width: 1100px;
+    padding: 0 40px;
+}
+
+/* Barra do topo: título da aula + sair do modo foco. */
+.viewer-layout.focus-mode .viewer-title-row {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    align-items: center;
+    gap: 16px;
+    margin: 0 -40px 24px;
+    padding: 16px 40px;
+    background: var(--bg-light);
+    border-bottom: 1px solid var(--border);
+}
+
+/* Rodapé: aula anterior / próxima aula sempre à mão, sem rolar até o fim. */
+.viewer-layout.focus-mode .viewer-nav-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    justify-content: space-between;
+    margin: 24px -40px 0;
+    padding: 14px 40px;
+    background: var(--bg-light);
 }
 
 /* Lesson content */
 .lesson-content {
-    background: white;
+    background: var(--bg-white);
     border-radius: var(--radius);
+    overflow: hidden; /* mídia larga (GIF em tela cheia) respeita o canto arredondado */
     padding: 30px;
     border: 1px solid var(--border);
     line-height: 1.8;
@@ -2844,11 +2908,18 @@ header[id] {
     margin: 16px 0;
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
+/* A imagem chega do editor com o tamanho escolhido lá (atributo `width`, ver
+   quillImageResize.js). Nenhuma largura é forçada aqui: qualquer regra CSS de
+   width venceria esse atributo e esticaria a imagem. O teto é a largura útil da
+   aula; o alinhamento vem das classes ql-align-* no parágrafo, por isso
+   inline-block em vez de block. Aula só com GIF é outro caso: ver
+   .lesson-content--gif. */
 .lesson-content img {
+    display: inline-block;
     max-width: 100%;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    margin: 16px auto;
+    height: auto;
+    vertical-align: middle;
+    border-radius: var(--radius-sm);
 }
 .lesson-content a { color: var(--primary-light); text-decoration: underline; }
 .lesson-content table { width: 100%; border-collapse: collapse; margin: 16px 0; }
@@ -2996,6 +3067,18 @@ header[id] {
         max-height: 340px;
     }
     .viewer-content-wrap { padding: 20px; }
+
+    /* Modo foco no celular: mesmas barras presas, com sangria de 16px. */
+    .viewer-layout.focus-mode .viewer-content-wrap { padding: 0 16px; }
+    .viewer-layout.focus-mode .viewer-title-row {
+        margin: 0 -16px 20px;
+        padding: 12px 16px;
+    }
+    .viewer-layout.focus-mode .viewer-title-row h1 { font-size: 1.25rem; }
+    .viewer-layout.focus-mode .viewer-nav-footer {
+        margin: 20px -16px 0;
+        padding: 12px 16px;
+    }
 }
 
 /* ============================================
@@ -3012,7 +3095,7 @@ header[id] {
 }
 
 .quiz-card {
-    background: white;
+    background: var(--bg-white);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-lg);
@@ -3066,7 +3149,7 @@ header[id] {
 }
 
 .quiz-hist-item {
-    background: white;
+    background: var(--bg-white);
     padding: 12px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
@@ -3093,7 +3176,7 @@ header[id] {
 
 /* Rules */
 .quiz-rules {
-    background: #f0f7ff;
+    background: var(--surface-hover);
     border-radius: var(--radius);
     padding: 20px;
     margin-bottom: 24px;
@@ -3128,14 +3211,14 @@ header[id] {
     display: flex;
     align-items: flex-start;
     gap: 16px;
-    background: #fff3cd;
+    background: var(--tint-warning);
     border: 1px solid #ffc107;
     border-radius: var(--radius);
     padding: 20px;
     margin-bottom: 24px;
 }
 
-.quiz-blocked.danger { background: #fce4ec; border-color: var(--danger); }
+.quiz-blocked.danger { background: var(--tint-danger); border-color: var(--danger); }
 .quiz-blocked.success { background: var(--success-light); border-color: var(--success); }
 
 .blocked-icon { font-size: 1.5rem; flex-shrink: 0; }
@@ -3183,7 +3266,7 @@ header[id] {
     align-items: center;
     justify-content: center;
     padding: 10px 22px;
-    background: white;
+    background: var(--bg-white);
     color: var(--primary);
     border: 2px solid var(--border);
     border-radius: var(--radius-sm);
@@ -3215,7 +3298,7 @@ header[id] {
 .quiz-progress-bar {
     flex: 1;
     height: 8px;
-    background: #e2e8f0;
+    background: var(--surface-2);
     border-radius: 99px;
     overflow: hidden;
 }
@@ -3260,17 +3343,17 @@ header[id] {
     transition: all var(--transition-fast);
     color: var(--text-main);
 }
-.quiz-option:hover:not(:disabled) { border-color: var(--primary); background: #f0f7ff; }
+.quiz-option:hover:not(:disabled) { border-color: var(--primary); background: var(--surface-hover); }
 .quiz-option:disabled { cursor: default; }
 .quiz-option.correct { background: var(--success-light); border-color: var(--success); color: #155724; }
-.quiz-option.wrong   { background: #fce4ec; border-color: var(--danger); color: #721c24; }
+.quiz-option.wrong   { background: var(--tint-danger); border-color: var(--danger); color: #721c24; }
 .quiz-option.dimmed  { opacity: 0.55; }
 
 .option-letter {
     width: 28px;
     height: 28px;
     border-radius: var(--radius-round);
-    background: white;
+    background: var(--bg-white);
     border: 2px solid var(--border);
     display: flex;
     align-items: center;
@@ -3290,7 +3373,7 @@ header[id] {
     font-size: 0.92rem;
 }
 .quiz-explanation.correct { background: var(--success-light); border-left: 4px solid var(--success); }
-.quiz-explanation.wrong   { background: #fce4ec; border-left: 4px solid var(--danger); }
+.quiz-explanation.wrong   { background: var(--tint-danger); border-left: 4px solid var(--danger); }
 .quiz-explanation strong  { display: block; margin-bottom: 6px; font-size: 0.95rem; }
 .quiz-explanation p { margin: 0; color: var(--text-main); }
 
@@ -3339,7 +3422,7 @@ header[id] {
 /* Opções na revisão são estáticas — mantêm a cor de acerto/erro no hover. */
 .quiz-review .quiz-option { cursor: default; }
 .quiz-review .quiz-option.correct:hover { background: var(--success-light); border-color: var(--success); }
-.quiz-review .quiz-option.wrong:hover   { background: #fce4ec; border-color: var(--danger); }
+.quiz-review .quiz-option.wrong:hover   { background: var(--tint-danger); border-color: var(--danger); }
 .quiz-review .quiz-option.dimmed:hover  { background: var(--bg-light); border-color: var(--border); }
 
 .btn-quiz-next {
@@ -3429,7 +3512,7 @@ header[id] {
 }
 
 .result-fail-msg {
-    background: #fff3cd;
+    background: var(--tint-warning);
     border: 1px solid var(--warning);
     color: #856404;
     padding: 16px 24px;
@@ -3438,7 +3521,7 @@ header[id] {
     font-size: 0.92rem;
 }
 .result-fail-msg.danger {
-    background: #fce4ec;
+    background: var(--tint-danger);
     border-color: var(--danger);
     color: #721c24;
 }
@@ -3462,7 +3545,7 @@ header[id] {
    ============================================ */
 
 .mop-panel {
-    background: white;
+    background: var(--bg-white);
     border-radius: var(--radius-lg);
     border: 1px solid #cbd5e1;
     border-top: 4px solid var(--primary);
@@ -3528,7 +3611,7 @@ header[id] {
 
 .mop-progress-bar {
     height: 12px;
-    background: #e2e8f0;
+    background: var(--surface-2);
     border-radius: 99px;
     overflow: hidden;
     margin-bottom: 5px;
@@ -3567,7 +3650,7 @@ header[id] {
 }
 .mop-status-card:hover { box-shadow: var(--shadow); }
 .mop-status-card.done   { border-color: var(--success); background: var(--success-light); }
-.mop-status-card.fail   { border-color: var(--danger);  background: #fce4ec; }
+.mop-status-card.fail   { border-color: var(--danger);  background: var(--tint-danger); }
 .mop-status-card.locked { border-color: var(--border);  opacity: 0.75; }
 
 .mop-status-icon { font-size: 1.5rem; }
@@ -3698,7 +3781,7 @@ header[id] {
 }
 
 .admin-stat-card {
-    background: white;
+    background: var(--bg-white);
     padding: 22px 20px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
@@ -3730,7 +3813,7 @@ header[id] {
 }
 
 .admin-table-container {
-    background: white;
+    background: var(--bg-white);
     border-radius: var(--radius);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-sm);
@@ -3787,7 +3870,7 @@ header[id] {
 }
 
 .admin-table tr:hover {
-    background: #f0f7ff;
+    background: var(--surface-hover);
 }
 
 /* Rolagem horizontal da tabela em telas estreitas — mantém o cabeçalho do
@@ -3816,7 +3899,7 @@ header[id] {
 }
 
 .admin-btn-edit {
-    background: #e3f2fd;
+    background: var(--tint-info);
     color: var(--primary);
 }
 
@@ -3826,7 +3909,7 @@ header[id] {
 }
 
 .admin-btn-delete {
-    background: #fce4ec;
+    background: var(--tint-danger);
     color: var(--danger);
 }
 
@@ -3836,7 +3919,7 @@ header[id] {
 }
 
 .admin-btn-view {
-    background: #e8f5e9;
+    background: var(--tint-success);
     color: var(--success);
 }
 
@@ -3869,7 +3952,7 @@ header[id] {
 .admin-nav {
     display: flex;
     gap: 5px;
-    background: white;
+    background: var(--bg-white);
     padding: 5px;
     border-radius: var(--radius);
     border: 1px solid var(--border);
@@ -4267,5 +4350,163 @@ header[id] {
     .carousel-dots,
     .home-carousel-dots {
         gap: 14px;
+    }
+}
+
+/* ============================================
+   TEMA ESCURO — ajustes que os tokens não cobrem
+   (gradientes pastel, cores fixas e superfícies que devem continuar claras)
+   ============================================ */
+
+/* Títulos: o azul da marca some no fundo escuro; o traço dourado segue lá. */
+:root[data-theme='dark'] h1,
+:root[data-theme='dark'] h2,
+:root[data-theme='dark'] h3,
+:root[data-theme='dark'] h4,
+:root[data-theme='dark'] h5,
+:root[data-theme='dark'] h6 {
+    color: var(--text-main);
+}
+
+:root[data-theme='dark'] .navbar {
+    border-bottom-color: var(--border);
+}
+
+/* Painéis "azul marinho" da marca: no tema escuro o --primary clareia (para
+   carregar texto branco nos botões), então estas áreas grandes voltam ao navy
+   em vez de virarem um bloco de azul elétrico. */
+:root[data-theme='dark'] .footer {
+    background: var(--bg-dark);
+}
+
+:root[data-theme='dark'] .methodology-cycle,
+:root[data-theme='dark'] .free-courses-cta,
+:root[data-theme='dark'] .curso-hero,
+:root[data-theme='dark'] .login-body {
+    background: linear-gradient(135deg, var(--dc-dark) 0%, #0d2a4a 100%);
+}
+
+/* Caixas pastel viram tintas translúcidas para não brigar com o texto claro. */
+:root[data-theme='dark'] .viewer-completion-box,
+:root[data-theme='dark'] .mop-status-card.pass {
+    background: var(--tint-success);
+    border-color: var(--success);
+    color: var(--text-main);
+}
+
+:root[data-theme='dark'] .auth-hint,
+:root[data-theme='dark'] .next-step-item:hover {
+    background: var(--tint-info);
+}
+
+:root[data-theme='dark'] .catalog-internal-note {
+    background: var(--tint-warning);
+    border-color: var(--warning);
+    color: var(--text-main);
+}
+
+:root[data-theme='dark'] .assistant-msg--erro {
+    background: var(--tint-danger);
+    border-color: var(--danger);
+}
+
+:root[data-theme='dark'] .quiz-option.wrong,
+:root[data-theme='dark'] .quiz-option.correct {
+    color: var(--text-main);
+}
+
+/* O certificado é papel: continua claro mesmo no tema escuro, senão a impressão
+   e o PDF saem com fundo preto. */
+:root[data-theme='dark'] .certificate {
+    background: #ffffff;
+    color: #0f172a;
+}
+:root[data-theme='dark'] .certificate h1,
+:root[data-theme='dark'] .certificate h2,
+:root[data-theme='dark'] .certificate h3,
+:root[data-theme='dark'] .cert-student,
+:root[data-theme='dark'] .cert-course {
+    color: #003366;
+}
+:root[data-theme='dark'] .cert-lead,
+:root[data-theme='dark'] .cert-details,
+:root[data-theme='dark'] .cert-validation {
+    color: #475569;
+}
+
+/* O editor de aulas (Quill) é a folha em branco do admin — mantém fundo claro
+   para o conteúdo ser escrito como o aluno vê no material impresso. */
+:root[data-theme='dark'] .ql-toolbar,
+:root[data-theme='dark'] .ql-container,
+:root[data-theme='dark'] .ql-editor {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+/* ============================================
+   AULA SÓ COM GIF — o cartão vira player
+   Fica depois das media queries de propósito: senão o padding do mobile
+   (.lesson-content { padding: 20px 14px }) voltaria a criar recuo.
+   Detecção em CourseViewer.jsx (isGifOnlyHtml).
+   ============================================ */
+
+.lesson-content--gif {
+    /* Troque para `cover` se preferir preencher a área toda (corta as bordas). */
+    --lesson-media-fit: contain;
+    /* Altura útil do player. No modo foco ela é recalculada mais abaixo. */
+    --lesson-media-height: clamp(300px, 70vh, 900px);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: none;
+    height: var(--lesson-media-height);
+    padding: 0;
+    overflow: hidden;
+    background: var(--bg-dark); /* fundo do player preenche o que sobrar */
+}
+
+/* Os wrappers do Quill (<p>, <div>) saem do layout: o GIF vira o único filho
+   posicionável, sem herdar margem de parágrafo. */
+.lesson-content--gif .lesson-html {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+.lesson-content--gif .lesson-html > * {
+    display: contents;
+}
+
+.lesson-content--gif img {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    object-fit: var(--lesson-media-fit);
+    object-position: center;
+}
+
+/* No modo foco o player ocupa a altura que sobra entre a barra do título e a
+   navegação de aulas. */
+.viewer-layout.focus-mode .lesson-content--gif {
+    --lesson-media-height: max(300px, calc(100dvh - 210px));
+}
+
+/* ...e a largura toda: o limite de leitura (max-width) existe para linha de
+   texto, não para mídia. Só a coluna que contém o player perde o limite. */
+.viewer-layout.focus-mode .viewer-content-wrap:has(.lesson-content--gif) {
+    max-width: none;
+}
+
+@media (max-width: 900px) {
+    .lesson-content--gif {
+        --lesson-media-height: clamp(240px, 60vh, 640px);
     }
 }

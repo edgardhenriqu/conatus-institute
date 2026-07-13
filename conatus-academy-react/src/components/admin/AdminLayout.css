@@ -1,7 +1,38 @@
 .admin-layout {
   display: flex;
   min-height: 100vh;
-  background: #f1f5f9;
+  background: var(--bg-light);
+}
+
+/* A barra lateral é sempre escura: o alternador de tema fica translúcido nela,
+   em vez de virar um círculo branco no tema claro. */
+.admin-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.admin-brand-row .admin-brand {
+  flex: 1;
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.admin-brand-row .theme-toggle {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #94a3b8;
+}
+
+.admin-brand-row .theme-toggle:hover {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: #38bdf8;
+  color: #f1f5f9;
 }
 
 .admin-sidebar {

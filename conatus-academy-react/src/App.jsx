@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './components/ui/Toast';
 import { Header } from './components/layout/Header';
@@ -64,6 +65,7 @@ function MainLayout() {
 function App() {
   return (
     <ErrorBoundary>
+    <ThemeProvider>
     <AuthProvider>
       <ToastProvider>
       <Router>
@@ -149,6 +151,7 @@ function App() {
       </Router>
       </ToastProvider>
     </AuthProvider>
+    </ThemeProvider>
     </ErrorBoundary>
   );
 }

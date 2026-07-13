@@ -10,6 +10,19 @@
          e desativar a tradução evita esse crash. -->
     <meta name="google" content="notranslate" />
     <title>Conatus Institute</title>
+    <!-- Aplica o tema antes do React montar: sem isto o site pisca branco por um
+         frame antes do modo escuro entrar. Mesma lógica do ThemeContext. -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('conatus-theme');
+          var theme = (saved === 'light' || saved === 'dark')
+            ? saved
+            : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) { /* sem localStorage: fica no tema claro */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

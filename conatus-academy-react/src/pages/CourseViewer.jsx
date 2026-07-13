@@ -39,6 +39,32 @@ function toEmbedUrl(url) {
   return null;
 }
 
+const isGifSrc = (src = '') =>
+  /^data:image\/gif[;,]/i.test(src) || /\.gif(?:[?#]|$)/i.test(src);
+
+/**
+ * A aula é "só um GIF"? Verdadeiro quando o HTML do conteúdo tem exatamente uma
+ * imagem .gif e nada mais que apareça na tela — sem texto, links, listas, tabelas
+ * ou outra mídia. É o que libera o player em tela cheia (.lesson-content--gif).
+ * Imagens comuns, PNG/JPG, vídeo e PDF continuam no layout normal.
+ */
+function isGifOnlyHtml(html) {
+  if (!html) return false;
+
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const body = doc.body;
+
+  if (body.textContent.trim()) return false;                       // sobrou texto
+  if (body.querySelector('a, video, iframe, table, ul, ol, blockquote, hr, input, button')) {
+    return false;                                                  // sobrou outro elemento
+  }
+
+  const imgs = body.querySelectorAll('img');
+  if (imgs.length !== 1) return false;
+
+  return isGifSrc(imgs[0].getAttribute('src') || '');
+}
+
 export function CourseViewer() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -56,16 +82,45 @@ export function CourseViewer() {
   const [accessDenied, setAccessDenied]     = useState(false);
   const [deniedMsg, setDeniedMsg]           = useState('');
   const [loadError, setLoadError]           = useState('');
-  const [focusMode, setFocusMode]           = useState(false); // esconde a lista de aulas
+  const [focusMode, setFocusMode]           = useState(false); // aula em tela cheia
 
-  // Esc sai do modo foco: sem isso o aluno que expandiu com o teclado fica sem
-  // saída óbvia, já que a lista de aulas some da tela.
+  // Modo foco = overlay em tela cheia. Pedimos também a tela cheia do navegador
+  // para cobrir a barra do sistema; se o navegador negar, o overlay sozinho já
+  // cobre a navbar e o resto da página.
+  const toggleFocusMode = useCallback(() => {
+    const next = !focusMode;
+    setFocusMode(next);
+    if (next) {
+      document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch(() => {});
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen?.()?.catch(() => {});
+    }
+  }, [focusMode]);
+
+  // Esc sai do modo foco. Dentro da tela cheia o Esc é capturado pelo navegador
+  // (nem chega no keydown), por isso também ouvimos o fullscreenchange — assim
+  // sair da tela cheia por Esc/F11 sai do modo foco junto.
   useEffect(() => {
     if (!focusMode) return undefined;
     const onKeyDown = (e) => { if (e.key === 'Escape') setFocusMode(false); };
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) setFocusMode(false);
+    };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.body.classList.add('focus-mode-open');
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.body.classList.remove('focus-mode-open');
+    };
   }, [focusMode]);
+
+  // Sair da página (link do rodapé, avaliação…) não pode deixar o navegador preso
+  // em tela cheia.
+  useEffect(() => () => {
+    if (document.fullscreenElement) document.exitFullscreen?.()?.catch(() => {});
+  }, []);
 
   // Chave de progresso da aula: MOP usa o id estático; DB usa "aula-<id>"
   const lessonKey = useCallback(
@@ -98,6 +153,20 @@ export function CourseViewer() {
   const isCurrentDone = useMemo(() =>
     activeLesson ? !!lessonProgress[lessonKey(activeLesson)] : false,
     [activeLesson, lessonProgress, lessonKey]);
+
+  // normalizeQuillHtml: corrige aulas salvas com &nbsp; no lugar de espaços
+  const lessonHtml = useMemo(() => {
+    const raw = activeLesson?.content || activeLesson?.conteudo;
+    return raw ? normalizeQuillHtml(raw) : '';
+  }, [activeLesson]);
+
+  // Aula que é só um GIF vira player: o GIF ocupa toda a área, sem padding nem
+  // margem. Vídeo ou material anexado descaracterizam o caso — aí é layout normal.
+  const isGifOnly = useMemo(() => {
+    if (!activeLesson) return false;
+    const hasVideo = activeLesson.tipo_conteudo === 'video' && !!activeLesson.video_url;
+    return !hasVideo && !activeLesson.material_url && isGifOnlyHtml(lessonHtml);
+  }, [activeLesson, lessonHtml]);
 
   /* ── Carregamento ─────────────────────────────────────────────── */
 
@@ -281,7 +350,9 @@ export function CourseViewer() {
 
       {/* ── Sidebar ─────────────────────────────────────────────── */}
       {/* No modo foco ela é ocultada por CSS (display:none), o que também a
-          tira da ordem de tabulação, mas preserva a rolagem e o estado. */}
+          tira da ordem de tabulação, mas preserva a rolagem e o estado.
+          O mesmo vale para breadcrumb, descrição, "marcar como concluída" e
+          o box de conclusão: em foco fica só título, conteúdo e navegação. */}
       <div className="viewer-sidebar">
         <div className="viewer-sidebar-header">
           <Link to={`/cursos/${id}`} className="viewer-back-link">← Detalhes do Curso</Link>
@@ -364,11 +435,11 @@ export function CourseViewer() {
               <button
                 type="button"
                 className="btn-focus-mode"
-                onClick={() => setFocusMode(v => !v)}
+                onClick={toggleFocusMode}
                 aria-pressed={focusMode}
-                title={focusMode ? 'Sair do modo foco (Esc)' : 'Expandir a aula e ocultar a lista'}
+                title={focusMode ? 'Sair do modo foco (Esc)' : 'Expandir a aula em tela cheia'}
               >
-                {focusMode ? '⤡ Sair do foco' : '⛶ Expandir aula'}
+                {focusMode ? '⤡ Sair do modo foco' : '⛶ Expandir aula'}
               </button>
               {isCurrentDone
                 ? <span className="lesson-done-badge">✓ Concluída</span>
@@ -382,14 +453,17 @@ export function CourseViewer() {
           </div>
 
           {activeLesson.descricao && (
-            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '0.97rem' }}>
+            <p className="viewer-lesson-desc"
+              style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '0.97rem' }}>
               {activeLesson.descricao}
               {activeLesson.duracao_minutos ? ` · ⏱ ${activeLesson.duracao_minutos} min` : ''}
             </p>
           )}
 
-          {/* Cartão da aula: vídeo + material + texto, tudo dentro da caixa */}
-          <div className="lesson-content">
+          {/* Cartão da aula: vídeo + material + texto, tudo dentro da caixa.
+              Quando a aula é só um GIF, o cartão vira player: sem padding, o GIF
+              ocupa 100% da área e o fundo preenche o resto. */}
+          <div className={`lesson-content ${isGifOnly ? 'lesson-content--gif' : ''}`}>
             {activeLesson.tipo_conteudo === 'video' && activeLesson.video_url && (
               <div className="lesson-video">
                 {embedUrl ? (
@@ -414,11 +488,8 @@ export function CourseViewer() {
               </a>
             )}
 
-            {(activeLesson.content || activeLesson.conteudo) && (
-              // normalizeQuillHtml: corrige aulas salvas com &nbsp; no lugar de espaços
-              <div className="lesson-html" dangerouslySetInnerHTML={{
-                __html: normalizeQuillHtml(activeLesson.content || activeLesson.conteudo),
-              }} />
+            {lessonHtml && (
+              <div className="lesson-html" dangerouslySetInnerHTML={{ __html: lessonHtml }} />
             )}
 
             {!activeLesson.content && !activeLesson.conteudo

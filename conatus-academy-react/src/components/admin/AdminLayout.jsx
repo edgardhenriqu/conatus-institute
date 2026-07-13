@@ -1,5 +1,6 @@
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { ThemeToggle } from '../ui/ThemeToggle';
 import './AdminLayout.css';
 
 const adminLinks = [
@@ -26,7 +27,11 @@ export default function AdminLayout() {
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <h2 className="admin-brand">{brandLabel}</h2>
+        <div className="admin-brand-row">
+          <h2 className="admin-brand">{brandLabel}</h2>
+          {/* O painel não tem a navbar do site — o alternador de tema vem junto. */}
+          <ThemeToggle />
+        </div>
         <nav className="admin-nav">
           {links.map(l => (
             <NavLink

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
+import { ThemeToggle } from '../ui/ThemeToggle';
 
 export function Header() {
   const { user, logout, isAdmin, isStaff } = useAuth();
@@ -24,6 +25,8 @@ export function Header() {
         </ul>
 
         <div className="nav-actions">
+          <ThemeToggle />
+
           {/* New Free Courses Button */}
           <Button variant="free" to="/cursos#gratuitos" onClick={closeMenu} className="hidden-mobile">
             <span role="img" aria-label="star">⭐</span> Cursos Gratuitos
