@@ -2833,11 +2833,12 @@ body.focus-mode-open { overflow: hidden; }
     display: none;
 }
 
-/* Em foco fica só o essencial: título, conteúdo e navegação entre aulas. */
+/* Em foco fica só o essencial: título, conteúdo e navegação entre aulas.
+   O "Marcar como Concluída" (e o selo de concluída) SEGUEM VISÍVEIS na barra do
+   topo: é a ação que o aluno vai querer justamente ao terminar de ler a aula, e
+   escondê-la obrigava a sair do modo foco só para clicar nela. */
 .viewer-layout.focus-mode .viewer-breadcrumb,
 .viewer-layout.focus-mode .viewer-lesson-desc,
-.viewer-layout.focus-mode .btn-mark-done,
-.viewer-layout.focus-mode .lesson-done-badge,
 .viewer-layout.focus-mode .viewer-lesson-counter,
 .viewer-layout.focus-mode .viewer-completion-box,
 .viewer-layout.focus-mode .assistant-fab,
@@ -2859,7 +2860,7 @@ body.focus-mode-open { overflow: hidden; }
     padding: 0 40px;
 }
 
-/* Barra do topo: título da aula + sair do modo foco. */
+/* Barra do topo: título da aula, sair do modo foco e concluir a aula. */
 .viewer-layout.focus-mode .viewer-title-row {
     position: sticky;
     top: 0;
