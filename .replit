@@ -48,6 +48,11 @@ OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free,openai/gpt-oss-120b:f
 ELEVENLABS_VOICE_ID = "HXmVs82qUTKZy5PrSBjo"
 TTS_PROVIDER = "elevenlabs"
 PORT = "5000"
+MAIL_FROM = "suporte.conatus.institute@gmail.com"
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = "465"
+SMTP_SECURE = "true"
+SMTP_USER = "suporte.conatus.institute@gmail.com"
 
 [userenv.shared]
 
