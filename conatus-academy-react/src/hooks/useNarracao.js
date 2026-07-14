@@ -1,118 +1,125 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useMotorAudio } from './narracao/motorAudio';
+import { useMotorVozNavegador } from './narracao/motorVozNavegador';
 
 /**
- * Motor de fala da narração dos blocos marcados com o megafone.
+ * Comando da narração dos blocos marcados com o megafone.
  *
  * Mora num hook, e não dentro do player, porque DOIS lugares comandam a mesma
  * voz: a barra de narração e a própria imagem do megafone dentro do texto da
  * aula, que o aluno clica para ouvir aquele trecho. Um motor por componente
  * faria duas vozes falarem juntas.
  *
- * A voz é a do navegador (Web Speech API): nenhum áudio é gerado ou trafegado —
- * do servidor vem só o ROTEIRO (texto reescrito por LLM, ver services/narracao.js).
+ * QUEM FALA
+ * A voz oficial é a do ElevenLabs: o áudio é gravado no servidor quando a aula é
+ * salva, e todo aluno ouve exatamente a mesma voz (motorAudio.js). Quando a aula
+ * não tem áudio gravado — ou quando a faixa não toca no navegador do aluno — a
+ * narração cai na voz do sistema dele (motorVozNavegador.js), que era como isso
+ * funcionava antes. Melhor uma voz robótica do que aula que não dá para concluir.
  *
- * Falamos FRASE A FRASE, não o roteiro inteiro:
- *   1. o Chrome corta utterances longas (~15s) no meio;
- *   2. o respiro entre frases é o que dá o ritmo de instrutor — a Web Speech não
- *      tem SSML, então a pausa é feita aqui, no relógio.
- *
- * A conclusão exige TODOS os trechos ouvidos até o fim (`tudoOuvido`) — é o que
- * libera o botão "Marcar como Concluída".
+ * Este hook não fala: ele guarda O QUE já foi ouvido e manda o motor da vez tocar
+ * o trecho certo. A conclusão exige TODOS os trechos ouvidos até o fim
+ * (`tudoOuvido`) — é o que libera o botão "Marcar como Concluída".
  */
-
-const PAUSA_MS = 350;         // respiro entre frases
-const RITMO = 0.95;           // ~140-160 palavras/min nas vozes pt-BR usuais
-const MAX_CHARS_FRASE = 220;  // acima disso o Chrome tende a cortar a fala
-
-function emFrases(texto) {
-  const frases = texto
-    .split(/(?<=[.!?:;])\s+/)
-    .map((f) => f.trim())
-    .filter(Boolean);
-
-  // Frase comprida (o LLM às vezes emenda ideias): corta na vírgula mais próxima.
-  const saida = [];
-  for (const frase of frases) {
-    if (frase.length <= MAX_CHARS_FRASE) { saida.push(frase); continue; }
-    let resto = frase;
-    while (resto.length > MAX_CHARS_FRASE) {
-      const janela = resto.slice(0, MAX_CHARS_FRASE);
-      const corte = Math.max(janela.lastIndexOf(', '), janela.lastIndexOf(' — '));
-      const fim = corte > MAX_CHARS_FRASE * 0.4 ? corte + 1 : janela.lastIndexOf(' ');
-      saida.push(resto.slice(0, fim).trim());
-      resto = resto.slice(fim).trim();
-    }
-    if (resto) saida.push(resto);
-  }
-  return saida;
-}
-
-/** Voz em português do Brasil, se o sistema do aluno tiver alguma. */
-function vozPtBr() {
-  const vozes = window.speechSynthesis.getVoices();
-  return (
-    vozes.find((v) => v.lang?.replace('_', '-') === 'pt-BR') ||
-    vozes.find((v) => v.lang?.toLowerCase().startsWith('pt')) ||
-    null
-  );
-}
-
-export function useNarracao({ narracoes, aulaId, onConcluir }) {
-  const suportado = typeof window !== 'undefined' && 'speechSynthesis' in window;
-
-  // Um array de frases por trecho narrado, na ordem do conteúdo da aula.
+export function useNarracao({ narracoes, aulaId, cursoId, onConcluir }) {
   const blocos = useMemo(
-    () => [...(narracoes || [])]
-      .sort((a, b) => a.ordem - b.ordem)
-      .map((n) => emFrases(n.roteiro)),
+    () => [...(narracoes || [])].sort((a, b) => a.ordem - b.ordem),
     [narracoes],
   );
-
+  const roteiros = useMemo(() => blocos.map((n) => n.roteiro), [blocos]);
   const totalBlocos = blocos.length;
 
   const [estado, setEstado] = useState('parado');   // parado | falando | pausado
   const [blocoAtivo, setBlocoAtivo] = useState(null);
-  const [fraseAtual, setFraseAtual] = useState(0);
+  const [fracao, setFracao] = useState(0);          // andamento dentro do trecho
   const [ouvidos, setOuvidos] = useState(() => new Set());
-  const [voz, setVoz] = useState(null);
+  const [audioFalhou, setAudioFalhou] = useState(false);
 
-  const estadoRef = useRef('parado');
-  const timerRef = useRef(null);
-  const retomarRef = useRef(null);   // { bloco, frase, seguir } para o "Retomar"
+  // Lidos de dentro dos callbacks entregues aos motores, que são criados uma vez
+  // e capturariam valores velhos se lessem as variáveis de render. O espelho é
+  // feito em efeito, e não durante o render: escrever ref no render é proibido
+  // pelo React Compiler (e os efeitos rodam antes de qualquer clique do aluno).
+  const seguirRef = useRef(false);        // encadear o próximo trecho ao terminar
+  const totalRef = useRef(0);
+  const blocoRef = useRef(null);
+  const motorRef = useRef(null);
+  const vozRef = useRef(null);
 
   const tudoOuvido = totalBlocos > 0 && ouvidos.size === totalBlocos;
 
-  // As vozes chegam de forma assíncrona no Chrome: sem esperar o evento, a
-  // primeira fala sairia com a voz padrão do sistema (às vezes em inglês).
-  useEffect(() => {
-    if (!suportado) return;
-    const carregar = () => setVoz(vozPtBr());
-    carregar();
-    window.speechSynthesis.addEventListener('voiceschanged', carregar);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', carregar);
-  }, [suportado]);
+  const aoAndar = useCallback((f) => setFracao(f), []);
 
-  const calar = useCallback(() => {
-    clearTimeout(timerRef.current);
-    if (suportado) window.speechSynthesis.cancel();
-  }, [suportado]);
+  const aoTerminar = useCallback((b) => {
+    setOuvidos((o) => new Set(o).add(b));
+    setFracao(0);
+
+    const proximo = b + 1;
+    if (seguirRef.current && proximo < totalRef.current) {
+      setBlocoAtivo(proximo);
+      setEstado('falando');
+      motorRef.current?.tocar(proximo);
+      return;
+    }
+
+    setEstado('parado');
+    setBlocoAtivo(null);
+  }, []);
+
+  // O áudio pode falhar no meio da aula (rede caiu, faixa corrompida, navegador
+  // recusou o formato). Em vez de deixar o aluno travado, passamos o comando para
+  // a voz do navegador e retomamos o MESMO trecho do começo — daqui em diante a
+  // aula inteira é falada por ela, para a voz não ficar trocando a cada trecho.
+  const aoFalhar = useCallback((motivo) => {
+    console.warn(`Narração: áudio indisponível (${motivo}). Usando a voz do navegador.`);
+    setAudioFalhou(true);
+
+    const b = blocoRef.current;
+
+    // Nem áudio nem Web Speech: paramos. O efeito de `suportado` mais abaixo
+    // libera a conclusão da aula, para o aluno não ficar preso nela.
+    if (b === null || !vozRef.current?.disponivel) {
+      setEstado('parado');
+      setBlocoAtivo(null);
+      return;
+    }
+
+    setEstado('falando');
+    vozRef.current.tocar(b);
+  }, []);
+
+  const motorAudio = useMotorAudio({
+    cursoId, aulaId, narracoes: blocos, aoTerminar, aoAndar, aoFalhar,
+  });
+  const motorVoz = useMotorVozNavegador({ roteiros, aoTerminar, aoAndar });
+
+  const motor = motorAudio.disponivel && !audioFalhou ? motorAudio : motorVoz;
+  const suportado = motor.disponivel;
+
+  useEffect(() => {
+    motorRef.current = motor;
+    vozRef.current = motorVoz;
+    totalRef.current = totalBlocos;
+    blocoRef.current = blocoAtivo;
+  }, [motor, motorVoz, totalBlocos, blocoAtivo]);
 
   // Trocar de aula tem de calar a voz e zerar o que foi ouvido: sem isso a
   // narração da aula anterior continuaria falando por cima da nova, e a aula
   // nova já nasceria "ouvida".
   useEffect(() => {
+    const calar = () => motorRef.current?.parar();
     calar();
-    estadoRef.current = 'parado';
+    seguirRef.current = false;
     setEstado('parado');
     setBlocoAtivo(null);
-    setFraseAtual(0);
+    setFracao(0);
     setOuvidos(new Set());
+    setAudioFalhou(false);
     return calar;
-  }, [aulaId, calar]);
+  }, [aulaId]);
 
-  // Sem Web Speech (navegador antigo, navegadores embutidos em apps) o aluno não
-  // teria como ouvir — e travar a conclusão o deixaria preso na aula para sempre.
-  // Liberamos com aviso: a trava é pedagógica, não pode virar uma armadilha.
+  // Sem áudio gravado E sem Web Speech (navegador antigo, navegadores embutidos
+  // em apps) o aluno não teria como ouvir — e travar a conclusão o deixaria preso
+  // na aula para sempre. Liberamos: a trava é pedagógica, não pode virar armadilha.
   useEffect(() => {
     if (!suportado && totalBlocos > 0) onConcluir?.();
   }, [suportado, totalBlocos, onConcluir]);
@@ -121,103 +128,57 @@ export function useNarracao({ narracoes, aulaId, onConcluir }) {
     if (tudoOuvido) onConcluir?.();
   }, [tudoOuvido, onConcluir]);
 
-  /** Fala a frase `f` do trecho `b`; ao acabar o trecho, segue para o próximo se `seguir`. */
-  const falar = useCallback((b, f, seguir) => {
-    const frases = blocos[b];
-    if (!frases) return;
-
-    if (f >= frases.length) {                     // trecho terminou
-      setOuvidos((o) => new Set(o).add(b));
-      const proximo = b + 1;
-      if (seguir && proximo < blocos.length) {
-        setBlocoAtivo(proximo);
-        setFraseAtual(0);
-        timerRef.current = setTimeout(() => falar(proximo, 0, true), PAUSA_MS * 2);
-        return;
-      }
-      estadoRef.current = 'parado';
-      setEstado('parado');
-      setBlocoAtivo(null);
-      retomarRef.current = null;
-      return;
-    }
-
-    retomarRef.current = { bloco: b, frase: f, seguir };
-    setBlocoAtivo(b);
-    setFraseAtual(f);
-
-    const fala = new SpeechSynthesisUtterance(frases[f]);
-    fala.lang = 'pt-BR';
-    fala.rate = RITMO;
-    if (voz) fala.voice = voz;
-
-    const avancar = () => {
-      if (estadoRef.current !== 'falando') return;   // pausado/parado no meio
-      timerRef.current = setTimeout(() => falar(b, f + 1, seguir), PAUSA_MS);
-    };
-
-    fala.onend = avancar;
-
-    // 'interrupted'/'canceled' são o nosso próprio cancel() — não são falha.
-    fala.onerror = (e) => {
-      if (e.error === 'interrupted' || e.error === 'canceled') return;
-      console.warn('Narração: falha na frase', f, 'do trecho', b, e.error);
-      avancar();                                     // pula a frase problemática
-    };
-
-    window.speechSynthesis.speak(fala);
-  }, [blocos, voz]);
-
   /** Ouve um trecho específico (o clique na imagem do megafone). */
   const tocarBloco = useCallback((b) => {
-    if (!suportado || !blocos[b]) return;
-    calar();
-    estadoRef.current = 'falando';
+    if (!suportado || b >= totalBlocos) return;
+    motor.parar();
+    seguirRef.current = false;
+    setBlocoAtivo(b);
+    setFracao(0);
     setEstado('falando');
-    falar(b, 0, false);
-  }, [suportado, blocos, calar, falar]);
+    motor.tocar(b);
+  }, [suportado, totalBlocos, motor]);
 
   /** Ouve tudo, do primeiro trecho ainda não ouvido em diante. */
   const tocarTudo = useCallback(() => {
     if (!suportado || !totalBlocos) return;
-    calar();
-    const inicio = blocos.findIndex((_, i) => !ouvidos.has(i));
-    estadoRef.current = 'falando';
+    const naoOuvido = [...Array(totalBlocos).keys()].find((i) => !ouvidos.has(i));
+    const inicio = naoOuvido ?? 0;
+
+    motor.parar();
+    seguirRef.current = true;
+    setBlocoAtivo(inicio);
+    setFracao(0);
     setEstado('falando');
-    falar(inicio === -1 ? 0 : inicio, 0, true);
-  }, [suportado, totalBlocos, blocos, ouvidos, calar, falar]);
+    motor.tocar(inicio);
+  }, [suportado, totalBlocos, ouvidos, motor]);
 
   const pausar = useCallback(() => {
-    estadoRef.current = 'pausado';
     setEstado('pausado');
-    calar();          // retomamos pela frase inteira, não pelo meio dela
-  }, [calar]);
+    motor.pausar();
+  }, [motor]);
 
   const retomar = useCallback(() => {
-    const ponto = retomarRef.current;
-    if (!ponto) return tocarTudo();
-    estadoRef.current = 'falando';
+    if (blocoAtivo === null) return tocarTudo();
     setEstado('falando');
-    falar(ponto.bloco, ponto.frase, ponto.seguir);
-  }, [falar, tocarTudo]);
+    motor.retomar();
+  }, [blocoAtivo, motor, tocarTudo]);
 
   /** Encerra a narração e some com o mini-player. O que já foi ouvido continua ouvido. */
   const parar = useCallback(() => {
-    calar();
-    estadoRef.current = 'parado';
+    motor.parar();
+    seguirRef.current = false;
     setEstado('parado');
     setBlocoAtivo(null);
-    retomarRef.current = null;
-  }, [calar]);
+    setFracao(0);
+  }, [motor]);
 
   // Progresso geral: trechos inteiros ouvidos + o quanto já andou no atual.
   const progresso = useMemo(() => {
     if (!totalBlocos) return 0;
-    const noAtual = blocoAtivo !== null && !ouvidos.has(blocoAtivo) && blocos[blocoAtivo]?.length
-      ? fraseAtual / blocos[blocoAtivo].length
-      : 0;
+    const noAtual = blocoAtivo !== null && !ouvidos.has(blocoAtivo) ? fracao : 0;
     return Math.min(100, Math.round(((ouvidos.size + noAtual) / totalBlocos) * 100));
-  }, [totalBlocos, ouvidos, blocoAtivo, fraseAtual, blocos]);
+  }, [totalBlocos, ouvidos, blocoAtivo, fracao]);
 
   return {
     suportado, estado, blocoAtivo, ouvidos, tudoOuvido, progresso,

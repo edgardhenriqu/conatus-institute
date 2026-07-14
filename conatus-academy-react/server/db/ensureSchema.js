@@ -242,8 +242,8 @@ const STATEMENTS = [
 
   // ── Narração dos blocos marcados com 📢 ────────────────────────────────────
   // Cada bloco do conteúdo da aula que contém o megafone vira um roteiro falado,
-  // reescrito por LLM ao salvar a aula (ver services/narracao.js). Guardamos o
-  // roteiro, não áudio: quem fala é o navegador do aluno (Web Speech API).
+  // reescrito por LLM ao salvar a aula, e o roteiro vira áudio sintetizado
+  // (ver services/narracao.js e services/tts/).
   // origem_hash é o hash do texto do bloco — se o instrutor não mexeu naquele
   // bloco, não regeramos o roteiro (economiza chamada de LLM a cada salvamento).
   `CREATE TABLE IF NOT EXISTS aula_narracoes (
@@ -260,6 +260,18 @@ const STATEMENTS = [
   // src da imagem do megafone que dispara este trecho. É por ele que o player
   // acha o <img> no HTML já renderizado e o transforma em botão de ouvir.
   `ALTER TABLE aula_narracoes ADD COLUMN IF NOT EXISTS img_src TEXT`,
+
+  // Áudio do roteiro (MP3). Fica no banco (bytea), como os uploads de imagem: o
+  // disco do Replit é efêmero e não é compartilhado, e um áudio perdido no
+  // redeploy significa aula que o aluno não consegue concluir.
+  // audio_voz guarda "provedor:modelo:voz:formato" — trocar qualquer um deles no
+  // .env invalida os áudios gravados, e eles são refeitos no próximo salvamento
+  // da aula (ou de uma vez, por scripts/gerarAudioNarracoes.js).
+  // Sem provedor de voz configurado as três colunas ficam nulas e o player cai na
+  // voz do navegador, que era como a narração funcionava antes.
+  `ALTER TABLE aula_narracoes ADD COLUMN IF NOT EXISTS audio BYTEA`,
+  `ALTER TABLE aula_narracoes ADD COLUMN IF NOT EXISTS audio_mime TEXT`,
+  `ALTER TABLE aula_narracoes ADD COLUMN IF NOT EXISTS audio_voz TEXT`,
 ];
 
 async function ensureSchema() {

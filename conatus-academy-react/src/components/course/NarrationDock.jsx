@@ -8,7 +8,8 @@ import megafoneImg from '../../assets/megafone-narracao.png';
  * transitório — só aparece enquanto há voz tocando ou pausada, para o aluno
  * poder pausar, retomar e ver o progresso sem perder o conteúdo de vista.
  *
- * A voz mora no hook useNarracao; aqui é só interface.
+ * A voz mora no hook useNarracao (ElevenLabs, com a voz do navegador como plano
+ * B); aqui é só interface.
  */
 export function NarrationDock({ narracao }) {
   const {

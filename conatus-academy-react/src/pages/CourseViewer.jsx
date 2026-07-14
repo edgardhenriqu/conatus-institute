@@ -105,6 +105,7 @@ export function CourseViewer() {
   const narracao = useNarracao({
     narracoes,
     aulaId: activeLesson?.id,
+    cursoId: id,                      // a faixa de áudio é buscada por curso/aula
     onConcluir: handleNarracaoConcluida,
   });
 

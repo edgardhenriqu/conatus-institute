@@ -1,4 +1,4 @@
-import { API_URL, request } from './httpClient';
+import { API_URL, request, requestBlob } from './httpClient';
 
 export const api = {
   // Auth
@@ -94,6 +94,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ aulas }),
     }),
+
+  // Áudio de um trecho narrado (voz do ElevenLabs, gravada ao salvar a aula).
+  // Vem como blob porque a rota é protegida — ver httpClient.requestBlob.
+  getNarracaoAudio: async (cursoId, aulaId, ordem) =>
+    requestBlob(`${API_URL}/cursos/${cursoId}/aulas/${aulaId}/narracao/${ordem}/audio`),
 
   // Assistente RAG: tira dúvidas do aluno com base no conteúdo do curso.
   perguntarAssistente: async (cursoId, pergunta) =>

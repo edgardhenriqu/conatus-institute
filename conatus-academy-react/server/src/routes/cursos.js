@@ -231,8 +231,12 @@ router.get('/:cursoId/conteudo', authMiddleware, async (req, res) => {
     // Roteiros de narração dos blocos marcados com 📢 (services/narracao.js).
     // Vêm junto com o conteúdo, e não numa rota à parte, porque o player precisa
     // deles no mesmo instante em que monta a aula — é texto, cabe no payload.
+    //
+    // O ÁUDIO (ElevenLabs) não vem aqui: são centenas de KB por trecho, e o aluno
+    // pode nem clicar no megafone. Mandamos só `temAudio`, e o player busca cada
+    // faixa na rota abaixo. Sem áudio, ele fala o roteiro com a voz do navegador.
     const narracoes = await pool.query(
-      `SELECT n.aula_id, n.ordem, n.roteiro, n.img_src
+      `SELECT n.aula_id, n.ordem, n.roteiro, n.img_src, (n.audio IS NOT NULL) AS tem_audio
          FROM aula_narracoes n
          JOIN aulas a   ON a.id = n.aula_id
          JOIN modulos m ON m.id = a.modulo_id
@@ -245,7 +249,7 @@ router.get('/:cursoId/conteudo', authMiddleware, async (req, res) => {
     for (const n of narracoes.rows) {
       if (!narracoesPorAula.has(n.aula_id)) narracoesPorAula.set(n.aula_id, []);
       narracoesPorAula.get(n.aula_id).push({
-        ordem: n.ordem, roteiro: n.roteiro, imgSrc: n.img_src,
+        ordem: n.ordem, roteiro: n.roteiro, imgSrc: n.img_src, temAudio: n.tem_audio,
       });
     }
 
@@ -269,6 +273,57 @@ router.get('/:cursoId/conteudo', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao buscar conteúdo do curso:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// Faixa de áudio de um trecho narrado (voz sintetizada e gravada ao salvar a
+// aula — ver services/tts/). Uma rota por trecho, e não o áudio embutido no
+// /conteudo, porque são centenas de KB cada.
+//
+// Passa pelo authMiddleware e pela MESMA checagem de acesso do conteúdo: a faixa
+// é o conteúdo da aula falado, e não pode ser um atalho para ouvir um curso
+// restrito sem matrícula. Por isso ela também não é servida como arquivo estático
+// — o player busca com o token (ver src/hooks/narracao/motorAudio.js).
+router.get('/:cursoId/aulas/:aulaId/narracao/:ordem/audio', authMiddleware, async (req, res) => {
+  try {
+    const { cursoId, aulaId, ordem } = req.params;
+
+    const cursoRes = await pool.query('SELECT * FROM cursos WHERE id = $1', [cursoId]);
+    if (cursoRes.rows.length === 0) return res.status(404).json({ erro: 'Curso não encontrado' });
+
+    const acesso = await checarAcessoCurso(cursoRes.rows[0], req);
+    if (!acesso.ok) {
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
+    }
+
+    // O JOIN com módulos amarra a aula ao curso: sem ele, um aluno com acesso a um
+    // curso qualquer ouviria as aulas de todos os outros trocando o aulaId.
+    const meta = await pool.query(
+      `SELECT n.audio_mime, n.origem_hash, n.audio_voz, octet_length(n.audio) AS bytes
+         FROM aula_narracoes n
+         JOIN aulas a   ON a.id = n.aula_id
+         JOIN modulos m ON m.id = a.modulo_id
+        WHERE m.curso_id = $1 AND n.aula_id = $2 AND n.ordem = $3 AND n.audio IS NOT NULL`,
+      [cursoId, aulaId, ordem]
+    );
+    if (meta.rows.length === 0) return res.status(404).json({ erro: 'Áudio não encontrado' });
+
+    const { audio_mime: mime, origem_hash: hash, audio_voz: voz, bytes } = meta.rows[0];
+
+    // A faixa só muda quando o instrutor reescreve o bloco ou o admin troca a voz
+    // — as duas coisas que compõem a ETag. Enquanto não mudarem, o navegador
+    // revalida com um 304 e não baixa o áudio de novo.
+    const etag = `"${crypto.createHash('md5').update(`${hash}:${voz}:${bytes}`).digest('hex')}"`;
+    res.set({ ETag: etag, 'Cache-Control': 'private, max-age=3600', 'Content-Type': mime || 'audio/mpeg' });
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+
+    const { rows } = await pool.query(
+      'SELECT audio FROM aula_narracoes WHERE aula_id = $1 AND ordem = $2', [aulaId, ordem]);
+
+    res.send(rows[0].audio);
+  } catch (error) {
+    console.error('Erro ao servir áudio da narração:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });

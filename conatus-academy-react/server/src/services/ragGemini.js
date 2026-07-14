@@ -105,4 +105,7 @@ const toVectorLiteral = (arr) => `[${arr.join(',')}]`;
 module.exports = {
   EMBED_MODEL, EMBED_DIMS, GEN_MODELS,
   embedDocument, embedQuery, generate, toVectorLiteral, withRetry,
+  // `ai` sai daqui para a narração falada (services/tts/gemini.js) reusar o
+  // mesmo cliente e a mesma chave, em vez de abrir um segundo.
+  ai,
 };

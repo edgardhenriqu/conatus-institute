@@ -17,4 +17,20 @@ export async function request(url, options = {}) {
   return res.json();
 }
 
+/**
+ * Baixa um binário protegido (hoje: o áudio da narração das aulas).
+ *
+ * Um <audio src="/api/..."> não serve: a tag não manda o Authorization, e a rota
+ * exige token e matrícula. Buscamos o blob aqui e o player toca de um object URL.
+ */
+export async function requestBlob(url, options = {}) {
+  const { Authorization } = getHeaders();
+  const res = await fetch(url, {
+    headers: { ...(Authorization ? { Authorization } : {}) },
+    ...options,
+  });
+  if (!res.ok) throw new Error(`Erro ${res.status}`);
+  return res.blob();
+}
+
 export { API_URL };

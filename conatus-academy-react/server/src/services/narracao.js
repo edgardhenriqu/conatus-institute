@@ -11,10 +11,14 @@
  * O caractere 📢 também vale como marcação, para quem preferir digitar.
  *
  * FLUXO
- * HTML do Quill → blocos marcados → roteiro falado escrito por LLM → aula_narracoes.
- * Roda ao salvar a aula no admin, em segundo plano, como o índice do RAG.
+ * HTML do Quill → blocos marcados → roteiro falado escrito por LLM → áudio
+ * sintetizado → aula_narracoes. Roda ao salvar a aula no admin, em segundo plano,
+ * como o índice do RAG.
  *
- * Guardamos TEXTO, não áudio: quem fala é o navegador do aluno (Web Speech API).
+ * Guardamos o ÁUDIO, não só o texto: a voz é a mesma para todos os alunos, e não
+ * a voz do sistema de cada máquina (ver tts/). Sem provedor de voz configurado,
+ * ou se a síntese falhar, a linha fica sem áudio e o player volta à voz do
+ * navegador.
  * Guardamos também o src da imagem (img_src) — é como o player encontra o <img>
  * no HTML renderizado para transformá-lo no botão de ouvir.
  */
@@ -22,6 +26,7 @@ const crypto = require('crypto');
 const pool = require('../../db/connection');
 const { generate } = require('./ragChat');
 const { stripHtml } = require('./ragIndex');
+const { ttsAtivo, sintetizar, assinaturaVoz } = require('./tts');
 
 // md5 dos bytes da imagem do megafone. Um megafone diferente (outro arquivo,
 // outra compressão) não bate — daí a lista, e a variável de ambiente para
@@ -113,6 +118,31 @@ async function gerarRoteiro(texto, tituloAula) {
 }
 
 /**
+ * Grava o áudio do trecho, se ele ainda não existir na voz configurada hoje.
+ *
+ * `atual` é a linha que já estava no banco com o MESMO roteiro (ou null, quando o
+ * roteiro acabou de ser reescrito e o áudio velho já foi zerado).
+ *
+ * Falha de síntese não derruba a sincronização: o roteiro já está salvo, e sem
+ * áudio o aluno ouve pela voz do navegador. Na próxima vez que a aula for salva,
+ * o áudio continua faltando e tentamos de novo.
+ */
+async function garantirAudio(aulaId, ordem, roteiro) {
+  if (!ttsAtivo()) return;
+
+  try {
+    const { dados, mime, assinatura } = await sintetizar(roteiro);
+    await pool.query(
+      `UPDATE aula_narracoes SET audio = $3, audio_mime = $4, audio_voz = $5
+        WHERE aula_id = $1 AND ordem = $2`,
+      [aulaId, ordem, dados, mime, assinatura],
+    );
+  } catch (e) {
+    console.error(`[Narração] Falha ao sintetizar áudio (aula ${aulaId}, trecho ${ordem}):`, e.message);
+  }
+}
+
+/**
  * Sincroniza as narrações de uma aula com o conteúdo atual.
  * Idempotente: gera só os blocos novos/alterados e descarta os que sumiram.
  * Devolve quantos blocos narrados a aula tem agora.
@@ -131,21 +161,34 @@ async function sincronizarNarracoes(aulaId) {
   }
 
   const atuais = await pool.query(
-    'SELECT ordem, origem_hash FROM aula_narracoes WHERE aula_id = $1', [aulaId]);
-  const hashPorOrdem = new Map(atuais.rows.map((r) => [r.ordem, r.origem_hash]));
+    `SELECT ordem, origem_hash, roteiro, audio_voz, (audio IS NOT NULL) AS tem_audio
+       FROM aula_narracoes WHERE aula_id = $1`, [aulaId]);
+  const porOrdem = new Map(atuais.rows.map((r) => [r.ordem, r]));
 
   for (const { ordem, texto, imgSrc } of blocos) {
     const h = hash(texto);
+    const atual = porOrdem.get(ordem);
+    const intacto = atual?.origem_hash === h;
 
     // Bloco intacto: aproveita o roteiro, mas atualiza o img_src — o instrutor
     // pode ter trocado a figura do megafone sem tocar no texto.
-    if (hashPorOrdem.get(ordem) === h) {
+    if (intacto) {
       await pool.query('UPDATE aula_narracoes SET img_src = $3 WHERE aula_id = $1 AND ordem = $2',
         [aulaId, ordem, imgSrc]);
+
+      // O áudio pode faltar mesmo com o roteiro intacto: aula narrada antes de o
+      // ElevenLabs existir aqui, síntese que falhou, ou voz trocada no .env.
+      const gravado = atual.tem_audio && atual.audio_voz === assinaturaVoz();
+      if (!gravado) await garantirAudio(aulaId, ordem, atual.roteiro);
       continue;
     }
 
     const roteiro = await gerarRoteiro(texto, aula.titulo);
+
+    // Roteiro novo, áudio velho fala outra coisa: zeramos as três colunas na
+    // mesma escrita do roteiro. Entre este INSERT e a síntese o trecho fica sem
+    // áudio — e é isso que queremos, porque o player prefere a voz do navegador
+    // a falar um texto que não é mais o da aula.
     await pool.query(
       `INSERT INTO aula_narracoes (aula_id, ordem, origem_hash, texto_origem, roteiro, img_src)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -154,9 +197,14 @@ async function sincronizarNarracoes(aulaId) {
                      texto_origem = EXCLUDED.texto_origem,
                      roteiro = EXCLUDED.roteiro,
                      img_src = EXCLUDED.img_src,
+                     audio = NULL,
+                     audio_mime = NULL,
+                     audio_voz = NULL,
                      created_at = CURRENT_TIMESTAMP`,
       [aulaId, ordem, h, texto, roteiro, imgSrc],
     );
+
+    await garantirAudio(aulaId, ordem, roteiro);
   }
 
   // O instrutor pode ter removido megafones: sobra linha com ordem alta.
