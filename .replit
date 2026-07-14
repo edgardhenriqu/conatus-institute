@@ -1,9 +1,4 @@
-# Configuração do Replit — Conatus Institute
-# O código da aplicação fica em ./conatus-academy-react (React + Express).
-# Os scripts do package.json na raiz orquestram o build e a execução.
-
-# Banco é externo (Supabase), então NÃO usamos o módulo postgresql do Replit.
-modules = ["nodejs-20", "web"]
+modules = ["nodejs-18", "web"]
 
 # Botão "Run": compila o frontend e sobe o servidor Express (API + site) numa
 # única porta. É intencional recompilar aqui para o dist/ existir na primeira vez.
