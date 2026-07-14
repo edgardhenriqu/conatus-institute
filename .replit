@@ -1,4 +1,4 @@
-modules = ["nodejs-18", "web"]
+modules = ["web", "postgresql-16", "nodejs-20"]
 
 # Botão "Run": compila o frontend e sobe o servidor Express (API + site) numa
 # única porta. É intencional recompilar aqui para o dist/ existir na primeira vez.
@@ -47,7 +47,38 @@ TTS_PROVIDER = "elevenlabs"
 OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free,openai/gpt-oss-120b:free,meta-llama/llama-3.3-70b-instruct:free,qwen/qwen3-next-80b-a3b-instruct:free"
 ELEVENLABS_VOICE_ID = "HXmVs82qUTKZy5PrSBjo"
 TTS_PROVIDER = "elevenlabs"
+PORT = "5000"
+
+[userenv.shared]
 
 [[ports]]
 localPort = 3000
 externalPort = 80
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run build && npm start"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
