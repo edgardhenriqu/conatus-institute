@@ -29,12 +29,12 @@ repositório GitHub existente; ver `README.md` para arquitetura completa.
   (`server/db/seedMopCourse.js`).
 - **`JWT_SECRET`**: gerado automaticamente e salvo como secret do Replit
   (ambiente shared). Não é necessário reconfigurar.
-- **Não configurado ainda** (opcional, só necessário para essas features):
-  `SMTP_*`/`MAIL_FROM` (confirmação de e-mail — sem eles, o link de
-  confirmação só aparece no console/log), `GEMINI_API_KEY`/
-  `OPENROUTER_API_KEY` (tutor de IA) e `ELEVENLABS_API_KEY` (narração das
-  aulas — sem provedor, usa a voz do navegador). Peça ao usuário essas chaves
-  quando ele quiser habilitar essas funcionalidades.
+- **E-mail (SMTP), tutor de IA e narração das aulas**: configurados. Valores
+  não sensíveis (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
+  `MAIL_FROM`, `OPENROUTER_MODEL`, `ELEVENLABS_VOICE_ID`, `TTS_PROVIDER`) em
+  env vars do ambiente `development`; credenciais (`SMTP_PASS`,
+  `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `ELEVENLABS_API_KEY`) salvas como
+  Secrets do Replit — nunca em arquivos versionados.
 
 ## User preferences
 
