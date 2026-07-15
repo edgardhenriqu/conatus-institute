@@ -97,14 +97,31 @@ export function CourseViewer() {
   // pode reemitir "tudo ouvido" enquanto o progresso ainda está sendo salvo).
   const autoConcluidaRef = useRef(false);
 
+  // A narração desta aula chegou a tocar? Sem esta trava, ao avançar para uma aula
+  // que também tem narração o `tudoOuvido` da aula ANTERIOR sobrevive por um render
+  // (o conjunto "ouvidos" ainda não foi zerado) e marcaria a nova aula como
+  // concluída/ouvida sem o aluno ter ouvido nada. Só contamos a conclusão quando a
+  // narração foi de fato iniciada NESTA aula.
+  const narracaoIniciadaRef = useRef(false);
+  const narracaoSuportadaRef = useRef(true);
+
   // Cada aula tem a sua narração: trocar de aula zera o que já foi ouvido, senão
   // a primeira narração ouvida liberaria o botão de todas as aulas seguintes.
   useEffect(() => {
     setNarracaoOuvida(false);
     autoConcluidaRef.current = false;
+    narracaoIniciadaRef.current = false;
   }, [activeLesson?.id]);
 
-  const handleNarracaoConcluida = useCallback(() => setNarracaoOuvida(true), []);
+  const handleNarracaoConcluida = useCallback(() => {
+    // Conta como ouvida quando a narração foi realmente iniciada nesta aula — ou
+    // quando não há suporte a áudio (aí liberamos para não prender o aluno). O
+    // "tudoOuvido" herdado da aula anterior (narração não iniciada + com suporte)
+    // é ignorado.
+    if (narracaoIniciadaRef.current || !narracaoSuportadaRef.current) {
+      setNarracaoOuvida(true);
+    }
+  }, []);
 
   const narracao = useNarracao({
     narracoes,
@@ -121,6 +138,17 @@ export function CourseViewer() {
   // Narração tocando ou em pausa — enquanto isso o botão "Ouça a Narração" fica
   // desabilitado (o mini-player assume o controle de pausar/retomar).
   const narrando = narracaoEstado === 'falando' || narracaoEstado === 'pausado';
+
+  // Marca que a narração desta aula chegou a tocar (o aluno clicou em "Ouça a
+  // Narração" ou num megafone). É o que valida a conclusão automática/"ouvida".
+  useEffect(() => {
+    if (narracaoEstado === 'falando') narracaoIniciadaRef.current = true;
+  }, [narracaoEstado]);
+
+  // Espelha o suporte a áudio num ref, lido dentro de handleNarracaoConcluida.
+  useEffect(() => {
+    narracaoSuportadaRef.current = narracaoSuportada;
+  }, [narracaoSuportada]);
 
   // Modo foco = overlay em tela cheia. Pedimos também a tela cheia do navegador
   // para cobrir a barra do sistema; se o navegador negar, o overlay sozinho já
@@ -460,7 +488,10 @@ export function CourseViewer() {
   // Só dispara em narração realmente ouvida (`tudoOuvido`) — nunca no fallback de
   // navegador sem suporte a áudio, que apenas libera a conclusão manual.
   useEffect(() => {
-    if (tudoOuvido && !autoConcluidaRef.current) {
+    // `narracaoIniciadaRef` evita o falso positivo ao trocar de aula: o
+    // `tudoOuvido` da aula anterior sobrevive por um render, mas a narração da
+    // nova aula ainda não foi iniciada, então não concluímos por engano.
+    if (tudoOuvido && narracaoIniciadaRef.current && !autoConcluidaRef.current) {
       autoConcluidaRef.current = true;
       marcarConcluida();
     }
