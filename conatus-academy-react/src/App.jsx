@@ -14,6 +14,7 @@ import { Login } from './pages/Login';
 import { VerifyEmail } from './pages/VerifyEmail';
 import { ResetPassword } from './pages/ResetPassword';
 import { Courses } from './pages/Courses';
+import { Simulacoes } from './pages/Simulacoes';
 import { CourseDetails } from './pages/CourseDetails';
 import { CourseViewer } from './pages/CourseViewer';
 import { CourseQuiz } from './pages/CourseQuiz';
@@ -28,6 +29,7 @@ import { AdminAlunos } from './pages/admin/AdminAlunos';
 import { AdminCursos } from './pages/admin/AdminCursos';
 import { AdminCertificados } from './pages/admin/AdminCertificados';
 import { AdminAvaliacoes } from './pages/admin/AdminAvaliacoes';
+import { AdminSimulacoes } from './pages/admin/AdminSimulacoes';
 import ModuleEditor from './pages/admin/ModuleEditor';
 import LessonEditor from './pages/admin/LessonEditor';
 import CourseEditor from './pages/admin/CourseEditor';
@@ -75,6 +77,14 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/cursos" element={<Courses />} />
+            <Route
+              path="/simulacoes"
+              element={
+                <ProtectedRoute>
+                  <Simulacoes />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/cursos/:id" element={<CourseDetails />} />
             <Route path="/validar-certificado" element={<ValidarCertificado />} />
             <Route path="/validar-certificado/:codigo" element={<ValidarCertificado />} />
@@ -137,6 +147,7 @@ function App() {
               <Route path="cursos" element={<AdminCursos />} />
               <Route path="certificados" element={<AdminCertificados />} />
               <Route path="avaliacoes" element={<AdminAvaliacoes />} />
+              <Route path="simulacoes" element={<AdminSimulacoes />} />
               <Route path="cursos/:cursoId/editar" element={<CourseEditor />} />
               <Route path="cursos/:cursoId/modulos" element={<ModuleEditor />} />
               <Route path="cursos/:cursoId/modulos/:moduloId/aulas" element={<LessonEditor />} />

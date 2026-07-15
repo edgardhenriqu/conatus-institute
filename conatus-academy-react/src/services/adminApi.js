@@ -80,6 +80,25 @@ export const adminApi = {
   deleteCompany: async (empresaId) =>
     request(`${API_URL}/admin/empresas/${empresaId}`, { method: 'DELETE' }),
 
+  // ----- Simulações (vídeos) -----
+  getSimulacoes: async () =>
+    request(`${API_URL}/simulacoes`),
+
+  createSimulacao: async (data) =>
+    request(`${API_URL}/simulacoes`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateSimulacao: async (id, data) =>
+    request(`${API_URL}/simulacoes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteSimulacao: async (id) =>
+    request(`${API_URL}/simulacoes/${id}`, { method: 'DELETE' }),
+
   // ----- Controle de acesso do curso (modo + regras) -----
   getCourseAccess: async (courseId) =>
     request(`${API_URL}/admin/cursos/${courseId}/acesso`),

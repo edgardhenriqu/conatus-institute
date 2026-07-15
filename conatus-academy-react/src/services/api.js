@@ -57,6 +57,9 @@ export const api = {
   // Notícias do setor (feeds RSS de portais de data center, via backend)
   getNoticias: async () => request(`${API_URL}/noticias`),
 
+  // Simulações (vídeos) — página exclusiva para alunos logados.
+  getSimulacoes: async () => request(`${API_URL}/simulacoes`),
+
   // Cursos
   getCursos: async () => request(`${API_URL}/cursos`),
 

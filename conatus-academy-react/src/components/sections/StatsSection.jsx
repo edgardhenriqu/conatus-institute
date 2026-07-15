@@ -2,6 +2,7 @@ const STATS = [
   { valor: '98%', rotulo: 'Taxa de Empregabilidade' },
   { valor: '150+', rotulo: 'Parceiros da Indústria' },
   { valor: '100%', rotulo: 'Online & Interativo' },
+  { valor: '90+', rotulo: 'Cursos Aplicados a Data Centers' },
 ];
 
 export function StatsSection() {

@@ -22,6 +22,9 @@ export function Header() {
           <li><Link to="/#cursos" onClick={closeMenu}>Cursos</Link></li>
           <li><Link to="/#metodologia" onClick={closeMenu}>Metodologia</Link></li>
           <li><Link to="/#professores" onClick={closeMenu}>Professores</Link></li>
+          {user && (
+            <li><Link to="/simulacoes" onClick={closeMenu}>Simulações</Link></li>
+          )}
         </ul>
 
         <div className="nav-actions">
@@ -34,13 +37,20 @@ export function Header() {
 
           {user ? (
             <>
-              <span className="nav-user-greeting hidden-mobile">Olá, {user.nome?.split(' ')[0] || user.email}</span>
+              {/* Saudação só para a equipe (admin/instrutor). O aluno tem o ícone
+                  de perfil abaixo, que já representa a área dele — assim a barra
+                  não estoura com o link extra "Meu Perfil". */}
+              {isStaff && (
+                <span className="nav-user-greeting hidden-mobile">Olá, {user.nome?.split(' ')[0] || user.email}</span>
+              )}
               <Button variant="outline" to={isAdmin ? "/admin/dashboard" : isStaff ? "/admin/cursos" : "/dashboard"} onClick={closeMenu}>
                 {isStaff && !isAdmin ? 'Meu Painel' : 'Dashboard'}
               </Button>
               {!isStaff && (
-                <Link to="/perfil" onClick={closeMenu} style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none', fontSize: '0.95rem' }}>
-                  Meu Perfil
+                <Link to="/perfil" onClick={closeMenu} className="nav-profile-link" title="Meu Perfil" aria-label="Meu Perfil">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+                    <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2.2c-4.03 0-7.5 2.02-7.5 4.8v1c0 .55.45 1 1 1h13c.55 0 1-.45 1-1v-1c0-2.78-3.47-4.8-7.5-4.8Z" />
+                  </svg>
                 </Link>
               )}
               <button

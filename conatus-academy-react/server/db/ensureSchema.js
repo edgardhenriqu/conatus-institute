@@ -272,6 +272,24 @@ const STATEMENTS = [
   `ALTER TABLE aula_narracoes ADD COLUMN IF NOT EXISTS audio BYTEA`,
   `ALTER TABLE aula_narracoes ADD COLUMN IF NOT EXISTS audio_mime TEXT`,
   `ALTER TABLE aula_narracoes ADD COLUMN IF NOT EXISTS audio_voz TEXT`,
+
+  // ── Vídeos das Simulações Aplicadas a Data Centers ─────────────────────────
+  // Página exclusiva para alunos logados (/simulacoes). O admin cadastra os
+  // vídeos aqui, agrupados em três eixos (tema): 'falhas' | 'operacoes' |
+  // 'manutencoes'. video_url guarda o link do YouTube/Vimeo ou o endereço direto
+  // de um arquivo .mp4 — o player do front se adapta. 'ordem' controla a
+  // exibição dentro de cada eixo.
+  `CREATE TABLE IF NOT EXISTS simulacoes (
+    id SERIAL PRIMARY KEY,
+    tema VARCHAR(20) NOT NULL,
+    titulo VARCHAR(200) NOT NULL,
+    video_url VARCHAR(500) NOT NULL,
+    descricao TEXT,
+    ordem INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_simulacoes_tema ON simulacoes(tema)`,
 ];
 
 async function ensureSchema() {

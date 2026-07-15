@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CourseCard } from './CourseCard';
 
-export function Carousel({ items, variant = 'carousel', renderItem }) {
+export function Carousel({ items, variant = 'carousel', renderItem, autoPlay = true }) {
   const [idx, setIdx] = useState(() => items.length);
 
   const move = useCallback((dir) => {
@@ -16,10 +16,12 @@ export function Carousel({ items, variant = 'carousel', renderItem }) {
   const goTo = (i) => setIdx(items.length + i);
 
   useEffect(() => {
-    if (items.length === 0) return;
+    // autoPlay desligado (ex.: carousel de vídeos) evita trocar o slide enquanto
+    // o aluno assiste; a navegação fica só nas setinhas/pontinhos.
+    if (!autoPlay || items.length === 0) return;
     const timer = setInterval(() => move(1), 5000);
     return () => clearInterval(timer);
-  }, [items.length, move]);
+  }, [autoPlay, items.length, move]);
 
   if (items.length === 0) return null;
 

@@ -8,6 +8,7 @@ const cursosRoutes = require("./src/routes/cursos");
 const adminRoutes = require("./src/routes/admin");
 const noticiasRoutes = require("./src/routes/noticias");
 const certificadosRoutes = require("./src/routes/certificados");
+const simulacoesRoutes = require("./src/routes/simulacoes");
 
 const app = express();
 
@@ -83,6 +84,7 @@ app.use("/api/cursos", cursosRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/noticias", noticiasRoutes);
 app.use("/api/certificados", certificadosRoutes);
+app.use("/api/simulacoes", simulacoesRoutes);
 
 // ── Frontend (SPA) ───────────────────────────────────────────────────────────
 // Em produção, o Express também serve o build do Vite (dist/), deixando API e

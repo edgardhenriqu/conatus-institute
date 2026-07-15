@@ -8,6 +8,7 @@ const adminLinks = [
   { to: '/admin/alunos',       label: '👥 Alunos' },
   { to: '/admin/cursos',       label: '📚 Cursos' },
   { to: '/admin/avaliacoes',   label: '📝 Avaliações' },
+  { to: '/admin/simulacoes',   label: '🎬 Simulações' },
   { to: '/admin/certificados', label: '🏆 Certificados' },
   { to: '/admin/perfil',       label: '👤 Meu Perfil' },
 ];
