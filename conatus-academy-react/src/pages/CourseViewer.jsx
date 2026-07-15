@@ -92,12 +92,16 @@ export function CourseViewer() {
   // só podem ser concluídas depois que a narração terminar. Sem blocos narrados,
   // nada muda — o botão segue como sempre foi.
   const narracoes = useMemo(() => activeLesson?.narracoes || [], [activeLesson]);
-  const narracaoPendente = narracoes.length > 0 && !narracaoOuvida;
+
+  // Garante que a conclusão automática dispare uma única vez por aula (a narração
+  // pode reemitir "tudo ouvido" enquanto o progresso ainda está sendo salvo).
+  const autoConcluidaRef = useRef(false);
 
   // Cada aula tem a sua narração: trocar de aula zera o que já foi ouvido, senão
   // a primeira narração ouvida liberaria o botão de todas as aulas seguintes.
   useEffect(() => {
     setNarracaoOuvida(false);
+    autoConcluidaRef.current = false;
   }, [activeLesson?.id]);
 
   const handleNarracaoConcluida = useCallback(() => setNarracaoOuvida(true), []);
@@ -109,7 +113,14 @@ export function CourseViewer() {
     onConcluir: handleNarracaoConcluida,
   });
 
-  const { tocarBloco, blocoAtivo, ouvidos, suportado: narracaoSuportada } = narracao;
+  const {
+    tocarBloco, tocarTudo, blocoAtivo, ouvidos, tudoOuvido,
+    estado: narracaoEstado, suportado: narracaoSuportada,
+  } = narracao;
+
+  // Narração tocando ou em pausa — enquanto isso o botão "Ouça a Narração" fica
+  // desabilitado (o mini-player assume o controle de pausar/retomar).
+  const narrando = narracaoEstado === 'falando' || narracaoEstado === 'pausado';
 
   // Modo foco = overlay em tela cheia. Pedimos também a tela cheia do navegador
   // para cobrir a barra do sistema; se o navegador negar, o overlay sozinho já
@@ -180,6 +191,10 @@ export function CourseViewer() {
   const isCurrentDone = useMemo(() =>
     activeLesson ? !!lessonProgress[lessonKey(activeLesson)] : false,
     [activeLesson, lessonProgress, lessonKey]);
+
+  // Aula com narração ainda por ouvir trava a conclusão e o "Próxima aula".
+  // Aula já concluída (revisita) não trava — o aluno navega livremente.
+  const narracaoPendente = narracoes.length > 0 && !narracaoOuvida && !isCurrentDone;
 
   // normalizeQuillHtml: corrige aulas salvas com &nbsp; no lugar de espaços
   const lessonHtml = useMemo(() => {
@@ -397,12 +412,11 @@ export function CourseViewer() {
     if (currentIndex < allLessons.length - 1) setActiveLesson(allLessons[currentIndex + 1]);
   }, [currentIndex, allLessons]);
 
-  const handleMarkDone = useCallback(async () => {
+  // Conclui a aula de fato (MOP em localStorage ou curso do banco). É chamada
+  // tanto pelo botão manual quanto pela conclusão automática ao fim da narração.
+  const marcarConcluida = useCallback(async () => {
     if (!activeLesson) return;
-    // Trava de narração: o botão já vem desabilitado, mas a checagem também mora
-    // aqui — desabilitar no JSX é aparência, e o clique pode chegar por teclado
-    // ou por um estado que mudou entre o render e o clique.
-    if (narracaoPendente) return;
+    if (lessonProgress[lessonKey(activeLesson)]) return; // já concluída — não repete
 
     if (isMop) {
       markLessonDone(activeLesson.id);
@@ -431,7 +445,26 @@ export function CourseViewer() {
     } catch {
       toast.error('Erro ao salvar progresso. Verifique sua conexão.');
     }
-  }, [activeLesson, isMop, allLessons, id, lessonKey, toast, narracaoPendente]);
+  }, [activeLesson, isMop, allLessons, id, lessonKey, toast, lessonProgress]);
+
+  const handleMarkDone = useCallback(() => {
+    // Trava de narração: o botão já vem desabilitado, mas a checagem também mora
+    // aqui — desabilitar no JSX é aparência, e o clique pode chegar por teclado
+    // ou por um estado que mudou entre o render e o clique.
+    if (narracaoPendente) return;
+    marcarConcluida();
+  }, [narracaoPendente, marcarConcluida]);
+
+  // Conclusão automática: quando a narração é ouvida até o fim, a aula conclui-se
+  // sozinha (o aluno não precisa marcar nada) e o botão "Próxima aula" destrava.
+  // Só dispara em narração realmente ouvida (`tudoOuvido`) — nunca no fallback de
+  // navegador sem suporte a áudio, que apenas libera a conclusão manual.
+  useEffect(() => {
+    if (tudoOuvido && !autoConcluidaRef.current) {
+      autoConcluidaRef.current = true;
+      marcarConcluida();
+    }
+  }, [tudoOuvido, marcarConcluida]);
 
   /* ── Estados especiais ────────────────────────────────────────── */
 
@@ -588,22 +621,33 @@ export function CourseViewer() {
               >
                 {focusMode ? '⤡ Sair do modo foco' : '⛶ Expandir aula'}
               </button>
-              {isCurrentDone
-                ? <span className="lesson-done-badge">✓ Concluída</span>
-                : (
-                  <button
-                    className={`btn-mark-done${narracaoPendente ? ' btn-mark-done--bloqueado' : ''}`}
-                    onClick={handleMarkDone}
-                    disabled={narracaoPendente}
-                    aria-disabled={narracaoPendente}
-                    title={narracaoPendente
-                      ? 'Ouça a narração até o fim para concluir esta aula'
-                      : 'Marcar esta aula como concluída'}
-                  >
-                    {narracaoPendente ? '🔒 Ouça a narração' : 'Marcar como Concluída'}
-                  </button>
-                )
-              }
+              {isCurrentDone ? (
+                <span className="lesson-done-badge">✓ Concluída</span>
+              ) : narracaoPendente && narracaoSuportada ? (
+                // Aula com narração: ouvir é o único caminho. Ao terminar o áudio
+                // a aula conclui-se sozinha e o botão "Próxima aula" destrava.
+                <button
+                  type="button"
+                  className="btn-ouvir-narracao"
+                  onClick={tocarTudo}
+                  disabled={narrando}
+                  aria-disabled={narrando}
+                  title={narrando
+                    ? 'Narração em andamento'
+                    : 'Ouça a narração para concluir a aula e liberar a próxima'}
+                >
+                  {narrando ? '🔊 Reproduzindo narração…' : '🔊 Ouça a Narração'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-mark-done"
+                  onClick={handleMarkDone}
+                  title="Marcar esta aula como concluída"
+                >
+                  Marcar como Concluída
+                </button>
+              )}
             </div>
           </div>
 
@@ -676,7 +720,17 @@ export function CourseViewer() {
             </span>
 
             {currentIndex < allLessons.length - 1 ? (
-              <Button variant="nav" className="btn-nav--next" onClick={goToNext}>
+              <Button
+                variant="nav"
+                className="btn-nav--next"
+                onClick={goToNext}
+                disabled={!isCurrentDone}
+                title={isCurrentDone
+                  ? undefined
+                  : narracaoPendente
+                    ? 'Ouça a narração para liberar a próxima aula'
+                    : 'Marque a aula como concluída para liberar a próxima'}
+              >
                 Próxima aula <Chevron dir={1} />
               </Button>
             ) : quizCta ? (

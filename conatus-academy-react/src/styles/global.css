@@ -2874,6 +2874,27 @@ header[id] {
 }
 .btn-mark-done:hover { background: var(--primary-light); }
 
+/* Botão "Ouça a Narração" — em aulas com narração é o único caminho para
+   concluir e liberar a próxima aula, então recebe o destaque dourado. */
+.btn-ouvir-narracao {
+    background: var(--gold);
+    color: var(--primary);
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    transition: background var(--transition), transform var(--transition);
+    white-space: nowrap;
+}
+.btn-ouvir-narracao:hover { background: var(--gold-hover); transform: translateY(-1px); }
+.btn-ouvir-narracao:disabled {
+    opacity: 0.7;
+    cursor: default;
+    transform: none;
+}
+
 /* Modo foco — expande a aula e oculta a lista lateral */
 
 .viewer-title-actions {
@@ -4417,6 +4438,7 @@ body.focus-mode-open { overflow: hidden; }
     .btn-small,
     .btn-card,
     .btn-mark-done,
+    .btn-ouvir-narracao,
     .btn-focus-mode,
     .btn-certificate,
     .btn-access-course,
