@@ -131,9 +131,11 @@ const STATEMENTS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_regra_usuario ON curso_acesso_regras(curso_id, aluno_id)   WHERE tipo = 'usuario'`,
   `CREATE INDEX IF NOT EXISTS idx_regras_curso ON curso_acesso_regras(curso_id)`,
 
-  // Seed dos fabricantes parceiros
+  // Seed dos fabricantes parceiros. O slug é o identificador interno e não muda
+  // (agrupa cursos por fabricante); só o nome exibido pode ser reeditado — ex.:
+  // o parceiro de slug 'huawei' é exibido como "Soluções WDC".
   `INSERT INTO empresas (nome, slug) VALUES
-     ('Huawei','huawei'),('Vertiv','vertiv'),('Schneider','schneider'),
+     ('Soluções WDC','huawei'),('Vertiv','vertiv'),('Schneider','schneider'),
      ('Delta','delta'),('Cummins','cummins')
    ON CONFLICT (slug) DO NOTHING`,
 

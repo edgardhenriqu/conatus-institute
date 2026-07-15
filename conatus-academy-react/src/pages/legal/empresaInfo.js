@@ -7,11 +7,11 @@
  */
 export const EMPRESA = {
   nome: 'Conatus Institute',
-  razaoSocial: '[RAZÃO SOCIAL LTDA.]',
-  cnpj: '[00.000.000/0001-00]',
-  endereco: '[Endereço completo — Rua, nº, complemento, Cidade/UF, CEP]',
+  razaoSocial: '[CONATUS DATA CENTER OPERATION PROCEDURES]',
+  cnpj: '[60.498.396/0001-70]',
+  endereco: '[VILA MAZZEI — R CAURE, nº 101, SÃO PAULO/SP, 02.310-140]',
   email: '[giovanni.silva@conatusprocedures.com]',
-  emailDpo: '[dpo@conatus.institute]',
+  emailDpo: '[giovanni.silva@conatusprocedures.com]',
   telefone: '[+55 (11) 91230-1413]',
   site: 'conatus.institute',
   // Foro / comarca para a cláusula de lei aplicável.
@@ -22,4 +22,4 @@ export const EMPRESA = {
  * Data da última atualização exibida nas duas páginas.
  * Atualize sempre que o conteúdo legal for revisado.
  */
-export const ULTIMA_ATUALIZACAO = '6 de julho de 2026';
+export const ULTIMA_ATUALIZACAO = '15 de julho de 2026';
