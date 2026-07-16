@@ -241,7 +241,21 @@ export function AdminSuporte() {
                     chamados.map(c => (
                       <tr key={c.id}>
                         <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{numeroChamado(c.id)}</td>
-                        <td style={{ fontWeight: 500 }}>{c.aluno_nome}</td>
+                        <td style={{ fontWeight: 500 }}>
+                          {c.aluno_nome}
+                          {/* Sem conta: avisa que não há cadastro por trás e que
+                              a resposta sai por e-mail. */}
+                          {c.visitante && (
+                            <span title="Chamado aberto pelo site, sem conta na plataforma"
+                              style={{
+                                marginLeft: '6px', fontSize: '0.68rem', fontWeight: 700,
+                                color: 'var(--amber)', border: '1px solid var(--amber)',
+                                borderRadius: 'var(--radius-pill)', padding: '1px 6px',
+                              }}>
+                              visitante
+                            </span>
+                          )}
+                        </td>
                         <td style={{ fontSize: '0.85rem' }}>{c.aluno_email}</td>
                         <td className="ticket-col-assunto">{c.assunto}</td>
                         <td style={{ fontSize: '0.85rem' }}>{categoriaInfo(c.categoria).label}</td>

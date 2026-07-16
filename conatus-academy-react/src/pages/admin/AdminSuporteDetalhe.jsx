@@ -210,23 +210,43 @@ export function AdminSuporteDetalhe() {
         {/* ── Informações do aluno e do chamado ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
           <div className="admin-table-container">
-            <div className="admin-table-header"><h2>Informações do aluno</h2></div>
+            <div className="admin-table-header" style={{ gap: '10px', flexWrap: 'wrap' }}>
+              <h2>{aluno?.visitante ? 'Informações do solicitante' : 'Informações do aluno'}</h2>
+              {aluno?.visitante && (
+                <span className="ticket-pill" style={{ '--pill-cor': 'var(--amber)' }}>
+                  Sem conta
+                </span>
+              )}
+            </div>
             <div className="ticket-dados">
               <Dado label="Nome">{aluno?.nome}</Dado>
               <Dado label="Email">{aluno?.email}</Dado>
-              <Dado label="Empresa">{aluno?.empresa}</Dado>
-              <Dado label="Perfil">{ROLE_LABELS[aluno?.role] || aluno?.role}</Dado>
-              <Dado label="Cursos matriculados">
-                {aluno?.matriculas?.length
-                  ? (
-                    <ul style={{ margin: 0, paddingLeft: '18px' }}>
-                      {aluno.matriculas.map((m, i) => (
-                        <li key={i}>{m.curso_nome} <span style={{ color: 'var(--text-muted)' }}>({m.progresso || 0}%)</span></li>
-                      ))}
-                    </ul>
-                  )
-                  : 'Nenhuma matrícula'}
-              </Dado>
+              {/* Visitante não tem cadastro: empresa, perfil e matrículas não
+                  existem, e mostrá-los vazios sugeriria dado faltando. */}
+              {aluno?.visitante ? (
+                <Dado label="Cadastro">
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    Chamado aberto pelo site, sem conta na plataforma.
+                    A resposta chega a esta pessoa por e-mail.
+                  </span>
+                </Dado>
+              ) : (
+                <>
+                  <Dado label="Empresa">{aluno?.empresa}</Dado>
+                  <Dado label="Perfil">{ROLE_LABELS[aluno?.role] || aluno?.role}</Dado>
+                  <Dado label="Cursos matriculados">
+                    {aluno?.matriculas?.length
+                      ? (
+                        <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                          {aluno.matriculas.map((m, i) => (
+                            <li key={i}>{m.curso_nome} <span style={{ color: 'var(--text-muted)' }}>({m.progresso || 0}%)</span></li>
+                          ))}
+                        </ul>
+                      )
+                      : 'Nenhuma matrícula'}
+                  </Dado>
+                </>
+              )}
             </div>
           </div>
 

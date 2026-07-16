@@ -156,4 +156,78 @@ async function sendPasswordResetEmail({ to, nome, link }) {
   });
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail };
+function montarHtmlChamado(nome, link, numero, houveResposta) {
+  const primeiroNome = (nome || '').trim().split(/\s+/)[0] || 'você';
+  const titulo = houveResposta
+    ? `Temos uma resposta no seu chamado ${numero}`
+    : `Recebemos o seu chamado ${numero}`;
+  const texto = houveResposta
+    ? 'Nossa equipe respondeu o seu chamado de suporte. Abra a conversa para ler e responder.'
+    : 'Recebemos a sua solicitação e nossa equipe já foi avisada. Guarde este e-mail: é por ele que você acompanha e responde o chamado.';
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#1f2937">
+    <div style="text-align:center;padding:24px 0">
+      <h1 style="color:#0f3d3e;font-size:22px;margin:0">Conatus Institute</h1>
+    </div>
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:32px">
+      <h2 style="margin-top:0;font-size:18px">Olá, ${primeiroNome}!</h2>
+      <p style="font-size:15px;line-height:1.6">${texto}</p>
+      <div style="text-align:center;margin:28px 0">
+        <a href="${link}"
+           style="background:#0f3d3e;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px;font-weight:bold;display:inline-block">
+          Abrir meu chamado
+        </a>
+      </div>
+      <p style="font-size:13px;color:#6b7280;line-height:1.6">
+        Se o botão não funcionar, copie e cole este endereço no navegador:<br>
+        <a href="${link}" style="color:#0f3d3e;word-break:break-all">${link}</a>
+      </p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
+      <p style="font-size:12px;color:#9ca3af">
+        Este link dá acesso ao seu chamado — não o compartilhe com outras pessoas.
+      </p>
+    </div>
+    <p style="text-align:center;font-size:12px;color:#9ca3af;margin-top:16px">
+      © ${new Date().getFullYear()} Conatus Institute. Todos os direitos reservados.
+    </p>
+  </div>`;
+}
+
+/**
+ * Envia o link de acompanhamento de um chamado aberto por visitante sem conta.
+ *
+ * É o ÚNICO caminho dele até a resposta: sem login, não há outra forma de voltar
+ * à conversa. Por isso o link não expira — um link morto deixaria a pessoa sem
+ * resposta e sem recurso.
+ *
+ * @param {{ to: string, nome: string, link: string, numero: string,
+ *           houveResposta?: boolean }} params
+ */
+async function sendChamadoEmail({ to, nome, link, numero, houveResposta = false }) {
+  const tx = getTransporter();
+  if (!tx) {
+    // Sem SMTP configurado o link vai para o console: em desenvolvimento é o
+    // que permite testar o fluxo do visitante de ponta a ponta.
+    console.warn(`[email] ${configError} Link do chamado ${numero} para ${to}: ${link}`);
+    throw new Error(configError);
+  }
+
+  const from = process.env.MAIL_FROM || process.env.SMTP_USER;
+  await tx.sendMail({
+    from: `"Conatus Institute" <${from}>`,
+    to,
+    subject: houveResposta
+      ? `Resposta no seu chamado ${numero} — Conatus Institute`
+      : `Chamado ${numero} recebido — Conatus Institute`,
+    html: montarHtmlChamado(nome, link, numero, houveResposta),
+    text:
+      `Olá, ${nome}!\n\n` +
+      (houveResposta
+        ? `Nossa equipe respondeu o seu chamado ${numero}.\n`
+        : `Recebemos o seu chamado ${numero} e nossa equipe já foi avisada.\n`) +
+      `Acompanhe e responda por este link:\n${link}\n\n` +
+      `Este link dá acesso ao seu chamado — não o compartilhe.`,
+  });
+}
+
+module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendChamadoEmail };

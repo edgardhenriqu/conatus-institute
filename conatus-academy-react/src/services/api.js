@@ -63,6 +63,24 @@ export const api = {
   // Suporte — chamados do próprio aluno. O detalhe e a resposta usam a mesma
   // rota do admin: o servidor confere a posse do chamado e filtra as
   // observações internas.
+  // ----- Suporte: visitante sem conta -----
+  // Estas três não mandam token: quem protege é o CAPTCHA (na abertura) e o
+  // token do link mágico, que chega por e-mail (na leitura e na resposta).
+  abrirChamadoPublico: async (dados) =>
+    request(`${API_URL}/suporte/publico`, {
+      method: 'POST',
+      body: JSON.stringify(dados),
+    }),
+
+  getChamadoPublico: async (token) =>
+    request(`${API_URL}/suporte/publico/${token}`),
+
+  responderChamadoPublico: async (token, mensagem) =>
+    request(`${API_URL}/suporte/publico/${token}/mensagens`, {
+      method: 'POST',
+      body: JSON.stringify({ mensagem }),
+    }),
+
   getMeusChamados: async () => request(`${API_URL}/suporte/meus`),
 
   // Quantos chamados já foram respondidos e aguardam o aluno (badge do menu).

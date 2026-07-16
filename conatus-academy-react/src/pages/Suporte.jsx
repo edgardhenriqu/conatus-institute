@@ -1,18 +1,24 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { PageLoader } from '../components/ui/PageLoader';
 import { TicketPill } from '../components/ui/TicketPill';
 import { TicketSeletorAnexos, TicketAnexosEnviados } from '../components/ui/TicketAnexos';
+import { ChamadoPublicoForm } from '../components/ui/ChamadoPublicoForm';
 import { TICKET_CATEGORIAS, categoriaInfo, numeroChamado, dataHora } from '../utils/suporte';
 
 /**
- * Suporte — área do aluno.
+ * Suporte — área do aluno e porta de entrada de quem não tem conta.
  *
- * Três telas em uma rota (`vista`): a lista dos próprios chamados, o formulário
- * de abertura e o histórico da conversa. São passos de um mesmo fluxo e o
- * usuário volta sempre para a lista, então não valem rotas separadas — e assim
- * a lista não precisa ser recarregada a cada ida e volta.
+ * A rota é aberta de propósito: quem chega sem login vê o formulário público
+ * (com CAPTCHA) e recebe o link do chamado por e-mail. Quem está logado vê os
+ * próprios chamados, com anexos e histórico.
+ *
+ * Para o aluno logado são três telas em uma rota (`vista`): a lista, o
+ * formulário de abertura e a conversa. São passos de um mesmo fluxo e ele volta
+ * sempre para a lista, então não valem rotas separadas — e assim a lista não
+ * precisa ser recarregada a cada ida e volta.
  *
  * As classes admin-table* são o estilo de tabela da plataforma (apesar do nome):
  * reutilizá-las mantém esta página idêntica ao resto do sistema.
@@ -29,6 +35,7 @@ function ListaVazia() {
 
 export function Suporte() {
   const toast = useToast();
+  const { user, loading: carregandoSessao } = useAuth();
   const [vista, setVista] = useState('lista'); // 'lista' | 'novo' | 'detalhe'
   const [chamados, setChamados] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +53,8 @@ export function Suporte() {
   const chatRef = useRef(null);
 
   const carregarLista = useCallback(async () => {
+    // Visitante não tem lista: a rota /meus exigiria token e devolveria 401.
+    if (!user) { setLoading(false); return; }
     try {
       const data = await api.getMeusChamados();
       setChamados(data.chamados || []);
@@ -56,9 +65,13 @@ export function Suporte() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user]);
 
-  useEffect(() => { carregarLista(); }, [carregarLista]);
+  useEffect(() => {
+    // Espera a sessão resolver: buscar antes faria o visitante ver o formulário
+    // público por um instante mesmo estando logado.
+    if (!carregandoSessao) carregarLista();
+  }, [carregarLista, carregandoSessao]);
 
   // Rola para a mensagem mais recente, mas só se o aluno já estava no fim —
   // com o polling ativo, rolar sempre atrapalharia quem está relendo a conversa.
@@ -144,7 +157,24 @@ export function Suporte() {
     }
   }
 
-  if (loading) return <PageLoader message="Carregando seus chamados…" />;
+  if (carregandoSessao || loading) return <PageLoader message="Carregando…" />;
+
+  /* ── Visitante sem conta: abertura pública ──────────────────── */
+  if (!user) {
+    return (
+      <div className="cursos-body">
+        <div className="container">
+          <div className="cursos-header">
+            <h1>Suporte</h1>
+            <p>
+              Abra um chamado e nossa equipe responde por e-mail. Não é preciso ter conta.
+            </p>
+          </div>
+          <ChamadoPublicoForm />
+        </div>
+      </div>
+    );
+  }
 
   /* ── Formulário de novo chamado ─────────────────────────────── */
   if (vista === 'novo') {

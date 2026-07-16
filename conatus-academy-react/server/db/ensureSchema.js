@@ -387,6 +387,35 @@ const STATEMENTS = [
     criado_em  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_ticket_eventos_ticket ON ticket_eventos(ticket_id, criado_em)`,
+
+  // ── Chamados abertos por visitante (sem conta) ─────────────────────────────
+  // Quem não tem login também abre chamado. Nesse caso não há aluno para
+  // apontar, então user_id passa a aceitar NULL e a identificação vem de
+  // visitante_nome/visitante_email.
+  //
+  // ATENÇÃO: com user_id nulável, todo `JOIN alunos` em consultas de ticket
+  // precisa virar LEFT JOIN — um INNER JOIN faria os chamados de visitante
+  // sumirem silenciosamente da listagem do admin.
+  `ALTER TABLE tickets ALTER COLUMN user_id DROP NOT NULL`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS visitante_nome  VARCHAR(150)`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS visitante_email VARCHAR(255)`,
+
+  // Link mágico: é o que permite ao visitante voltar e ler a resposta sem
+  // conta. Guardamos só o HASH do token — igual a email_verificacoes e
+  // senha_resets. Vazando o banco, ninguém abre as conversas.
+  // Não expira de propósito: é o único acesso do visitante ao chamado dele, e
+  // um link morto o deixaria sem resposta e sem recurso.
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS acesso_token_hash VARCHAR(64)`,
+  `CREATE INDEX IF NOT EXISTS idx_tickets_acesso_token ON tickets(acesso_token_hash)`,
+
+  // Todo chamado tem dono: ou uma conta, ou um visitante identificado.
+  // Sem esta regra, um bug poderia gravar chamado órfão — sem ninguém para
+  // responder e sem ninguém para ler.
+  `ALTER TABLE tickets DROP CONSTRAINT IF EXISTS ticket_tem_dono`,
+  `ALTER TABLE tickets ADD CONSTRAINT ticket_tem_dono CHECK (
+     user_id IS NOT NULL
+     OR (visitante_nome IS NOT NULL AND visitante_email IS NOT NULL AND acesso_token_hash IS NOT NULL)
+   )`,
 ];
 
 async function ensureSchema() {

@@ -17,6 +17,7 @@ import { ResetPassword } from './pages/ResetPassword';
 import { Courses } from './pages/Courses';
 import { Simulacoes } from './pages/Simulacoes';
 import { Suporte } from './pages/Suporte';
+import { ChamadoPublico } from './pages/ChamadoPublico';
 import { CourseDetails } from './pages/CourseDetails';
 import { CourseViewer } from './pages/CourseViewer';
 import { CourseQuiz } from './pages/CourseQuiz';
@@ -114,14 +115,12 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/suporte"
-              element={
-                <ProtectedRoute>
-                  <Suporte />
-                </ProtectedRoute>
-              }
-            />
+            {/* Suporte é rota ABERTA: quem não tem conta abre chamado pelo
+                formulário público (com CAPTCHA) e acompanha pelo link que
+                recebe por e-mail. A própria página decide o que mostrar
+                conforme haja sessão ou não. */}
+            <Route path="/suporte" element={<Suporte />} />
+            <Route path="/chamado/:token" element={<ChamadoPublico />} />
             <Route
               path="/cursos/:id/sala-de-aula"
               element={

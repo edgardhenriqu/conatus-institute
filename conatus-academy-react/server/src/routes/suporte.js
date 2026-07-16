@@ -16,8 +16,75 @@ const multer = require('multer');
 const pool = require('../../db/connection');
 const { authMiddleware, adminMiddleware } = require('../middlewares/auth');
 const { ADMIN_ROLES } = require('../utils/roles');
+const captchaStore = require('../captcha/captchaStore');
+const { sendChamadoEmail } = require('../email/mailer');
 
 const router = express.Router();
+
+// Base dos links enviados por e-mail (aponta para o frontend), igual a auth.js.
+const APP_URL = (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, '');
+
+/* ── Abertura por visitante: limite por IP ──────────────────────────────────
+ * O POST público grava no banco e dispara e-mail sem exigir login. O CAPTCHA já
+ * barra robô ingênuo, mas não impede alguém de resolver um e repetir em laço.
+ * Este teto simples (em memória) limita o estrago de um abuso.
+ *
+ * Em memória e não no banco porque o dado é descartável e some no restart —
+ * bloquear alguém para sempre por causa de um pico não é o objetivo.
+ */
+const LIMITE_JANELA_MS = 60 * 60 * 1000; // 1 hora
+const LIMITE_POR_IP = 5;                 // chamados por IP na janela
+const aberturasPorIp = new Map();        // Map<ip, number[]> (timestamps)
+
+function podeAbrirChamado(ip) {
+  const agora = Date.now();
+  const recentes = (aberturasPorIp.get(ip) || []).filter(t => agora - t < LIMITE_JANELA_MS);
+  // Limpeza preguiçosa: sem isso o Map cresceria para sempre com IPs antigos.
+  if (recentes.length === 0) aberturasPorIp.delete(ip);
+  else aberturasPorIp.set(ip, recentes);
+  return recentes.length < LIMITE_POR_IP;
+}
+
+function registrarAbertura(ip) {
+  const recentes = aberturasPorIp.get(ip) || [];
+  recentes.push(Date.now());
+  aberturasPorIp.set(ip, recentes);
+}
+
+/* ── Token do link mágico ───────────────────────────────────────────────────
+ * O token é DERIVADO do id do chamado por HMAC, não sorteado. O motivo é
+ * prático: a equipe responde e o visitante precisa receber o link de novo, mas
+ * o banco guarda só o hash — e hash não se reverte. Sortear um token novo a
+ * cada aviso mataria o link do e-mail anterior.
+ *
+ * Sendo HMAC de um segredo forte, é tão imprevisível quanto um sorteio: ninguém
+ * chega ao token conhecendo o id. E o banco segue sem o token em claro, então
+ * um vazamento do banco não abre as conversas.
+ *
+ * O segredo é DERIVADO do JWT_SECRET (e não ele próprio) para que este token
+ * jamais seja confundido com um de sessão. Trocar o JWT_SECRET invalida os
+ * links já enviados — a mesma consequência que ele já tem para as sessões.
+ */
+const LINK_SECRET = crypto
+  .createHash('sha256')
+  .update(`${process.env.JWT_SECRET || ''}:suporte-link-v1`)
+  .digest();
+
+function tokenDoChamado(ticketId) {
+  return crypto.createHmac('sha256', LINK_SECRET).update(`ticket:${ticketId}`).digest('hex');
+}
+
+/** Hash do token, que é o que vai ao banco (como em senha_resets). */
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/** Link de acompanhamento do chamado, recomputável a qualquer momento. */
+function linkDoChamado(ticketId) {
+  return `${APP_URL}/chamado/${tokenDoChamado(ticketId)}`;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /* ── Anexos ────────────────────────────────────────────────────────────────
  * Tipos aceitos: PDF, DOC(X), imagem e ZIP. A extensão gravada vem SEMPRE do
@@ -138,12 +205,17 @@ async function ehAdmin(alunoId) {
  * um 403 confirmaria a existência do chamado alheio.
  */
 async function carregarTicketAutorizado(ticketId, alunoId, admin) {
+  // LEFT JOIN em alunos: chamado de visitante não tem user_id, e um INNER JOIN
+  // o faria desaparecer da tela do admin. COALESCE escolhe entre os dados da
+  // conta e os que o visitante digitou.
   const r = await pool.query(
-    `SELECT t.*, a.nome AS aluno_nome, a.email AS aluno_email,
+    `SELECT t.*,
+            COALESCE(a.nome, t.visitante_nome)   AS aluno_nome,
+            COALESCE(a.email, t.visitante_email) AS aluno_email,
             a.empresa AS aluno_empresa, a.role AS aluno_role,
             resp.nome AS responsavel_nome
        FROM tickets t
-       JOIN alunos a ON a.id = t.user_id
+       LEFT JOIN alunos a ON a.id = t.user_id
        LEFT JOIN alunos resp ON resp.id = t.responsavel_id
       WHERE t.id = $1`,
     [ticketId]
@@ -180,6 +252,186 @@ async function carregarMensagens(ticketId, incluirInternas) {
   );
   return r.rows;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ÁREA PÚBLICA — visitante sem conta
+   Sem authMiddleware. O que protege aqui é o CAPTCHA (na abertura) e o token do
+   link mágico (na leitura e na resposta). Declarada antes de /:id para
+   "publico" não ser capturado como id de chamado.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Carrega o chamado pelo token do link mágico.
+ * A busca é pelo HASH: o token em claro só existe no e-mail do visitante.
+ */
+async function carregarPorToken(token) {
+  if (!token || token.length < 20) return null;
+  const r = await pool.query(
+    `SELECT id, assunto, categoria, prioridade, status, criado_em, atualizado_em,
+            visitante_nome, visitante_email
+       FROM tickets
+      WHERE acesso_token_hash = $1`,
+    [hashToken(token)]
+  );
+  return r.rows[0] || null;
+}
+
+// ── Abertura de chamado por visitante ─────────────────────────────────────────
+// Sem anexo de propósito: um upload sem autenticação, protegido só por CAPTCHA,
+// é vetor de abuso e encheria o banco (500 MB no Supabase).
+router.post('/publico', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const nome = (req.body.nome || '').trim();
+    const email = (req.body.email || '').trim().toLowerCase();
+    const assunto = (req.body.assunto || '').trim();
+    const categoria = (req.body.categoria || '').trim();
+    const mensagem = (req.body.mensagem || '').trim();
+    const { captchaId, captchaTexto } = req.body;
+
+    // O CAPTCHA é verificado ANTES de qualquer validação de campo. Assim um robô
+    // não usa as mensagens de erro do formulário para sondar a rota sem nunca
+    // resolver o desafio.
+    const cap = captchaStore.verifyAndConsume(captchaId, captchaTexto);
+    if (!cap.ok) {
+      return res.status(400).json({
+        erro: cap.reason === 'not_found'
+          ? 'A verificação expirou. Gere uma nova imagem e tente de novo.'
+          : 'O texto da imagem não confere. Tente novamente.',
+        captchaInvalido: true,
+      });
+    }
+
+    if (!nome) return res.status(400).json({ erro: 'Informe o seu nome.' });
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ erro: 'Informe um e-mail válido.' });
+    if (!assunto) return res.status(400).json({ erro: 'Informe o assunto do chamado.' });
+    if (assunto.length > LIMITE_ASSUNTO) {
+      return res.status(400).json({ erro: `O assunto deve ter no máximo ${LIMITE_ASSUNTO} caracteres.` });
+    }
+    if (!CATEGORIAS_VALIDAS.includes(categoria)) {
+      return res.status(400).json({ erro: 'Selecione uma categoria válida.' });
+    }
+    if (!mensagem) return res.status(400).json({ erro: 'Descreva sua solicitação na mensagem.' });
+    if (mensagem.length > LIMITE_MENSAGEM) {
+      return res.status(400).json({ erro: `A mensagem deve ter no máximo ${LIMITE_MENSAGEM} caracteres.` });
+    }
+
+    // O teto por IP é checado depois do CAPTCHA: quem nem resolveu o desafio não
+    // deve conseguir consumir a cota de outra pessoa atrás do mesmo IP.
+    if (!podeAbrirChamado(req.ip)) {
+      return res.status(429).json({
+        erro: 'Muitos chamados abertos deste endereço na última hora. ' +
+              'Aguarde um pouco ou responda pelo link que enviamos por e-mail.',
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // O token deriva do id, que só existiria depois do INSERT. Reservar o id na
+    // sequência antes resolve a ordem e evita gravar um hash provisório só para
+    // satisfazer o CHECK e corrigir logo em seguida.
+    const seq = await client.query(
+      `SELECT nextval(pg_get_serial_sequence('tickets','id')) AS id`
+    );
+    const novoId = Number(seq.rows[0].id);
+    const token = tokenDoChamado(novoId);
+
+    const t = await client.query(
+      `INSERT INTO tickets (id, user_id, visitante_nome, visitante_email, acesso_token_hash,
+                            assunto, categoria)
+       VALUES ($1, NULL, $2, $3, $4, $5, $6)
+       RETURNING id, assunto, categoria, prioridade, status, criado_em`,
+      [novoId, nome, email, hashToken(token), assunto, categoria]
+    );
+    const ticket = t.rows[0];
+    await client.query(
+      `INSERT INTO ticket_messages (ticket_id, user_id, autor_tipo, mensagem)
+       VALUES ($1, NULL, 'aluno', $2)`,
+      [ticket.id, mensagem]
+    );
+    await client.query('COMMIT');
+    registrarAbertura(req.ip);
+
+    const link = linkDoChamado(ticket.id);
+    const numero = `#${String(ticket.id).padStart(5, '0')}`;
+
+    // O e-mail é o único caminho do visitante de volta ao chamado. Se o envio
+    // falhar, o chamado JÁ existe e a equipe o verá — então não devolvemos erro
+    // (seria pedir para ele reabrir e duplicar). Devolvemos o link direto, para
+    // ele salvar, e avisamos que o e-mail não saiu.
+    let emailEnviado = true;
+    try {
+      await sendChamadoEmail({ to: email, nome, link, numero });
+    } catch (err) {
+      emailEnviado = false;
+      console.error(`[Suporte] Falha ao enviar link do chamado ${numero} para ${email}:`, err.message);
+    }
+
+    res.status(201).json({ numero, link, emailEnviado, chamado: ticket });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Erro ao abrir chamado público:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  } finally {
+    client.release();
+  }
+});
+
+// ── Leitura da conversa pelo link mágico ──────────────────────────────────────
+router.get('/publico/:token', async (req, res) => {
+  try {
+    const ticket = await carregarPorToken(req.params.token);
+    if (!ticket) return res.status(404).json({ erro: 'Chamado não encontrado ou link inválido.' });
+
+    // Notas internas ficam de fora, como para qualquer não-admin.
+    const mensagens = await carregarMensagens(ticket.id, false);
+    res.json({ chamado: ticket, mensagens });
+  } catch (error) {
+    console.error('Erro ao abrir chamado por token:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// ── Resposta do visitante pelo link mágico ────────────────────────────────────
+router.post('/publico/:token/mensagens', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const ticket = await carregarPorToken(req.params.token);
+    if (!ticket) return res.status(404).json({ erro: 'Chamado não encontrado ou link inválido.' });
+
+    const mensagem = (req.body.mensagem || '').trim();
+    if (!mensagem) return res.status(400).json({ erro: 'Escreva uma mensagem.' });
+    if (mensagem.length > LIMITE_MENSAGEM) {
+      return res.status(400).json({ erro: `A mensagem deve ter no máximo ${LIMITE_MENSAGEM} caracteres.` });
+    }
+    if (STATUS_ENCERRADOS.includes(ticket.status)) {
+      return res.status(409).json({ erro: 'Este chamado está fechado e não aceita novas mensagens.' });
+    }
+
+    await client.query('BEGIN');
+    const m = await client.query(
+      `INSERT INTO ticket_messages (ticket_id, user_id, autor_tipo, mensagem)
+       VALUES ($1, NULL, 'aluno', $2)
+       RETURNING id, autor_tipo, mensagem, interna, criado_em`,
+      [ticket.id, mensagem]
+    );
+    // Mesma regra do aluno logado: responder reabre o chamado.
+    const novoStatus = ticket.status === 'em_atendimento' ? 'em_atendimento' : 'aberto';
+    await client.query(
+      `UPDATE tickets SET status = $1, atualizado_em = CURRENT_TIMESTAMP WHERE id = $2`,
+      [novoStatus, ticket.id]
+    );
+    await client.query('COMMIT');
+
+    res.status(201).json({ mensagem: m.rows[0] });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Erro ao responder chamado por token:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  } finally {
+    client.release();
+  }
+});
 
 /* ══════════════════════════════════════════════════════════════════════════
    DOWNLOAD DE ANEXO
@@ -328,12 +580,14 @@ router.get('/admin', adminMiddleware, async (req, res) => {
       // Busca por nome, e-mail, assunto ou número do chamado. O número é casado
       // à parte: o usuário digita "#123" ou "123", e id é inteiro (ILIKE não se
       // aplica). Sem dígitos, a comparação de id sai da cláusula.
+      // O nome/e-mail procurado é o efetivo (conta ou visitante), senão buscar
+      // por um visitante nunca acharia o chamado dele.
       const soDigitos = termo.replace(/\D/g, '');
       params.push(`%${termo}%`);
       const idxTexto = params.length;
       const partes = [
-        `a.nome ILIKE $${idxTexto}`,
-        `a.email ILIKE $${idxTexto}`,
+        `COALESCE(a.nome, t.visitante_nome) ILIKE $${idxTexto}`,
+        `COALESCE(a.email, t.visitante_email) ILIKE $${idxTexto}`,
         `t.assunto ILIKE $${idxTexto}`,
       ];
       // Number.isSafeInteger barra entradas absurdas ("999999999999999999999"),
@@ -349,8 +603,10 @@ router.get('/admin', adminMiddleware, async (req, res) => {
     // Ordenação por lista fechada: o valor jamais vem do cliente para o SQL.
     const direcao = ordem === 'antigos' ? 'ASC' : 'DESC';
 
+    // LEFT JOIN aqui também: com INNER, a contagem e a listagem ignorariam todo
+    // chamado de visitante (user_id nulo).
     const totalRes = await pool.query(
-      `SELECT COUNT(*) AS total FROM tickets t JOIN alunos a ON a.id = t.user_id ${sqlWhere}`,
+      `SELECT COUNT(*) AS total FROM tickets t LEFT JOIN alunos a ON a.id = t.user_id ${sqlWhere}`,
       params
     );
     const total = Number(totalRes.rows[0].total);
@@ -369,12 +625,14 @@ router.get('/admin', adminMiddleware, async (req, res) => {
     const r = await pool.query(
       `SELECT t.id, t.assunto, t.categoria, t.prioridade, t.status,
               t.criado_em, t.atualizado_em,
-              a.nome AS aluno_nome, a.email AS aluno_email,
+              COALESCE(a.nome, t.visitante_nome)   AS aluno_nome,
+              COALESCE(a.email, t.visitante_email) AS aluno_email,
+              (t.user_id IS NULL) AS visitante,
               resp.nome AS responsavel_nome,
               (SELECT COUNT(*) FROM ticket_messages m
                 WHERE m.ticket_id = t.id AND m.interna = false) AS total_mensagens
          FROM tickets t
-         JOIN alunos a ON a.id = t.user_id
+         LEFT JOIN alunos a ON a.id = t.user_id
          LEFT JOIN alunos resp ON resp.id = t.responsavel_id
          ${sqlWhere}
         ORDER BY t.atualizado_em ${direcao}, t.id ${direcao}
@@ -646,25 +904,36 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
     // Só o admin recebe a observação interna e os dados de gestão do aluno.
     if (!admin) delete ticket.observacao_interna;
+    // O hash do link mágico nunca sai daqui — nem para o admin. É segredo de
+    // acesso do visitante e não tem uso na interface.
+    delete ticket.acesso_token_hash;
 
     let aluno = null;
     let eventos = [];
     if (admin) {
-      const m = await pool.query(
-        `SELECT c.nome AS curso_nome, mt.progresso
-           FROM matriculas mt
-           JOIN cursos c ON c.id = mt.curso_id
-          WHERE mt.aluno_id = $1
-          ORDER BY c.nome`,
-        [ticket.user_id]
-      );
+      // Visitante não tem conta: nada de matrículas, empresa ou perfil. A
+      // consulta só faz sentido (e só roda) quando há user_id.
+      let matriculas = [];
+      if (ticket.user_id) {
+        const m = await pool.query(
+          `SELECT c.nome AS curso_nome, mt.progresso
+             FROM matriculas mt
+             JOIN cursos c ON c.id = mt.curso_id
+            WHERE mt.aluno_id = $1
+            ORDER BY c.nome`,
+          [ticket.user_id]
+        );
+        matriculas = m.rows;
+      }
       aluno = {
         id: ticket.user_id,
         nome: ticket.aluno_nome,
         email: ticket.aluno_email,
         empresa: ticket.aluno_empresa,
         role: ticket.aluno_role,
-        matriculas: m.rows,
+        // Sinaliza ao painel que não há conta por trás deste chamado.
+        visitante: !ticket.user_id,
+        matriculas,
       };
       // O histórico de alterações é interno: mostra quem mexeu no quê e quando.
       // Fica fora da resposta ao aluno junto com o resto dos dados de gestão.
@@ -748,6 +1017,24 @@ router.post('/:id/mensagens', authMiddleware, comAnexos, async (req, res) => {
       [novoStatus, assumir, assumir ? req.alunoId : null, ticket.id]
     );
     await client.query('COMMIT');
+
+    // Chamado de visitante (sem conta): o e-mail é o único jeito de ele saber
+    // que houve resposta — não há badge nem área logada para avisá-lo.
+    // Nota interna não dispara: ele nem a recebe.
+    // O envio fica FORA da transação e não derruba a resposta: a mensagem já
+    // está gravada, e falha de SMTP não pode desfazer o atendimento.
+    if (admin && !interna && !ticket.user_id && ticket.visitante_email) {
+      const numero = `#${String(ticket.id).padStart(5, '0')}`;
+      sendChamadoEmail({
+        to: ticket.visitante_email,
+        nome: ticket.visitante_nome,
+        link: linkDoChamado(ticket.id),
+        numero,
+        houveResposta: true,
+      }).catch(err => {
+        console.error(`[Suporte] Falha ao avisar visitante do chamado ${numero}:`, err.message);
+      });
+    }
 
     res.status(201).json({ mensagem: m.rows[0] });
   } catch (error) {
