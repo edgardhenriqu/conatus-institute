@@ -42,6 +42,33 @@ export const statusInfo = (v) => acharEm(TICKET_STATUS, v);
 export const prioridadeInfo = (v) => acharEm(TICKET_PRIORIDADES, v);
 export const categoriaInfo = (v) => acharEm(TICKET_CATEGORIAS, v);
 
+/**
+ * Horas até um chamado resolvido fechar sozinho.
+ * Espelha HORAS_ATE_FECHAR de server/src/services/fecharChamados.js.
+ */
+export const HORAS_ATE_FECHAR = 24;
+
+/**
+ * Quanto falta para o fechamento automático, em texto.
+ *
+ * Devolve null quando não há prazo correndo (chamado não resolvido, ou sem a
+ * marca de resolução) — o chamador usa isso para não exibir nada.
+ *
+ * O fechamento é feito por uma varredura a cada 15 min no servidor, então o
+ * texto é uma aproximação — daí "em cerca de X", e não uma contagem regressiva
+ * ao segundo, que prometeria uma precisão que não existe.
+ */
+export function prazoFechamento(chamado) {
+  if (!chamado || chamado.status !== 'resolvido' || !chamado.resolvido_em) return null;
+  const limite = new Date(chamado.resolvido_em).getTime() + HORAS_ATE_FECHAR * 3600_000;
+  const faltamMs = limite - Date.now();
+  if (faltamMs <= 0) return 'a qualquer momento';
+  const horas = Math.floor(faltamMs / 3600_000);
+  if (horas >= 1) return `em cerca de ${horas} ${horas === 1 ? 'hora' : 'horas'}`;
+  const minutos = Math.max(Math.floor(faltamMs / 60_000), 1);
+  return `em cerca de ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`;
+}
+
 /** Número exibido do chamado: id 42 → "#00042". */
 export function numeroChamado(id) {
   return `#${String(id).padStart(5, '0')}`;

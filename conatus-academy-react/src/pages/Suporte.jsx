@@ -6,6 +6,7 @@ import { PageLoader } from '../components/ui/PageLoader';
 import { TicketPill } from '../components/ui/TicketPill';
 import { TicketSeletorAnexos, TicketAnexosEnviados } from '../components/ui/TicketAnexos';
 import { ChamadoPublicoForm } from '../components/ui/ChamadoPublicoForm';
+import { TicketPrazoFechamento } from '../components/ui/TicketPrazoFechamento';
 import { TICKET_CATEGORIAS, categoriaInfo, numeroChamado, dataHora } from '../utils/suporte';
 
 /**
@@ -297,6 +298,11 @@ export function Suporte() {
                 </p>
               ) : (
                 <>
+                  {/* Resolvido: avisa do fechamento automático antes do campo de
+                      resposta, que é justamente o que reabre o chamado. */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <TicketPrazoFechamento chamado={chamado} />
+                  </div>
                   <label className="ticket-filtro-label" htmlFor="resposta-aluno">Responder</label>
                   <textarea id="resposta-aluno" className="ticket-filtro-campo" rows={4}
                     maxLength={5000}

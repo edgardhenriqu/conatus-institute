@@ -5,6 +5,7 @@ import { useToast } from '../../components/ui/Toast';
 import { PageLoader } from '../../components/ui/PageLoader';
 import { TicketPill } from '../../components/ui/TicketPill';
 import { TicketSeletorAnexos, TicketAnexosEnviados } from '../../components/ui/TicketAnexos';
+import { TicketPrazoFechamento } from '../../components/ui/TicketPrazoFechamento';
 import { ROLE_LABELS } from '../../utils/permissions';
 import {
   TICKET_STATUS, TICKET_PRIORIDADES,
@@ -342,6 +343,9 @@ export function AdminSuporteDetalhe() {
           <div className="admin-table-container">
             <div className="admin-table-header"><h2>Alteração rápida</h2></div>
             <form onSubmit={handleSalvarGestao} style={{ padding: '20px 25px', display: 'grid', gap: '16px' }}>
+              {/* Deixa claro que "resolvido" tem prazo — e que quem fecha é o
+                  sistema, não um colega. */}
+              <TicketPrazoFechamento chamado={chamado} paraEquipe />
               <div>
                 <label className="ticket-filtro-label" htmlFor="g-status">Editar status</label>
                 <select id="g-status" className="ticket-filtro-campo" value={gestao.status}

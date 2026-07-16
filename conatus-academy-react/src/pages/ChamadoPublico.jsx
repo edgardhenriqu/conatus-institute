@@ -5,6 +5,7 @@ import { useToast } from '../components/ui/Toast';
 import { PageLoader } from '../components/ui/PageLoader';
 import { TicketPill } from '../components/ui/TicketPill';
 import { TicketChat } from '../components/ui/TicketChat';
+import { TicketPrazoFechamento } from '../components/ui/TicketPrazoFechamento';
 import { categoriaInfo, numeroChamado, dataHora } from '../utils/suporte';
 
 /**
@@ -119,6 +120,9 @@ export function ChamadoPublico() {
               </p>
             ) : (
               <>
+                <div style={{ marginBottom: '14px' }}>
+                  <TicketPrazoFechamento chamado={chamado} />
+                </div>
                 <label className="ticket-filtro-label" htmlFor="resp-publico">Responder</label>
                 <textarea id="resp-publico" className="ticket-filtro-campo" rows={4} maxLength={5000}
                   style={{ resize: 'vertical' }}

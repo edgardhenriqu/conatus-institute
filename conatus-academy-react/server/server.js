@@ -137,12 +137,17 @@ if (!process.env.DB_HOST) {
 const ensureSchema = require('./db/ensureSchema');
 const seedMopCourse = require('./db/seedMopCourse');
 const migrateUploads = require('./db/migrateUploads');
+const { iniciarFechamentoAutomatico } = require('./src/services/fecharChamados');
 
 ensureSchema()
   .then(() => seedMopCourse())
   .then(() => migrateUploads())
   .catch(err => console.error('Aviso: não foi possível atualizar o schema/seed automaticamente:', err.message))
   .finally(() => {
+    // Chamado resolvido fecha sozinho 24h depois. Só liga DEPOIS do
+    // ensureSchema: a varredura depende da coluna resolvido_em e do trigger.
+    iniciarFechamentoAutomatico();
+
     app.listen(PORT, HOST, () => {
       console.log("");
       console.log("🚀 Conatus Institute — servidor iniciado");

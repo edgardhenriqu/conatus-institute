@@ -283,7 +283,7 @@ async function carregarPorToken(token) {
   if (!token || token.length < 20) return null;
   const r = await pool.query(
     `SELECT id, assunto, categoria, prioridade, status, criado_em, atualizado_em,
-            visitante_nome, visitante_email
+            resolvido_em, visitante_nome, visitante_email
        FROM tickets
       WHERE acesso_token_hash = $1`,
     [hashToken(token)]
@@ -828,7 +828,7 @@ router.get('/meus', authMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT t.id, t.assunto, t.categoria, t.prioridade, t.status,
-              t.criado_em, t.atualizado_em,
+              t.criado_em, t.atualizado_em, t.resolvido_em,
               resp.nome AS responsavel_nome
          FROM tickets t
          LEFT JOIN alunos resp ON resp.id = t.responsavel_id

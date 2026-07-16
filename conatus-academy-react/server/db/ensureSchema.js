@@ -416,6 +416,47 @@ const STATEMENTS = [
      user_id IS NOT NULL
      OR (visitante_nome IS NOT NULL AND visitante_email IS NOT NULL AND acesso_token_hash IS NOT NULL)
    )`,
+
+  // ── Fechamento automático 24h após a resolução ─────────────────────────────
+  // Quando marcamos "resolvido", o aluno ainda tem 24h para voltar e responder
+  // (o que reabre o chamado). Passado o prazo sem retorno, ele fecha sozinho.
+  //
+  // O prazo NÃO pode contar de atualizado_em: essa coluna muda a cada alteração,
+  // então editar a observação interna de um chamado resolvido reiniciaria o
+  // relógio sem que ninguém tivesse pedido. Daí uma marca própria.
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolvido_em TIMESTAMP`,
+  `CREATE INDEX IF NOT EXISTS idx_tickets_resolvido_em ON tickets(resolvido_em)
+     WHERE status = 'resolvido'`,
+
+  // A marca é mantida por TRIGGER, e não pelas rotas, porque o status muda em
+  // vários caminhos (alteração rápida, resposta do admin, resposta do aluno,
+  // resposta do visitante) e ainda pode mudar por SQL manual no Supabase.
+  // Espalhar a regra por todos eles é como esquecê-la em um.
+  `CREATE OR REPLACE FUNCTION marcar_resolucao_ticket() RETURNS TRIGGER AS $$
+   BEGIN
+     IF NEW.status = 'resolvido' AND OLD.status IS DISTINCT FROM 'resolvido' THEN
+       -- Entrou em resolvido agora: começa a contagem.
+       NEW.resolvido_em := CURRENT_TIMESTAMP;
+     ELSIF NEW.status <> 'resolvido' THEN
+       -- Saiu de resolvido (reaberto pelo aluno, ou fechado): o prazo perde o
+       -- sentido e a marca sai junto, senão um chamado reaberto e resolvido de
+       -- novo herdaria o relógio antigo e fecharia cedo demais.
+       NEW.resolvido_em := NULL;
+     END IF;
+     RETURN NEW;
+   END;
+   $$ LANGUAGE plpgsql`,
+  `DROP TRIGGER IF EXISTS trg_marcar_resolucao ON tickets`,
+  `CREATE TRIGGER trg_marcar_resolucao
+     BEFORE UPDATE ON tickets
+     FOR EACH ROW EXECUTE FUNCTION marcar_resolucao_ticket()`,
+
+  // Chamados que já estavam resolvidos antes do trigger existir não têm a marca
+  // e nunca fechariam. atualizado_em é a melhor aproximação disponível do
+  // momento em que foram resolvidos. Só toca em quem está sem a marca, então é
+  // seguro rodar a cada boot.
+  `UPDATE tickets SET resolvido_em = atualizado_em
+    WHERE status = 'resolvido' AND resolvido_em IS NULL`,
 ];
 
 async function ensureSchema() {
