@@ -18,6 +18,25 @@ const nodemailer = require('nodemailer');
 let transporter = null;
 let configError = null;
 
+/**
+ * Escapa texto para interpolação segura no HTML dos e-mails.
+ *
+ * Não é zelo teórico: o nome do remetente de um chamado de suporte é digitado
+ * por um visitante sem conta, e o e-mail sai pelo NOSSO SMTP (assinado por
+ * DKIM). Sem escape, alguém informaria um "nome" como
+ * `<a/href="https://falso">Clique-aqui</a>` — sem espaços, para atravessar o
+ * corte do primeiro nome — e usaria a plataforma para entregar phishing com a
+ * marca da Conatus a terceiros.
+ */
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getTransporter() {
   if (transporter || configError) return transporter;
 
@@ -37,7 +56,8 @@ function getTransporter() {
 }
 
 function montarHtml(nome, link) {
-  const primeiroNome = (nome || '').trim().split(/\s+/)[0] || 'aluno(a)';
+  const primeiroNome = escapeHtml((nome || '').trim().split(/\s+/)[0] || 'aluno(a)');
+  link = escapeHtml(link);
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#1f2937">
     <div style="text-align:center;padding:24px 0">
@@ -72,7 +92,8 @@ function montarHtml(nome, link) {
 }
 
 function montarHtmlReset(nome, link) {
-  const primeiroNome = (nome || '').trim().split(/\s+/)[0] || 'aluno(a)';
+  const primeiroNome = escapeHtml((nome || '').trim().split(/\s+/)[0] || 'aluno(a)');
+  link = escapeHtml(link);
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#1f2937">
     <div style="text-align:center;padding:24px 0">
@@ -157,10 +178,10 @@ async function sendPasswordResetEmail({ to, nome, link }) {
 }
 
 function montarHtmlChamado(nome, link, numero, houveResposta) {
-  const primeiroNome = (nome || '').trim().split(/\s+/)[0] || 'você';
-  const titulo = houveResposta
-    ? `Temos uma resposta no seu chamado ${numero}`
-    : `Recebemos o seu chamado ${numero}`;
+  // nome vem de visitante sem conta — é a entrada menos confiável do sistema.
+  const primeiroNome = escapeHtml((nome || '').trim().split(/\s+/)[0] || 'você');
+  link = escapeHtml(link);
+  numero = escapeHtml(numero);
   const texto = houveResposta
     ? 'Nossa equipe respondeu o seu chamado de suporte. Abra a conversa para ler e responder.'
     : 'Recebemos a sua solicitação e nossa equipe já foi avisada. Guarde este e-mail: é por ele que você acompanha e responde o chamado.';

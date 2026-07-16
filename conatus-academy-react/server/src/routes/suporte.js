@@ -86,6 +86,21 @@ function linkDoChamado(ticketId) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+/*
+ * Nome do visitante: letras (com acento), espaço, ponto, apóstrofo e hífen.
+ *
+ * O escape do mailer já impede injetar HTML, mas sozinho não basta: o nome vai
+ * dentro de um e-mail que sai do NOSSO domínio, assinado por DKIM, para um
+ * endereço que o próprio remetente escolhe. Sem esta regra, alguém se chamaria
+ * "URGENTE acesse http://falso.com" e usaria a plataforma para entregar texto
+ * de phishing com a marca da Conatus — e clientes de e-mail ainda
+ * transformariam a URL crua em link clicável.
+ *
+ * Recusamos em vez de limpar em silêncio: nome mutilado sem explicação é pior
+ * para quem tem um nome legítimo e incomum.
+ */
+const NOME_RE = /^[\p{L}\p{M}][\p{L}\p{M}\s.'-]{0,99}$/u;
+
 /* ── Anexos ────────────────────────────────────────────────────────────────
  * Tipos aceitos: PDF, DOC(X), imagem e ZIP. A extensão gravada vem SEMPRE do
  * mimetype verificado, nunca do nome enviado pelo cliente — um "foto.jpg.exe"
@@ -303,6 +318,11 @@ router.post('/publico', async (req, res) => {
     }
 
     if (!nome) return res.status(400).json({ erro: 'Informe o seu nome.' });
+    if (!NOME_RE.test(nome)) {
+      return res.status(400).json({
+        erro: 'Informe um nome válido (apenas letras, espaços, apóstrofos e hífens).',
+      });
+    }
     if (!EMAIL_RE.test(email)) return res.status(400).json({ erro: 'Informe um e-mail válido.' });
     if (!assunto) return res.status(400).json({ erro: 'Informe o assunto do chamado.' });
     if (assunto.length > LIMITE_ASSUNTO) {
