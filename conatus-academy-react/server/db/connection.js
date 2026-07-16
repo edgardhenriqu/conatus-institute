@@ -1,4 +1,28 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+/* ── Fuso dos TIMESTAMP sem fuso ───────────────────────────────────────────
+ * Praticamente todas as colunas de data do projeto são `timestamp without time
+ * zone`, gravadas com CURRENT_TIMESTAMP/now(). A sessão do Postgres roda em
+ * UTC, então o valor guardado é o horário UTC — só que "cru", sem dizer isso.
+ *
+ * O driver pg, por padrão, lê esse valor como horário LOCAL do servidor Node.
+ * Rodando em Brasília (UTC−3), toda data voltava 3 horas ADIANTADA: um chamado
+ * aberto às 19:45 aparecia como 22:45, e a contagem de 24h do fechamento
+ * automático exibia "26 horas".
+ *
+ * Aqui dizemos ao driver o que esses valores realmente são: UTC. Assim o Date
+ * passa a representar o instante certo, e toLocaleString mostra o horário local
+ * correto em qualquer fuso — inclusive no servidor do Replit, que roda em UTC.
+ *
+ * 1114 é o OID de `timestamp without time zone`. Não mexe em `timestamptz`
+ * (1184), que o driver já interpreta corretamente.
+ *
+ * Nada é reescrito no banco: os valores gravados sempre foram UTC. O que muda
+ * é só a LEITURA, que antes estava errada. Comparações feitas dentro do SQL
+ * (ex.: a varredura do fechamento automático) nunca passaram pelo driver e por
+ * isso já estavam corretas.
+ */
+types.setTypeParser(1114, (valor) => new Date(`${valor.replace(' ', 'T')}Z`));
 
 // SSL é exigido por bancos gerenciados (ex.: Supabase). Em dev/Docker local
 // deixe DB_SSL ausente/false. Em produção (Supabase) use DB_SSL=true.
