@@ -4296,14 +4296,20 @@ body.focus-mode-open { overflow: hidden; }
     justify-content: center;
     border-radius: var(--radius-round);
     background: var(--bg-white);
-    border: 1px solid var(--border);
+    /* Anel grosso em --primary: o círculo é claro como a página (--bg-light), e
+       com a borda fina de --border ele praticamente sumia no fundo. O anel
+       escuro é o que dá o contorno. Não usar --gold aqui — no design system ele
+       marca certificado/destaque, e repeti-lo diluiria esse significado. */
+    border: 3px solid var(--primary);
     box-shadow: var(--shadow-lg);
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast),
+                border-color var(--transition-fast);
 }
 
 .suporte-fab:hover {
     transform: translateY(-3px);
     box-shadow: var(--shadow-xl);
+    border-color: var(--primary-light);
 }
 
 .suporte-fab:focus-visible {
