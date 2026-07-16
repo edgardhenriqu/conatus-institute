@@ -4128,19 +4128,27 @@ body.focus-mode-open { overflow: hidden; }
     line-height: 1;
 }
 
-/* Na navbar o link é curto: o contador acompanha o texto em vez de ser
-   empurrado para a borda (o margin-left: auto acima serve à barra lateral). */
-.nav-suporte-link {
-    display: inline-flex;
+/* O contador do botão flutuante é o mesmo da barra lateral, mas ancorado no
+   canto do círculo em vez de empurrado por margin-left: auto. */
+.suporte-fab-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    display: flex;
     align-items: center;
-    gap: 6px;
-}
-
-.nav-suporte-link .ticket-contador {
-    margin-left: 0;
-    min-width: 18px;
-    height: 18px;
-    font-size: 0.65rem;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: var(--radius-pill);
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    /* A borda na cor do botão descola o contador do círculo, para ele não
+       parecer colado no ícone quando o fundo do card é claro. */
+    border: 2px solid var(--bg-white);
 }
 
 /* Barra de filtros acima da tabela. auto-fit faz os campos se reorganizarem

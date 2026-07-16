@@ -1,8 +1,17 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../../services/api';
+
+// Frequência da consulta ao contador de chamados aguardando o aluno.
+const INTERVALO_SUPORTE = 60000;
 
 /**
  * Botão flutuante de atalho para os chamados do aluno (/suporte).
+ *
+ * É o ÚNICO acesso do aluno ao suporte (não há item no menu), então ele também
+ * carrega o aviso de que a equipe respondeu — sem isso não sobraria nenhum
+ * sinal de resposta na interface do aluno.
  *
  * Fica escondido em quatro situações, e cada uma tem seu motivo:
  *  - visitante deslogado → /suporte é rota protegida; o clique só o jogaria na
@@ -18,22 +27,74 @@ import { useAuth } from '../../contexts/AuthContext';
 export function SuporteFab() {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const [aguardando, setAguardando] = useState(0);
 
-  if (!user) return null;
-  if (pathname.startsWith('/admin')) return null;
-  if (pathname === '/suporte') return null;
-  if (pathname.endsWith('/sala-de-aula')) return null;
+  const escondido =
+    !user ||
+    pathname.startsWith('/admin') ||
+    pathname === '/suporte' ||
+    pathname.endsWith('/sala-de-aula');
+
+  // Conta os chamados do aluno em "Aguardando Aluno" (a equipe respondeu).
+  // O efeito precisa vir ANTES de qualquer return: hook não pode ficar depois
+  // de uma saída condicional. Por isso a consulta é guardada por `escondido`,
+  // em vez de o componente sair mais cedo — assim nada é consultado nas telas
+  // em que o botão nem aparece.
+  useEffect(() => {
+    if (escondido) { setAguardando(0); return; }
+    let vivo = true;
+
+    async function buscar() {
+      try {
+        const d = await api.getChamadosAguardando();
+        if (vivo) setAguardando(d.aguardando || 0);
+      } catch {
+        /* silencioso: o aviso é acessório e não deve virar erro na tela */
+      }
+    }
+
+    // A primeira busca é incondicional. A página pode ter carregado numa aba em
+    // segundo plano (Ctrl+clique, sessão restaurada com várias abas): checar a
+    // visibilidade aqui descartaria essa busca e deixaria o aluno sem o aviso
+    // até o próximo tique.
+    buscar();
+
+    // Os tiques periódicos, sim, pulam enquanto a aba está oculta — ninguém
+    // está lendo, e é o que evita dezenas de requisições em aba esquecida.
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') buscar();
+    }, INTERVALO_SUPORTE);
+
+    // Ao voltar para a aba, revalida na hora em vez de esperar até 60s com um
+    // número possivelmente velho na tela.
+    const aoVoltar = () => {
+      if (document.visibilityState === 'visible') buscar();
+    };
+    document.addEventListener('visibilitychange', aoVoltar);
+
+    return () => {
+      vivo = false;
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', aoVoltar);
+    };
+  }, [escondido]);
+
+  if (escondido) return null;
+
+  const rotulo = aguardando > 0
+    ? `Suporte — ${aguardando} chamado(s) com resposta da equipe`
+    : 'Suporte — abrir ou acompanhar chamados';
 
   return (
-    <Link
-      to="/suporte"
-      className="suporte-fab"
-      title="Suporte — abrir ou acompanhar chamados"
-      aria-label="Suporte — abrir ou acompanhar chamados"
-    >
+    <Link to="/suporte" className="suporte-fab" title={rotulo} aria-label={rotulo}>
       {/* alt vazio + aria-label no link: o ícone é decorativo aqui, e um alt
           repetiria o rótulo que o leitor de tela já anuncia. */}
       <img src="/icone.svg" alt="" width="38" height="38" aria-hidden="true" />
+      {aguardando > 0 && (
+        <span className="suporte-fab-badge" aria-hidden="true">
+          {aguardando > 9 ? '9+' : aguardando}
+        </span>
+      )}
     </Link>
   );
 }

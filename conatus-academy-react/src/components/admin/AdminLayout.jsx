@@ -39,9 +39,7 @@ export default function AdminLayout() {
     if (!isAdmin) return;
     let vivo = true;
 
-    async function atualizar() {
-      // Aba em segundo plano não precisa de contador atualizado.
-      if (document.visibilityState !== 'visible') return;
+    async function buscar() {
       try {
         const d = await adminApi.getSuportePendentes();
         if (vivo) setContadores({ pendentes: d.pendentes || 0 });
@@ -50,9 +48,27 @@ export default function AdminLayout() {
       }
     }
 
-    atualizar();
-    const t = setInterval(atualizar, INTERVALO_CONTADOR);
-    return () => { vivo = false; clearInterval(t); };
+    // Primeira busca incondicional: o painel pode ter sido aberto numa aba em
+    // segundo plano, e checar a visibilidade aqui deixaria o menu sem contador
+    // até o próximo tique.
+    buscar();
+
+    // Já os tiques periódicos pulam com a aba oculta — ninguém está lendo.
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') buscar();
+    }, INTERVALO_CONTADOR);
+
+    // Voltou para a aba: revalida na hora, em vez de exibir um número velho.
+    const aoVoltar = () => {
+      if (document.visibilityState === 'visible') buscar();
+    };
+    document.addEventListener('visibilitychange', aoVoltar);
+
+    return () => {
+      vivo = false;
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', aoVoltar);
+    };
   }, [isAdmin]);
 
   return (

@@ -1,40 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../services/api';
 import { Button } from '../ui/Button';
 import { ThemeToggle } from '../ui/ThemeToggle';
-
-// Frequência da consulta ao contador de chamados aguardando o aluno.
-const INTERVALO_SUPORTE = 60000;
 
 export function Header() {
   const { user, logout, isAdmin, isStaff } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [aguardando, setAguardando] = useState(0);
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
-
-  // Avisa o aluno de que a equipe respondeu: conta os chamados dele em
-  // "Aguardando Aluno". Sai do ar quando ninguém está logado.
-  useEffect(() => {
-    if (!user) { setAguardando(0); return; }
-    let vivo = true;
-
-    async function atualizar() {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const d = await api.getChamadosAguardando();
-        if (vivo) setAguardando(d.aguardando || 0);
-      } catch {
-        /* silencioso: o badge é acessório e não deve virar erro na navbar */
-      }
-    }
-
-    atualizar();
-    const t = setInterval(atualizar, INTERVALO_SUPORTE);
-    return () => { vivo = false; clearInterval(t); };
-  }, [user]);
 
   return (
     <nav className="navbar">
@@ -51,20 +25,8 @@ export function Header() {
           {user && (
             <li><Link to="/simulacoes" onClick={closeMenu}>Simulações</Link></li>
           )}
-          {user && (
-            <li>
-              <Link to="/suporte" onClick={closeMenu} className="nav-suporte-link">
-                Suporte
-                {aguardando > 0 && (
-                  <span className="ticket-contador"
-                    title={`${aguardando} chamado(s) com resposta da equipe`}
-                    aria-label={`${aguardando} chamados com resposta da equipe`}>
-                    {aguardando > 9 ? '9+' : aguardando}
-                  </span>
-                )}
-              </Link>
-            </li>
-          )}
+          {/* Suporte não entra aqui: o acesso do aluno é pelo botão flutuante
+              (SuporteFab), que também carrega o aviso de resposta da equipe. */}
         </ul>
 
         <div className="nav-actions">
