@@ -1,4 +1,4 @@
-import { API_URL, request } from './httpClient';
+import { API_URL, request, requestBlob, requestForm } from './httpClient';
 
 export const adminApi = {
   // ----- Upload de imagem (capa de curso) -----
@@ -98,6 +98,61 @@ export const adminApi = {
 
   deleteSimulacao: async (id) =>
     request(`${API_URL}/simulacoes/${id}`, { method: 'DELETE' }),
+
+  // ----- Suporte (chamados) -----
+  // A listagem aceita filtros combinados; só os preenchidos viajam na URL, para
+  // não mandar "status=" vazio e sujar a query.
+  getChamados: async (filtros = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(filtros).forEach(([k, v]) => {
+      if (v !== '' && v !== null && v !== undefined) qs.append(k, v);
+    });
+    const query = qs.toString();
+    return request(`${API_URL}/suporte/admin${query ? `?${query}` : ''}`);
+  },
+
+  getSuporteResumo: async () => request(`${API_URL}/suporte/admin/resumo`),
+
+  getSuportePendentes: async () => request(`${API_URL}/suporte/admin/pendentes`),
+
+  getAtendentes: async () => request(`${API_URL}/suporte/admin/atendentes`),
+
+  // Detalhe e resposta são compartilhados com o aluno (o servidor decide o que
+  // cada um vê) — por isso apontam para /suporte/:id, e não para /suporte/admin.
+  getChamado: async (id) => request(`${API_URL}/suporte/${id}`),
+
+  responderChamado: async (id, mensagem, interna = false, anexos = []) => {
+    const fd = new FormData();
+    fd.append('mensagem', mensagem);
+    // Vai como string: em multipart todo campo é texto. O servidor aceita
+    // 'true' além do booleano justamente por isso.
+    fd.append('interna', String(interna));
+    anexos.forEach(f => fd.append('anexos', f));
+    return requestForm(`${API_URL}/suporte/${id}/mensagens`, fd);
+  },
+
+  // Mesmo download do aluno: a rota confere o papel e libera anexo de nota
+  // interna só para a equipe.
+  baixarAnexo: async (anexoId, nome) => {
+    const blob = await requestBlob(`${API_URL}/suporte/anexos/${anexoId}`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nome || 'anexo';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+
+  updateChamado: async (id, data) =>
+    request(`${API_URL}/suporte/admin/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteChamado: async (id) =>
+    request(`${API_URL}/suporte/admin/${id}`, { method: 'DELETE' }),
 
   // ----- Controle de acesso do curso (modo + regras) -----
   getCourseAccess: async (courseId) =>

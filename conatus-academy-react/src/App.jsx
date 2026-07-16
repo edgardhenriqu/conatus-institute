@@ -15,6 +15,7 @@ import { VerifyEmail } from './pages/VerifyEmail';
 import { ResetPassword } from './pages/ResetPassword';
 import { Courses } from './pages/Courses';
 import { Simulacoes } from './pages/Simulacoes';
+import { Suporte } from './pages/Suporte';
 import { CourseDetails } from './pages/CourseDetails';
 import { CourseViewer } from './pages/CourseViewer';
 import { CourseQuiz } from './pages/CourseQuiz';
@@ -30,6 +31,8 @@ import { AdminCursos } from './pages/admin/AdminCursos';
 import { AdminCertificados } from './pages/admin/AdminCertificados';
 import { AdminAvaliacoes } from './pages/admin/AdminAvaliacoes';
 import { AdminSimulacoes } from './pages/admin/AdminSimulacoes';
+import { AdminSuporte } from './pages/admin/AdminSuporte';
+import { AdminSuporteDetalhe } from './pages/admin/AdminSuporteDetalhe';
 import ModuleEditor from './pages/admin/ModuleEditor';
 import LessonEditor from './pages/admin/LessonEditor';
 import CourseEditor from './pages/admin/CourseEditor';
@@ -108,6 +111,14 @@ function App() {
               }
             />
             <Route
+              path="/suporte"
+              element={
+                <ProtectedRoute>
+                  <Suporte />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/cursos/:id/sala-de-aula"
               element={
                 <ProtectedRoute>
@@ -148,6 +159,15 @@ function App() {
               <Route path="certificados" element={<AdminCertificados />} />
               <Route path="avaliacoes" element={<AdminAvaliacoes />} />
               <Route path="simulacoes" element={<AdminSimulacoes />} />
+              {/* Suporte é só do admin-tier: o layout /admin/* aceita instrutor
+                  (requireStaff), então estas duas rotas restringem por conta
+                  própria. O servidor exige adminMiddleware de qualquer modo. */}
+              <Route path="suporte" element={
+                <ProtectedRoute requireAdmin={true}><AdminSuporte /></ProtectedRoute>
+              } />
+              <Route path="suporte/:id" element={
+                <ProtectedRoute requireAdmin={true}><AdminSuporteDetalhe /></ProtectedRoute>
+              } />
               <Route path="cursos/:cursoId/editar" element={<CourseEditor />} />
               <Route path="cursos/:cursoId/modulos" element={<ModuleEditor />} />
               <Route path="cursos/:cursoId/modulos/:moduloId/aulas" element={<LessonEditor />} />

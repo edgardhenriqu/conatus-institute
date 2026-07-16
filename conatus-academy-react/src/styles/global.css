@@ -4067,6 +4067,360 @@ body.focus-mode-open { overflow: hidden; }
     white-space: nowrap;
 }
 
+/* ============================================
+   SUPORTE (chamados)
+   Usado pelo painel (/admin/suporte) e pela área do aluno (/suporte).
+   ============================================ */
+
+/* Pílula de status/prioridade. A cor vem de --pill-cor, definido inline pelo
+   componente a partir dos tokens de src/utils/suporte.js — assim há uma regra
+   só, em vez de uma classe por status. O fundo é a própria cor a 12%, o que
+   funciona nos dois temas sem precisar de tinta dedicada. */
+.ticket-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--pill-cor, var(--text-muted));
+    background: color-mix(in srgb, var(--pill-cor, var(--text-muted)) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--pill-cor, var(--text-muted)) 35%, transparent);
+}
+
+/* As 10 colunas do Suporte não cabem nos 1200px do container. Sem uma largura
+   mínima o navegador espreme o Assunto até ~120px, quebrando o texto em quatro
+   linhas e inflando a altura da linha para 150px. Com min-width a tabela mantém
+   colunas legíveis e desliza dentro de .admin-table-scroll — o mesmo padrão das
+   outras tabelas do painel. */
+.ticket-tabela {
+    min-width: 1240px;
+}
+
+/* Só o assunto quebra em duas linhas; o resto é curto e fica em uma linha. */
+.ticket-tabela th,
+.ticket-tabela td {
+    white-space: nowrap;
+}
+
+.ticket-tabela .ticket-col-assunto {
+    white-space: normal;
+    min-width: 240px;
+}
+
+/* Bolinha do contador: pendentes no menu lateral do admin e chamados
+   respondidos no link Suporte do site. */
+.ticket-contador {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    margin-left: auto;
+    border-radius: var(--radius-pill);
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Na navbar o link é curto: o contador acompanha o texto em vez de ser
+   empurrado para a borda (o margin-left: auto acima serve à barra lateral). */
+.nav-suporte-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nav-suporte-link .ticket-contador {
+    margin-left: 0;
+    min-width: 18px;
+    height: 18px;
+    font-size: 0.65rem;
+}
+
+/* Barra de filtros acima da tabela. auto-fit faz os campos se reorganizarem
+   sozinhos conforme a largura — sem breakpoint. */
+.ticket-filtros {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    padding: 20px 25px;
+    border-bottom: 1px solid var(--border);
+    align-items: end;
+}
+
+.ticket-filtro-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+
+.ticket-filtro-campo {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-white);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ticket-filtro-campo:focus {
+    border-color: var(--primary);
+    box-shadow: var(--focus-ring);
+}
+
+/* O campo de busca ocupa duas colunas do grid quando há espaço. */
+.ticket-filtro-busca {
+    grid-column: span 2;
+}
+
+/* ── Chat ──────────────────────────────────────────────────────────────────
+   Conversa estilo mensageiro: aluno à esquerda, administrador à direita. */
+.ticket-chat {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 24px;
+    max-height: 460px;
+    overflow-y: auto;
+    background: var(--bg-light);
+}
+
+.ticket-msg {
+    display: flex;
+    flex-direction: column;
+    max-width: min(78%, 560px);
+}
+
+.ticket-msg-aluno {
+    align-self: flex-start;
+    align-items: flex-start;
+}
+
+.ticket-msg-admin {
+    align-self: flex-end;
+    align-items: flex-end;
+}
+
+.ticket-balao {
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    /* Mensagem é texto puro do usuário: preserva as quebras de linha que ele
+       digitou e quebra palavras longas (URLs) em vez de esticar o balão. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    box-shadow: var(--shadow-sm);
+}
+
+.ticket-msg-aluno .ticket-balao {
+    background: var(--bg-white);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: var(--radius-sm);
+}
+
+.ticket-msg-admin .ticket-balao {
+    background: var(--primary);
+    color: #fff;
+    border-bottom-right-radius: var(--radius-sm);
+}
+
+/* Nota interna: nunca chega ao aluno. O tracejado âmbar deixa isso óbvio para
+   quem atende, evitando confundi-la com uma resposta enviada. */
+.ticket-msg-interna .ticket-balao {
+    background: var(--tint-warning);
+    color: var(--text-main);
+    border: 1px dashed var(--amber);
+}
+
+.ticket-msg-meta {
+    margin-top: 4px;
+    padding: 0 4px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* Layout do detalhe: conversa + card lateral de alteração rápida. */
+.ticket-detalhe-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 20px;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .ticket-detalhe-grid {
+        grid-template-columns: 1fr;
+    }
+    .ticket-filtro-busca {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ── Anexos ─────────────────────────────────────────────────────────────── */
+
+.ticket-anexo-lista {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Anexo ainda não enviado (staging), no formulário. */
+.ticket-anexo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg-light);
+    font-size: 0.8rem;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.ticket-anexo-tamanho {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    white-space: nowrap;
+}
+
+.ticket-anexo-remover {
+    border: none;
+    background: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+}
+
+.ticket-anexo-remover:hover {
+    background: var(--tint-danger);
+}
+
+.ticket-anexo-remover:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* Anexos dentro do balão da conversa. */
+.ticket-anexo-lista-balao {
+    margin-top: 8px;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ticket-anexo-baixar {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+    /* Nome de arquivo longo não pode esticar o balão. */
+    overflow-wrap: anywhere;
+    transition: background var(--transition-fast);
+}
+
+/* O balão do admin é azul escuro: a tinta do hover precisa ser clara sobre ele,
+   enquanto no balão do aluno (fundo claro) ela é escura. currentColor resolve a
+   borda, mas o fundo do hover precisa desta distinção. */
+.ticket-msg-aluno .ticket-anexo-baixar:hover,
+.ticket-msg-interna .ticket-anexo-baixar:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.ticket-msg-admin:not(.ticket-msg-interna) .ticket-anexo-baixar:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.ticket-anexo-baixar:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* ── Histórico de alterações (log interno) ───────────────────────────────── */
+
+.ticket-historico {
+    list-style: none;
+    margin: 0;
+    padding: 20px 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.ticket-historico li {
+    display: flex;
+    gap: 10px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.ticket-historico li:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.ticket-historico-quando {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* Lista de dados (rótulo + valor) dos painéis de informação. */
+.ticket-dados {
+    display: grid;
+    gap: 12px;
+    padding: 20px 25px;
+}
+
+.ticket-dado-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.ticket-dado-valor {
+    font-size: 0.92rem;
+    color: var(--text-main);
+    overflow-wrap: anywhere;
+}
+
 /* Admin Nav */
 .admin-nav {
     display: flex;

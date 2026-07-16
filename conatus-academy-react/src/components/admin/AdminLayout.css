@@ -73,6 +73,11 @@
   font-weight: 500;
   transition: background 0.15s, color 0.15s;
   border-left: 3px solid transparent;
+  /* Flex para o contador de pendentes do Suporte encostar na direita
+     (margin-left: auto). Para os links sem badge o efeito é o mesmo de antes. */
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .admin-link:hover,
@@ -95,12 +100,11 @@
   color: #94a3b8;
 }
 
-/* Links da navegação lateral com área de toque mínima em telas de toque */
+/* Links da navegação lateral com área de toque mínima em telas de toque.
+   O display/align-items agora vêm da regra base — aqui basta a altura. */
 @media (pointer: coarse) {
   .admin-link {
     min-height: 44px;
-    display: inline-flex;
-    align-items: center;
   }
 }
 

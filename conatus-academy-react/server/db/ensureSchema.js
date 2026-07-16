@@ -292,6 +292,101 @@ const STATEMENTS = [
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_simulacoes_tema ON simulacoes(tema)`,
+
+  // ── Suporte: chamados entre alunos e administradores ───────────────────────
+  // O aluno abre um chamado e a conversa acontece em ticket_messages. Os valores
+  // de status/categoria/prioridade são validados por CHECK aqui e espelhados no
+  // front em src/utils/suporte.js — mantenha os dois em sincronia.
+  //
+  // status:
+  //   aberto           → recém-criado, ninguém assumiu
+  //   em_atendimento   → um admin assumiu e está tratando
+  //   aguardando_aluno → admin respondeu e espera retorno do aluno
+  //   resolvido        → solucionado (o aluno ainda pode reabrir respondendo)
+  //   fechado          → encerrado; não aceita mais mensagens
+  //
+  // responsavel_id é o admin que atende. ON DELETE SET NULL: se a conta do
+  // atendente sair, o chamado continua existindo, apenas sem responsável.
+  // Já user_id é ON DELETE CASCADE — sem o aluno, o chamado perde o sentido.
+  `CREATE TABLE IF NOT EXISTS tickets (
+    id             SERIAL PRIMARY KEY,
+    user_id        UUID NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
+    assunto        VARCHAR(200) NOT NULL,
+    categoria      VARCHAR(30)  NOT NULL DEFAULT 'duvida',
+    prioridade     VARCHAR(20)  NOT NULL DEFAULT 'media',
+    status         VARCHAR(30)  NOT NULL DEFAULT 'aberto',
+    responsavel_id UUID REFERENCES alunos(id) ON DELETE SET NULL,
+    observacao_interna TEXT,
+    criado_em      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ticket_status_valido CHECK (
+      status IN ('aberto','em_atendimento','aguardando_aluno','resolvido','fechado')
+    ),
+    CONSTRAINT ticket_prioridade_valida CHECK (
+      prioridade IN ('baixa','media','alta','urgente')
+    ),
+    CONSTRAINT ticket_categoria_valida CHECK (
+      categoria IN ('duvida','problema_tecnico','pagamento','certificados','matriculas','outros')
+    )
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_tickets_user   ON tickets(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)`,
+  // A listagem do admin ordena por atualizado_em (mais recentes/antigos).
+  `CREATE INDEX IF NOT EXISTS idx_tickets_atualizado ON tickets(atualizado_em DESC)`,
+
+  // Mensagens da conversa. autor_tipo distingue os lados do chat sem depender do
+  // papel ATUAL de quem escreveu: se o aluno virar admin depois, as mensagens
+  // antigas dele continuam do lado do aluno.
+  // interna = observação visível apenas para a equipe (nunca vai ao aluno).
+  `CREATE TABLE IF NOT EXISTS ticket_messages (
+    id         SERIAL PRIMARY KEY,
+    ticket_id  INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    user_id    UUID REFERENCES alunos(id) ON DELETE SET NULL,
+    autor_tipo VARCHAR(10) NOT NULL DEFAULT 'aluno',
+    mensagem   TEXT NOT NULL,
+    interna    BOOLEAN NOT NULL DEFAULT false,
+    criado_em  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT msg_autor_valido CHECK (autor_tipo IN ('aluno','admin'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_ticket_msgs_ticket ON ticket_messages(ticket_id, criado_em)`,
+
+  // Anexos de uma mensagem. Os BYTES não ficam aqui: vão para arquivos_upload
+  // (mesma razão dos uploads de curso — o disco do Replit é efêmero), e
+  // `arquivo` guarda a chave lá. Esta tabela é só o metadado + o nome original,
+  // que é o que o aluno vê ao baixar.
+  //
+  // ATENÇÃO: diferente de /api/uploads/courses/:nome, que é público, o download
+  // de anexo passa por /api/suporte/anexos/:id COM verificação de posse — um
+  // anexo de chamado pode conter dado pessoal (print de pagamento, documento).
+  // Vídeo está fora dos tipos aceitos de propósito: o free tier do Supabase é
+  // 500 MB e poucos vídeos em bytea comprometeriam a plataforma inteira.
+  `CREATE TABLE IF NOT EXISTS ticket_attachments (
+    id         SERIAL PRIMARY KEY,
+    message_id INTEGER NOT NULL REFERENCES ticket_messages(id) ON DELETE CASCADE,
+    arquivo    VARCHAR(255) NOT NULL,
+    nome_original VARCHAR(255) NOT NULL,
+    tipo       VARCHAR(100) NOT NULL,
+    tamanho    INTEGER NOT NULL,
+    criado_em  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_ticket_anexos_msg ON ticket_attachments(message_id)`,
+
+  // Log de ações da equipe sobre o chamado (histórico de alterações).
+  // ator_id é ON DELETE SET NULL: o registro do que aconteceu sobrevive à saída
+  // do funcionário — um log que some junto com a conta não serve como log.
+  // valor_de/valor_para são texto livre para caber qualquer campo (status,
+  // prioridade, responsável) sem uma coluna por tipo de mudança.
+  `CREATE TABLE IF NOT EXISTS ticket_eventos (
+    id         SERIAL PRIMARY KEY,
+    ticket_id  INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    ator_id    UUID REFERENCES alunos(id) ON DELETE SET NULL,
+    ator_nome  VARCHAR(150),
+    acao       VARCHAR(40) NOT NULL,
+    valor_de   TEXT,
+    valor_para TEXT,
+    criado_em  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_ticket_eventos_ticket ON ticket_eventos(ticket_id, criado_em)`,
 ];
 
 async function ensureSchema() {

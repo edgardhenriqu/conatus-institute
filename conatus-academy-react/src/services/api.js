@@ -1,4 +1,4 @@
-import { API_URL, request, requestBlob } from './httpClient';
+import { API_URL, request, requestBlob, requestForm } from './httpClient';
 
 export const api = {
   // Auth
@@ -59,6 +59,48 @@ export const api = {
 
   // Simulações (vídeos) — página exclusiva para alunos logados.
   getSimulacoes: async () => request(`${API_URL}/simulacoes`),
+
+  // Suporte — chamados do próprio aluno. O detalhe e a resposta usam a mesma
+  // rota do admin: o servidor confere a posse do chamado e filtra as
+  // observações internas.
+  getMeusChamados: async () => request(`${API_URL}/suporte/meus`),
+
+  // Quantos chamados já foram respondidos e aguardam o aluno (badge do menu).
+  getChamadosAguardando: async () => request(`${API_URL}/suporte/meus/aguardando`),
+
+  // Sempre multipart: a rota aceita os dois formatos, e mandar um só simplifica
+  // o front (não precisa decidir conforme ter ou não anexo).
+  abrirChamado: async (data, anexos = []) => {
+    const fd = new FormData();
+    fd.append('assunto', data.assunto);
+    fd.append('categoria', data.categoria);
+    fd.append('mensagem', data.mensagem);
+    anexos.forEach(f => fd.append('anexos', f));
+    return requestForm(`${API_URL}/suporte`, fd);
+  },
+
+  getChamado: async (id) => request(`${API_URL}/suporte/${id}`),
+
+  responderChamado: async (id, mensagem, anexos = []) => {
+    const fd = new FormData();
+    fd.append('mensagem', mensagem);
+    anexos.forEach(f => fd.append('anexos', f));
+    return requestForm(`${API_URL}/suporte/${id}/mensagens`, fd);
+  },
+
+  // Um <a href> não serve: a rota exige Authorization e a tag não o envia.
+  // Buscamos o blob e disparamos o download por um link temporário.
+  baixarAnexo: async (anexoId, nome) => {
+    const blob = await requestBlob(`${API_URL}/suporte/anexos/${anexoId}`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nome || 'anexo';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 
   // Cursos
   getCursos: async () => request(`${API_URL}/cursos`),
