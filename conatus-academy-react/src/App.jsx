@@ -7,6 +7,7 @@ import { ToastProvider } from './components/ui/Toast';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { ProtectedRoute } from './components/ui/ProtectedRoute';
+import { SuporteFab } from './components/ui/SuporteFab';
 
 // Pages
 import { Home } from './pages/Home';
@@ -63,6 +64,9 @@ function MainLayout() {
       <Header />
       <Outlet />
       <Footer />
+      {/* Atalho flutuante para os chamados. Ele mesmo decide quando aparecer
+          (só para logado, fora do painel e da sala de aula). */}
+      <SuporteFab />
     </>
   );
 }

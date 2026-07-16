@@ -4272,6 +4272,71 @@ body.focus-mode-open { overflow: hidden; }
     }
 }
 
+/* ── Botão flutuante de suporte ──────────────────────────────────────────
+   Atalho fixo para /suporte, visível ao aluno logado fora do painel.
+   z-index abaixo do Toast (que precisa aparecer por cima de tudo) e acima do
+   conteúdo da página. */
+.suporte-fab {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 900;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-round);
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.suporte-fab:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-xl);
+}
+
+.suporte-fab:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring), var(--shadow-lg);
+}
+
+.suporte-fab img {
+    /* O desenho preenche o viewBox inteiro (sem margem própria), então a folga
+       até a borda do círculo vem daqui. O "C" é formado por pontos miúdos e
+       perde definição se encolher muito — 38px em 60 é o limite prático. */
+    width: 38px;
+    height: 38px;
+    pointer-events: none;
+}
+
+/* Em telas estreitas o botão encolhe e chega mais perto do canto, para não
+   cobrir conteúdo nem competir com a barra de navegação do celular. */
+@media (max-width: 600px) {
+    .suporte-fab {
+        right: 16px;
+        bottom: 16px;
+        width: 52px;
+        height: 52px;
+    }
+    .suporte-fab img {
+        width: 33px;
+        height: 33px;
+    }
+}
+
+/* Quem pediu menos movimento não recebe o salto no hover. */
+@media (prefers-reduced-motion: reduce) {
+    .suporte-fab {
+        transition: none;
+    }
+    .suporte-fab:hover {
+        transform: none;
+    }
+}
+
 /* ── Anexos ─────────────────────────────────────────────────────────────── */
 
 .ticket-anexo-lista {
