@@ -50,8 +50,21 @@
 }
 
 .ce-status--rascunho { background: #f1f5f9; color: #475569; }
+.ce-status--em_breve { background: #e0e7ff; color: #3730a3; }
 .ce-status--publicado { background: #dcfce7; color: #166534; }
 .ce-status--inativo { background: #fee2e2; color: #991b1b; }
+
+.ce-interest-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fdf3d7;
+  color: #7a5c00;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
 
 /* Tabs */
 .ce-tabs {
@@ -571,6 +584,13 @@
   color: #94a3b8;
   margin-bottom: 8px;
 }
+.cap-bloco--fabricante {
+  margin-top: 20px;
+  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
 .cap-empresas {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -615,6 +635,72 @@
   transition: color .15s, background .15s;
 }
 .cap-empresa-del:hover { color: #dc2626; background: #fef2f2; }
+
+/* ── Configuração de venda (modo Pago) ────────────────────────────────────── */
+.cap-venda {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 18px 20px;
+  background: #f8fafc;
+}
+.cap-venda__titulo {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  color: #1e293b;
+}
+.cap-venda-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.cap-venda-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cap-venda-campo > span {
+  font-size: .85rem;
+  font-weight: 600;
+  color: #475569;
+}
+.cap-venda-campo input,
+.cap-venda-campo select,
+.cap-venda-campo textarea {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: .9rem;
+  background: #fff;
+  font-family: inherit;
+}
+.cap-venda-campo input:focus,
+.cap-venda-campo select:focus,
+.cap-venda-campo textarea:focus {
+  outline: none;
+  border-color: #7c3aed;
+}
+.cap-venda-campo--full { margin-top: 14px; }
+.cap-venda-campo textarea { resize: vertical; }
+.cap-venda__resumo {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  font-size: .88rem;
+  color: #475569;
+}
+.cap-venda-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 16px;
+}
+.cap-venda__aviso {
+  margin: 10px 0 0;
+  font-size: .82rem;
+  color: #b45309;
+}
 
 /* ── Responsivo ───────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {

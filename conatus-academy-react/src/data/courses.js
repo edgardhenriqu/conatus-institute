@@ -70,6 +70,7 @@ export const NIVEL_LABELS = {
  */
 export function normalizeDbCourse(c) {
   const acesso = c.acesso || 'publico';
+  const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
   return {
     ...c,
     acesso,
@@ -79,5 +80,19 @@ export function normalizeDbCourse(c) {
     nivel: NIVEL_LABELS[c.nivel] || c.nivel,
     descricao: c.descricao_curta || c.descricao,
     image: c.image || `images/courses/${c.nome}.png`,
+    // Venda (cursos pagos) — NUMERIC chega como string do Postgres
+    preco: num(c.preco),
+    preco_promocional: num(c.preco_promocional),
+    moeda: c.moeda || 'BRL',
+    max_parcelas: num(c.max_parcelas) || 1,
+    ocultar_preco: Boolean(c.ocultar_preco),
+    destaque_promocao: Boolean(c.destaque_promocao),
+    mensagem_compra: c.mensagem_compra || '',
+    // true quando o aluno logado já comprou (ou é staff/instrutor do curso)
+    possuiCurso: Boolean(c.possui_curso),
+    // "Em breve" — curso ainda não lançado, com captação de interesse
+    emBreve: c.status === 'em_breve' || Boolean(c.em_breve),
+    totalInteresse: num(c.total_interesse) || 0,
+    interesseRegistrado: Boolean(c.interesse_registrado),
   };
 }

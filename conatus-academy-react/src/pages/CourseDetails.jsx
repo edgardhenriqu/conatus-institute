@@ -4,10 +4,12 @@ import { api } from '../services/api';
 import { staticCourses, normalizeDbCourse } from '../data/courses';
 import { useAuth } from '../contexts/AuthContext';
 import { Badge } from '../components/ui/Badge';
+import { InterestButton } from '../components/ui/InterestButton';
 import { PageLoader } from '../components/ui/PageLoader';
 import { useToast } from '../components/ui/Toast';
 import { mopCourseContent } from '../data/mopCourseContent';
 import { calcLessonStats, quizStatus, isCertEligible, getStaticEnrollments, saveStaticEnrollments } from '../utils/mopProgress';
+import { formatarPreco, formatarParcelamento, precoVigente } from '../utils/currency';
 
 const INTERNAL_DENIED_MSG =
   'Este curso é exclusivo para funcionários autorizados da Conatus. Solicite liberação ao administrador.';
@@ -21,6 +23,7 @@ export function CourseDetails() {
   const [curso, setCurso] = useState(null);
   const [loading, setLoading] = useState(true);
   const [restricted, setRestricted] = useState(false);
+  const [comprando, setComprando] = useState(false);
 
   // MOP progress (only computed when viewing the legacy static MOP route).
   // Atenção: NÃO incluir o id '6' aqui — hoje o id 6 é um curso do banco
@@ -76,7 +79,37 @@ export function CourseDetails() {
     }
   }, [location, curso]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Compra de curso pago: hoje o gateway não está configurado e o servidor
+  // responde 501 com uma mensagem amigável; quando houver gateway, a resposta
+  // trará { checkout: { url } } e o aluno é redirecionado ao provedor.
+  const handleComprar = async () => {
+    if (!user) {
+      toast.warning('Você precisa estar logado para comprar o curso.');
+      navigate('/login', { state: { from: `/cursos/${id}` } });
+      return;
+    }
+    setComprando(true);
+    try {
+      const data = await api.comprarCurso(curso.id);
+      if (data.checkout?.url) {
+        window.location.href = data.checkout.url;
+        return;
+      }
+      toast.info('Compra iniciada. Siga as instruções de pagamento.');
+    } catch (err) {
+      toast.info(err.message || 'O pagamento online ainda não está disponível.');
+    } finally {
+      setComprando(false);
+    }
+  };
+
   const handleMatricular = async () => {
+    // Curso pago sem posse: o CTA correto é a compra, nunca a matrícula
+    // (o backend também bloqueia — isto só evita um 403 desnecessário).
+    if (curso?.pago && !curso.possuiCurso) {
+      handleComprar();
+      return;
+    }
     if (!user) {
       toast.warning('Você precisa estar logado para se matricular.');
       navigate('/login');
@@ -144,11 +177,13 @@ export function CourseDetails() {
 
   const isFree = curso.gratuito;
   const isRestrito = curso.restrito;
+  const isSoon = curso.emBreve;
 
   // Curso restrito exige login. O acesso em si é decidido pelo BACKEND: o curso só
   // é carregado por api.getCurso se o usuário puder acessá-lo (público, empresa
   // parceira, funcionário ou liberação individual). Se chegamos aqui, pode acessar.
-  if (isRestrito && !user) {
+  // Exceção: cursos "em breve" são vitrines públicas de captação de interesse.
+  if (isRestrito && !user && !isSoon) {
     navigate('/login', { state: { from: `/cursos/${id}` } });
     return null;
   }
@@ -161,8 +196,10 @@ export function CourseDetails() {
             <Link to="/cursos" className="back-link">← Voltar aos Cursos</Link>
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '15px' }}>
-              {isFree && <Badge variant="free">Gratuito</Badge>}
-              {isRestrito && <Badge variant="internal">Acesso Restrito</Badge>}
+              {isSoon && <Badge variant="soon">Em Breve</Badge>}
+              {!isSoon && isFree && <Badge variant="free">Gratuito</Badge>}
+              {!isSoon && isRestrito && <Badge variant="internal">Acesso Restrito</Badge>}
+              {!isSoon && curso.pago && <Badge variant="paid">Curso Pago</Badge>}
             </div>
 
             <h1>{curso.nome}</h1>
@@ -217,15 +254,63 @@ export function CourseDetails() {
               </div>
             )}
 
-            <button
-              className="btn-matricular"
-              onClick={handleMatricular}
-              style={{ marginTop: '30px' }}
-            >
-              {isMopCourse
-                ? (isAlreadyEnrolled ? 'Continuar Curso →' : 'Acessar Curso →')
-                : 'Matricule-se Agora'}
-            </button>
+            {/* Vitrine "Em breve" — captação de interesse */}
+            {isSoon && (
+              <div className="cd-soon-box">
+                <span className="cd-soon-tag">🚀 Lançamento em breve</span>
+                <p className="cd-soon-text">
+                  Este curso ainda não foi lançado. Registre seu interesse e
+                  avisaremos você assim que ele estiver disponível.
+                </p>
+                <InterestButton curso={curso} size="lg" />
+              </div>
+            )}
+
+            {/* Vitrine de venda — curso pago que o aluno ainda não possui */}
+            {!isSoon && curso.pago && !curso.possuiCurso && (
+              <div className="cd-preco-box">
+                {curso.destaque_promocao && curso.preco_promocional != null && (
+                  <span className="cd-preco-destaque">🔥 Oferta por tempo limitado</span>
+                )}
+                {!curso.ocultar_preco && curso.preco != null ? (
+                  <div className="cd-preco-valores">
+                    {curso.preco_promocional != null && (
+                      <s className="cd-preco-antigo">{formatarPreco(curso.preco, curso.moeda)}</s>
+                    )}
+                    <strong className="cd-preco-atual">{formatarPreco(precoVigente(curso), curso.moeda)}</strong>
+                    {formatarParcelamento(precoVigente(curso), curso.max_parcelas, curso.moeda) && (
+                      <span className="cd-preco-parcelas">
+                        ou {formatarParcelamento(precoVigente(curso), curso.max_parcelas, curso.moeda)}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <p className="cd-preco-consulte">Consulte as condições de compra.</p>
+                )}
+                {curso.mensagem_compra && <p className="cd-preco-msg">{curso.mensagem_compra}</p>}
+              </div>
+            )}
+
+            {isSoon ? null : curso.pago && !curso.possuiCurso ? (
+              <button
+                className="btn-matricular"
+                onClick={handleComprar}
+                disabled={comprando}
+                style={{ marginTop: '20px' }}
+              >
+                {comprando ? 'Processando...' : '🛒 Comprar Curso'}
+              </button>
+            ) : (
+              <button
+                className="btn-matricular"
+                onClick={handleMatricular}
+                style={{ marginTop: '30px' }}
+              >
+                {isMopCourse
+                  ? (isAlreadyEnrolled ? 'Continuar Curso →' : 'Acessar Curso →')
+                  : curso.pago ? 'Continuar Curso →' : 'Matricule-se Agora'}
+              </button>
+            )}
           </div>
 
           <img

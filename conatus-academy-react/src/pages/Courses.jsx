@@ -88,10 +88,15 @@ export function Courses() {
     return (e.progresso || 0) === 100;
   };
 
+  // Cursos "em breve" têm sua própria seção de captação de interesse e ficam
+  // fora de todas as outras (não são matriculáveis).
+  const emBreveCourses = courses.filter(c => c.emBreve);
+  const disponiveis = courses.filter(c => !c.emBreve);
+
   // Cursos vinculados a fabricantes (empresas) têm sua própria seção agrupada;
   // ficam fora das seções genéricas para não aparecer duplicados.
   const isFabricante = (c) => Array.isArray(c.empresas) && c.empresas.length > 0;
-  const catalogo = courses.filter(c => !isFabricante(c));
+  const catalogo = disponiveis.filter(c => !isFabricante(c));
 
   const inProgress = catalogo.filter(c => getEnrollment(c) && !isCompleted(c));
   const completed  = catalogo.filter(c => isCompleted(c));
@@ -102,7 +107,7 @@ export function Courses() {
 
   // Agrupa os cursos de fabricante por empresa (um curso pode ter mais de uma)
   const fabricantes = Object.values(
-    courses.filter(isFabricante).reduce((acc, curso) => {
+    disponiveis.filter(isFabricante).reduce((acc, curso) => {
       for (const emp of curso.empresas) {
         (acc[emp.slug] ||= { nome: emp.nome, slug: emp.slug, cursos: [] }).cursos.push(curso);
       }
@@ -136,6 +141,26 @@ export function Courses() {
           {completed.map(curso => (
             <CourseCard key={curso.id} curso={curso}
               enrollment={{ ...getEnrollment(curso), progresso: 100 }} />
+          ))}
+        </CatalogSection>
+      )}
+
+      {/* Em breve — captação de interesse */}
+      {emBreveCourses.length > 0 && (
+        <CatalogSection
+          icon="📅" title="Em Breve" count={emBreveCourses.length}
+          note={(
+            <div className="catalog-internal-note">
+              <span>🚀</span>
+              <span>
+                Cursos em desenvolvimento. Clique em <strong>Tenho interesse</strong> para
+                ser avisado no lançamento e ajudar a priorizarmos os próximos conteúdos.
+              </span>
+            </div>
+          )}
+        >
+          {emBreveCourses.map(curso => (
+            <CourseCard key={curso.id} curso={curso} />
           ))}
         </CatalogSection>
       )}

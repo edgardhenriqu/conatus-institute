@@ -1234,6 +1234,26 @@ header[id] {
     content: '🔒 ';
 }
 
+.badge-paid {
+    background: linear-gradient(135deg, #fdf3d7, #f5e3ab);
+    color: #7a5c00;
+    font-weight: 700;
+}
+
+.badge-paid::before {
+    content: '💰 ';
+}
+
+.badge-soon {
+    background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+    color: #3730a3;
+    font-weight: 700;
+}
+
+.badge-soon::before {
+    content: '📅 ';
+}
+
 /* ============================================
    COURSE CARD (Catalog)
    ============================================ */
@@ -2443,6 +2463,106 @@ header[id] {
 .btn-matricular:hover {
     transform: translateY(-3px);
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.btn-matricular:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ── Vitrine de curso pago (página de detalhes) ── */
+.cd-preco-box {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-left: 4px solid var(--gold);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin-top: 25px;
+    max-width: 520px;
+}
+
+.cd-preco-destaque {
+    display: inline-block;
+    background: var(--gold);
+    color: var(--primary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+}
+
+.cd-preco-valores {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.cd-preco-antigo {
+    opacity: 0.7;
+    font-size: 1.05rem;
+}
+
+.cd-preco-atual {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    color: var(--gold);
+    line-height: 1.1;
+}
+
+.cd-preco-parcelas {
+    font-size: 0.95rem;
+    opacity: 0.9;
+}
+
+.cd-preco-consulte {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.cd-preco-msg {
+    margin: 12px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 0.95rem;
+    opacity: 0.95;
+    white-space: pre-line;
+}
+
+/* ── Vitrine "Em breve" (página de detalhes) ── */
+.cd-soon-box {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-left: 4px solid #a5b4fc;
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-top: 25px;
+    max-width: 520px;
+}
+
+.cd-soon-tag {
+    display: inline-block;
+    background: #e0e7ff;
+    color: #3730a3;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+}
+
+.cd-soon-text {
+    margin: 0 0 18px;
+    font-size: 0.98rem;
+    opacity: 0.95;
+    line-height: 1.5;
 }
 
 /* ============================================

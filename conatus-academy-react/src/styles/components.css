@@ -186,6 +186,94 @@ textarea:focus-visible {
     gap: 4px;
 }
 
+.ccard-promo-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--secondary);
+    color: #fff;
+}
+
+.ccard-preco {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.ccard-preco-antigo {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+
+.ccard-preco-atual {
+    font-family: var(--font-heading);
+    font-size: 1.35rem;
+    color: var(--primary);
+}
+
+/* ── Botão "Tenho interesse" (cursos em breve) ── */
+.interest-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--primary);
+    background: #fff;
+    color: var(--primary);
+    font-family: var(--font-body);
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.interest-btn:hover:not(:disabled) {
+    background: var(--primary);
+    color: #fff;
+}
+
+.interest-btn:disabled { opacity: 0.6; cursor: wait; }
+
+.interest-btn--on {
+    background: var(--primary);
+    color: #fff;
+}
+
+.interest-btn--md { padding: 10px 18px; font-size: 0.9rem; }
+.interest-btn--lg { padding: 15px 32px; font-size: 1.05rem; }
+
+.interest-btn__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: var(--gold);
+    color: var(--primary);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.interest-btn--on .interest-btn__count,
+.interest-btn:hover:not(:disabled) .interest-btn__count {
+    background: #fff;
+    color: var(--primary);
+}
+
+.ccard-soon-hint {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+    font-weight: 600;
+}
+
 .ccard-progress { margin-bottom: 4px; }
 
 .ccard-progress-labels {

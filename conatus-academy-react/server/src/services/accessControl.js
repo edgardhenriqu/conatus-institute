@@ -6,7 +6,7 @@
  * regras CUMULATIVAS (união/OR). O usuário acessa se satisfizer QUALQUER regra.
  *
  *   acesso = 'publico'   → qualquer um
- *   acesso = 'pago'      → mediante pagamento (futuro)
+ *   acesso = 'pago'      → quem tem compra aprovada (curso_compras)
  *   acesso = 'restrito'  → funcionários Conatus  OU
  *                          pertence a uma empresa parceira liberada  OU
  *                          é um usuário liberado individualmente
@@ -14,6 +14,7 @@
  * Admins/superadmins e o instrutor responsável sempre acessam.
  */
 const pool = require('../../db/connection');
+const { possuiCurso } = require('./payments/compras');
 
 const STAFF_ROLES = ['admin', 'superadmin', 'diretor'];
 const EMPLOYEE_ROLES = ['admin', 'superadmin', 'diretor', 'conatus_employee'];
@@ -80,7 +81,8 @@ async function podeAcessarCurso(alunoId, curso) {
   if (usuario && STAFF_ROLES.includes(usuario.role)) return true;
   if (usuario && curso.instrutor_id && usuario.id === curso.instrutor_id) return true;
 
-  if (acesso === 'pago') return false; // TODO: integração de pagamento
+  // 'pago' — precisa ter uma compra aprovada (services/payments/compras.js)
+  if (acesso === 'pago') return usuario ? possuiCurso(usuario.id, curso.id) : false;
 
   // 'restrito' — precisa satisfazer ao menos uma regra
   if (!usuario) return false;
@@ -92,4 +94,8 @@ async function podeAcessarCurso(alunoId, curso) {
 const MSG_ACESSO_NEGADO =
   'Este curso tem acesso restrito. Solicite liberação ao administrador.';
 
-module.exports = { podeAcessarCurso, MSG_ACESSO_NEGADO, EMPLOYEE_ROLES, STAFF_ROLES };
+/** Mensagem padrão quando o acesso é negado a um curso pago. */
+const MSG_CURSO_PAGO =
+  'Este curso é pago. Adquira-o para acessar o conteúdo.';
+
+module.exports = { podeAcessarCurso, MSG_ACESSO_NEGADO, MSG_CURSO_PAGO, EMPLOYEE_ROLES, STAFF_ROLES };

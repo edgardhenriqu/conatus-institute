@@ -2,12 +2,37 @@ import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '../../services/adminApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
+import { formatarPreco, formatarParcelamento } from '../../utils/currency';
 
 const MODOS = [
   { value: 'publico',  titulo: 'Público',  desc: 'Qualquer usuário pode acessar o curso.' },
   { value: 'restrito', titulo: 'Restrito',  desc: 'Somente quem satisfizer as regras abaixo.' },
-  { value: 'pago',     titulo: 'Pago',      desc: 'Mediante pagamento (em breve).', disabled: true },
+  { value: 'pago',     titulo: 'Pago',      desc: 'Mediante compra do curso.' },
 ];
+
+const MOEDAS = [{ value: 'BRL', label: 'Real (R$)' }];
+const MAX_PARCELAS = 12;
+
+// Config de venda vazia (novo curso / curso nunca precificado).
+// Valores monetários ficam como STRING no estado — são campos de digitação;
+// a conversão para número acontece só no salvar.
+const VENDA_VAZIA = {
+  preco: '',
+  preco_promocional: '',
+  moeda: 'BRL',
+  max_parcelas: 1,
+  permite_cupom: false,
+  mensagem_compra: '',
+  a_venda: false,
+  ocultar_preco: false,
+  destaque_promocao: false,
+};
+
+const numOuNull = (v) => {
+  if (v === '' || v === null || v === undefined) return null;
+  const n = Number(String(v).replace(',', '.'));
+  return Number.isFinite(n) ? n : NaN;
+};
 
 /**
  * Painel de Controle de Acesso do curso: modo (público/restrito/pago) +
@@ -19,6 +44,7 @@ export default function CourseAccessPanel({ courseId }) {
   const { isAdmin } = useAuth();
 
   const [acesso, setAcesso] = useState('publico');
+  const [venda, setVenda] = useState(VENDA_VAZIA);
   const [funcionarios, setFuncionarios] = useState(false);
   const [empresasSel, setEmpresasSel] = useState([]);   // ids selecionados
   const [empresas, setEmpresas] = useState([]);          // catálogo de fabricantes
@@ -36,6 +62,14 @@ export default function CourseAccessPanel({ courseId }) {
       ]);
       setEmpresas(cat.empresas || []);
       setAcesso(acc.acesso || 'publico');
+      if (acc.venda) {
+        setVenda({
+          ...VENDA_VAZIA,
+          ...acc.venda,
+          preco: acc.venda.preco ?? '',
+          preco_promocional: acc.venda.preco_promocional ?? '',
+        });
+      }
       setFuncionarios(Boolean(acc.funcionarios));
       setEmpresasSel(acc.empresas || []);
       setUsuarios(acc.usuarios || []);
@@ -83,15 +117,48 @@ export default function CourseAccessPanel({ courseId }) {
     }
   };
 
+  const setV = (campo, valor) => setVenda(v => ({ ...v, [campo]: valor }));
+
+  // Validação espelho da do servidor (services/payments/compras.js) — o toast
+  // aqui é imediato; o servidor revalida de qualquer forma.
+  const validarVendaLocal = () => {
+    const preco = numOuNull(venda.preco);
+    const promo = numOuNull(venda.preco_promocional);
+    if (preco === null || Number.isNaN(preco) || preco <= 0) {
+      return 'Informe o valor do curso para o modo Pago.';
+    }
+    if (Number.isNaN(promo)) return 'Valor promocional inválido.';
+    if (promo !== null && (promo <= 0 || promo >= preco)) {
+      return 'O valor promocional deve ser maior que zero e menor que o valor do curso.';
+    }
+    return null;
+  };
+
   const handleSave = async () => {
+    if (acesso === 'pago') {
+      const erro = validarVendaLocal();
+      if (erro) { toast.error(erro); return; }
+    }
     setSaving(true);
     try {
       await adminApi.saveCourseAccess(courseId, {
         acesso,
         funcionarios: acesso === 'restrito' ? funcionarios : false,
-        empresas: acesso === 'restrito' ? empresasSel : [],
+        // O vínculo de fabricante é sempre persistido: serve para agrupar o
+        // curso na seção "Fabricantes" do catálogo em QUALQUER modo (inclusive
+        // gratuito). Quando o acesso é restrito, também vale como regra de acesso.
+        empresas: empresasSel,
+        ...(acesso === 'pago' ? {
+          venda: {
+            ...venda,
+            preco: numOuNull(venda.preco),
+            preco_promocional: numOuNull(venda.preco_promocional),
+          },
+        } : {}),
       });
-      toast.success('Regras de acesso salvas!');
+      toast.success(acesso === 'pago'
+        ? 'Regras de acesso e configuração de venda salvas!'
+        : 'Regras de acesso salvas!');
     } catch (err) {
       toast.error(err.message || 'Erro ao salvar as regras de acesso.');
     } finally {
@@ -130,6 +197,8 @@ export default function CourseAccessPanel({ courseId }) {
   }
 
   const restrito = acesso === 'restrito';
+  const pago = acesso === 'pago';
+  const precoEfetivo = numOuNull(venda.preco_promocional) ?? numOuNull(venda.preco);
 
   return (
     <div className="ce-form">
@@ -154,7 +223,8 @@ export default function CourseAccessPanel({ courseId }) {
         {restrito && (
           <div className="cap-regras">
             <p className="cap-regras__hint">
-              As regras são <strong>cumulativas</strong>: quem satisfizer qualquer uma delas terá acesso.
+              As regras são <strong>cumulativas</strong>: quem satisfizer qualquer uma delas
+              (funcionário Conatus, fabricante vinculado abaixo ou usuário liberado) terá acesso.
             </p>
 
             <label className="cap-check cap-check--destaque">
@@ -162,50 +232,142 @@ export default function CourseAccessPanel({ courseId }) {
                 onChange={e => setFuncionarios(e.target.checked)} />
               <span>Funcionários Conatus</span>
             </label>
+          </div>
+        )}
 
-            <div className="cap-bloco">
-              <span className="cap-bloco__titulo">Empresas autorizadas</span>
-              {empresas.length === 0 ? (
-                <p className="cap-vazio">Nenhuma empresa cadastrada.</p>
-              ) : (
-                <div className="cap-empresas">
-                  {empresas.map(emp => (
-                    <div key={emp.id} className="cap-empresa-item">
-                      <label className="cap-check">
-                        <input type="checkbox"
-                          checked={empresasSel.includes(emp.id)}
-                          onChange={() => toggleEmpresa(emp.id)} />
-                        <span>{emp.nome}</span>
-                      </label>
-                      {isAdmin && (
-                        <button type="button" className="cap-empresa-del"
-                          title={`Excluir ${emp.nome} do catálogo`}
-                          onClick={() => handleDeleteCompany(emp)}>
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  ))}
+        {/* Fabricante — agrupamento na vitrine do catálogo. Vale para QUALQUER
+            modo (inclusive gratuito); quando restrito, também libera acesso. */}
+        <div className="cap-bloco cap-bloco--fabricante">
+          <span className="cap-bloco__titulo">Fabricante (vitrine do catálogo)</span>
+          <p className="cap-regras__hint" style={{ margin: '0 0 12px' }}>
+            Vincule o curso a um fabricante para exibi-lo na seção <strong>Fabricantes</strong> do
+            catálogo — vale para qualquer modo de acesso, inclusive gratuito.
+            {restrito && ' Como o acesso é Restrito, os membros do fabricante também terão acesso.'}
+          </p>
+          {empresas.length === 0 ? (
+            <p className="cap-vazio">Nenhum fabricante cadastrado.</p>
+          ) : (
+            <div className="cap-empresas">
+              {empresas.map(emp => (
+                <div key={emp.id} className="cap-empresa-item">
+                  <label className="cap-check">
+                    <input type="checkbox"
+                      checked={empresasSel.includes(emp.id)}
+                      onChange={() => toggleEmpresa(emp.id)} />
+                    <span>{emp.nome}</span>
+                  </label>
+                  {isAdmin && (
+                    <button type="button" className="cap-empresa-del"
+                      title={`Excluir ${emp.nome} do catálogo`}
+                      onClick={() => handleDeleteCompany(emp)}>
+                      ×
+                    </button>
+                  )}
                 </div>
-              )}
-
-              {isAdmin && (
-                <form onSubmit={handleAddCompany} className="cap-nova-empresa">
-                  <input type="text" value={novaEmpresa}
-                    onChange={e => setNovaEmpresa(e.target.value)}
-                    placeholder="Adicionar fabricante (ex.: ABB)" />
-                  <button type="submit" className="ce-btn ce-btn--secondary ce-btn--sm">
-                    + Adicionar
-                  </button>
-                </form>
-              )}
+              ))}
             </div>
+          )}
+
+          {isAdmin && (
+            <form onSubmit={handleAddCompany} className="cap-nova-empresa">
+              <input type="text" value={novaEmpresa}
+                onChange={e => setNovaEmpresa(e.target.value)}
+                placeholder="Adicionar fabricante (ex.: ABB)" />
+              <button type="submit" className="ce-btn ce-btn--secondary ce-btn--sm">
+                + Adicionar
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* Configuração de venda — só quando pago */}
+        {pago && (
+          <div className="cap-venda">
+            <h4 className="cap-venda__titulo">💰 Configuração de Venda</h4>
+
+            <span className="cap-bloco__titulo">Informações do curso</span>
+            <div className="cap-venda-grid">
+              <label className="cap-venda-campo">
+                <span>Valor do curso (R$) *</span>
+                <input type="number" min="0.01" max="99999.99" step="0.01"
+                  value={venda.preco} placeholder="497,00"
+                  onChange={e => setV('preco', e.target.value)} />
+              </label>
+              <label className="cap-venda-campo">
+                <span>Valor promocional (opcional)</span>
+                <input type="number" min="0.01" max="99999.99" step="0.01"
+                  value={venda.preco_promocional} placeholder="297,00"
+                  onChange={e => setV('preco_promocional', e.target.value)} />
+              </label>
+              <label className="cap-venda-campo">
+                <span>Moeda</span>
+                <select value={venda.moeda} onChange={e => setV('moeda', e.target.value)}>
+                  {MOEDAS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </label>
+              <label className="cap-venda-campo">
+                <span>Parcelamento máximo</span>
+                <select value={venda.max_parcelas}
+                  onChange={e => setV('max_parcelas', Number(e.target.value))}>
+                  {Array.from({ length: MAX_PARCELAS }, (_, i) => i + 1).map(n => (
+                    <option key={n} value={n}>{n === 1 ? 'À vista (1x)' : `${n}x`}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {precoEfetivo > 0 && (
+              <p className="cap-venda__resumo">
+                O aluno verá: <strong>{formatarPreco(precoEfetivo, venda.moeda)}</strong>
+                {venda.max_parcelas > 1 && (
+                  <> ou <strong>{formatarParcelamento(precoEfetivo, venda.max_parcelas, venda.moeda)}</strong></>
+                )}
+              </p>
+            )}
+
+            <span className="cap-bloco__titulo">Configuração</span>
+            <div className="cap-venda-checks">
+              <label className="cap-check">
+                <input type="checkbox" checked={venda.a_venda}
+                  onChange={e => setV('a_venda', e.target.checked)} />
+                <span>Curso disponível para compra</span>
+              </label>
+              <label className="cap-check">
+                <input type="checkbox" checked={venda.permite_cupom}
+                  onChange={e => setV('permite_cupom', e.target.checked)} />
+                <span>Permitir cupom de desconto</span>
+              </label>
+              <label className="cap-check">
+                <input type="checkbox" checked={venda.ocultar_preco}
+                  onChange={e => setV('ocultar_preco', e.target.checked)} />
+                <span>Ocultar preço (opcional)</span>
+              </label>
+              <label className="cap-check">
+                <input type="checkbox" checked={venda.destaque_promocao}
+                  onChange={e => setV('destaque_promocao', e.target.checked)} />
+                <span>Destaque de promoção</span>
+              </label>
+            </div>
+            {!venda.a_venda && (
+              <p className="cap-venda__aviso">
+                Enquanto "disponível para compra" estiver desmarcado, o curso não
+                aparece no catálogo para quem ainda não o possui.
+              </p>
+            )}
+
+            <label className="cap-venda-campo cap-venda-campo--full">
+              <span>Mensagem personalizada antes da compra</span>
+              <textarea rows={3} maxLength={500}
+                value={venda.mensagem_compra}
+                placeholder="Curso completo com certificado e acesso vitalício."
+                onChange={e => setV('mensagem_compra', e.target.value)} />
+            </label>
           </div>
         )}
 
         <div className="ce-save-bar">
           <button onClick={handleSave} disabled={saving} className="ce-btn ce-btn--primary">
-            {saving ? 'Salvando...' : '💾 Salvar Acesso'}
+            {saving ? 'Salvando...' : pago ? '💾 Salvar Configuração' : '💾 Salvar Acesso'}
           </button>
         </div>
       </div>

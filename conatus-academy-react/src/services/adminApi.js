@@ -175,6 +175,10 @@ export const adminApi = {
       method: 'DELETE',
     }),
 
+  // Pessoas que manifestaram "Tenho interesse" num curso em breve.
+  getCourseInteressados: async (courseId) =>
+    request(`${API_URL}/admin/cursos/${courseId}/interessados`),
+
   // ----- Modules -----
   getModules: async (courseId) =>
     request(`${API_URL}/admin/modulos?cursoId=${encodeURIComponent(courseId)}`),

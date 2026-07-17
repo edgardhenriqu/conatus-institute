@@ -6,6 +6,8 @@ const { contentMiddleware } = require('../middlewares/auth');
 const { ADMIN_ROLES, canManage, canView, hiddenFrom, rank } = require('../utils/roles');
 const { indexAulaById } = require('../services/ragIndex');
 const { sincronizarNarracoes } = require('../services/narracao');
+const { validarVenda, vendaDoCurso, VENDA_FIELDS } = require('../services/payments/compras');
+const { listarInteressados } = require('../services/interesse');
 
 const router = express.Router();
 
@@ -399,7 +401,8 @@ router.get('/cursos', async (req, res) => {
         (SELECT COUNT(*) FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE m.curso_id = c.id AND a.role NOT IN ('admin', 'superadmin', 'diretor')) as total_matriculas,
         (SELECT COUNT(*) FROM modulos mo WHERE mo.curso_id = c.id) as total_modulos,
         (SELECT COUNT(*) FROM aulas au JOIN modulos mo ON mo.id = au.modulo_id WHERE mo.curso_id = c.id) as total_aulas,
-        (SELECT COUNT(*) FROM questoes q WHERE q.curso_id = c.id) as total_questoes
+        (SELECT COUNT(*) FROM questoes q WHERE q.curso_id = c.id) as total_questoes,
+        (SELECT COUNT(*) FROM curso_interesses ci WHERE ci.curso_id = c.id) as total_interesse
        FROM cursos c
        ${whereClause}
        ORDER BY c.id`,
@@ -421,7 +424,7 @@ const CURSO_FIELDS = [
 ];
 
 const NIVEIS_VALIDOS  = ['basico', 'intermediario', 'avancado'];
-const STATUS_VALIDOS  = ['rascunho', 'publicado', 'inativo'];
+const STATUS_VALIDOS  = ['rascunho', 'em_breve', 'publicado', 'inativo'];
 
 function validarCurso(body, { exigirObrigatorios = false } = {}) {
   if (exigirObrigatorios && (!body.nome || !body.duracao)) {
@@ -446,7 +449,8 @@ router.get('/cursos/:id', async (req, res) => {
 
     const curso = await pool.query(
       `SELECT c.*,
-        (SELECT COUNT(*) FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE m.curso_id = c.id AND a.role NOT IN ('admin', 'superadmin', 'diretor')) as total_matriculas
+        (SELECT COUNT(*) FROM matriculas m JOIN alunos a ON a.id = m.aluno_id WHERE m.curso_id = c.id AND a.role NOT IN ('admin', 'superadmin', 'diretor')) as total_matriculas,
+        (SELECT COUNT(*) FROM curso_interesses ci WHERE ci.curso_id = c.id) as total_interesse
        FROM cursos c
        WHERE c.id = $1`,
       [id]
@@ -577,6 +581,21 @@ router.put('/cursos/:id/status', async (req, res) => {
     res.json({ curso: resultado.rows[0] });
   } catch (error) {
     console.error('Erro ao alterar status do curso:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// Lista as pessoas que manifestaram "Tenho interesse" (cursos 'em_breve').
+router.get('/cursos/:id/interessados', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!(await checkCourseAccess(req, id))) {
+      return res.status(403).json({ erro: 'Acesso negado a este curso.' });
+    }
+    const interessados = await listarInteressados(id);
+    res.json({ interessados });
+  } catch (error) {
+    console.error('Erro ao listar interessados:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
   }
 });
@@ -944,7 +963,10 @@ router.get('/cursos/:id/acesso', async (req, res) => {
       return res.status(403).json({ erro: 'Acesso negado a este curso.' });
     }
 
-    const curso = await pool.query('SELECT acesso FROM cursos WHERE id = $1', [id]);
+    const curso = await pool.query(
+      `SELECT acesso, ${VENDA_FIELDS.join(', ')} FROM cursos WHERE id = $1`,
+      [id]
+    );
     if (curso.rows.length === 0) return res.status(404).json({ erro: 'Curso não encontrado' });
 
     const regras = await pool.query(
@@ -965,6 +987,7 @@ router.get('/cursos/:id/acesso', async (req, res) => {
       funcionarios: regras.rows.some(r => r.tipo === 'funcionarios'),
       empresas: regras.rows.filter(r => r.tipo === 'empresa').map(r => r.empresa_id),
       usuarios: usuarios.rows,
+      venda: vendaDoCurso(curso.rows[0]),
     });
   } catch (error) {
     console.error('Erro ao carregar acesso do curso:', error);
@@ -993,12 +1016,33 @@ router.put('/cursos/:id/acesso', async (req, res) => {
       ? [...new Set(req.body.empresas.map(Number).filter(Number.isInteger))]
       : [];
 
+    // Configuração de venda — obrigatória (e validada) apenas no modo 'pago'.
+    // Nos demais modos os campos ficam intactos: voltar de 'pago' para
+    // 'restrito' e depois para 'pago' não perde a precificação.
+    let venda = null;
+    if (acesso === 'pago') {
+      const v = validarVenda(req.body.venda || {});
+      if (v.erro) {
+        client.release();
+        return res.status(400).json({ erro: v.erro });
+      }
+      venda = v.venda;
+    }
+
     await client.query('BEGIN');
 
     await client.query(
       'UPDATE cursos SET acesso = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [acesso, id]
     );
+
+    if (venda) {
+      const sets = VENDA_FIELDS.map((f, i) => `${f} = $${i + 1}`).join(', ');
+      await client.query(
+        `UPDATE cursos SET ${sets} WHERE id = $${VENDA_FIELDS.length + 1}`,
+        [...VENDA_FIELDS.map(f => venda[f]), id]
+      );
+    }
 
     // regra 'funcionarios'
     await client.query(
@@ -1025,7 +1069,7 @@ router.put('/cursos/:id/acesso', async (req, res) => {
     }
 
     await client.query('COMMIT');
-    res.json({ acesso, funcionarios, empresas });
+    res.json({ acesso, funcionarios, empresas, ...(venda ? { venda } : {}) });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Erro ao salvar acesso do curso:', error);

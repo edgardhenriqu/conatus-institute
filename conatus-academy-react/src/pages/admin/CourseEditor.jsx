@@ -16,7 +16,7 @@ const NIVEIS = [
   { value: 'avancado',      label: 'Avançado' },
 ];
 
-const STATUS_LABEL = { rascunho: 'Rascunho', publicado: 'Publicado', inativo: 'Inativo' };
+const STATUS_LABEL = { rascunho: 'Rascunho', em_breve: 'Em breve', publicado: 'Publicado', inativo: 'Inativo' };
 
 const TIPOS_CONTEUDO = [
   { value: 'texto',    label: '📝 Texto',                icon: '📝' },
@@ -71,6 +71,9 @@ export default function CourseEditor() {
   // Alunos
   const [students, setStudents] = useState([]);
 
+  // Interessados (cursos em breve)
+  const [interessados, setInteressados] = useState([]);
+
   const setField = (name, value) => setForm(f => ({ ...f, [name]: value }));
 
   /* ── Carregamento ─────────────────────────────────────────────── */
@@ -114,15 +117,23 @@ export default function CourseEditor() {
     } catch { /* servidor offline */ }
   }, [cursoId]);
 
+  const loadInteressados = useCallback(async () => {
+    try {
+      const data = await adminApi.getCourseInteressados(cursoId);
+      setInteressados(data.interessados || []);
+    } catch { /* servidor offline */ }
+  }, [cursoId]);
+
   useEffect(() => {
     loadCurso();
     loadModules();
     loadQuiz();
     loadStudents();
+    loadInteressados();
     if (isAdmin) {
       api.getAdminInstrutores().then(d => setInstrutores(d.instrutores || [])).catch(() => {});
     }
-  }, [loadCurso, loadModules, loadQuiz, loadStudents, isAdmin]);
+  }, [loadCurso, loadModules, loadQuiz, loadStudents, loadInteressados, isAdmin]);
 
   /* ── Curso (salvar / publicar) ────────────────────────────────── */
 
@@ -208,6 +219,21 @@ export default function CourseEditor() {
       toast.success(novoStatus === 'publicado'
         ? '🎉 Curso publicado! Ele já aparece para os alunos.'
         : 'Curso despublicado (voltou para rascunho).');
+    } catch {
+      toast.error('Erro ao alterar status do curso.');
+    }
+  };
+
+  const handleSoonToggle = async () => {
+    const novoStatus = curso.status === 'em_breve' ? 'rascunho' : 'em_breve';
+    try {
+      const data = await adminApi.setCourseStatus(cursoId, novoStatus);
+      if (data.erro) { toast.error(data.erro); return; }
+      setCurso(data.curso);
+      setForm(f => ({ ...f, status: data.curso.status }));
+      toast.success(novoStatus === 'em_breve'
+        ? '📅 Curso marcado como "Em breve" — já aparece no catálogo para captar interesse.'
+        : 'Curso voltou para rascunho.');
     } catch {
       toast.error('Erro ao alterar status do curso.');
     }
@@ -444,11 +470,23 @@ export default function CourseEditor() {
           <button onClick={() => navigate('/admin/cursos')} className="ce-back-btn">← Voltar</button>
           <h1 className="ce-title">{form.nome || 'Novo Curso'}</h1>
           <span className={`ce-status-badge ce-status--${status}`}>{STATUS_LABEL[status]}</span>
+          {Number(curso.total_interesse) > 0 && (
+            <span className="ce-interest-chip" title="Pessoas que clicaram em 'Tenho interesse'">
+              ❤ {curso.total_interesse} {Number(curso.total_interesse) === 1 ? 'interessado' : 'interessados'}
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <Link to={`/cursos/${cursoId}`} target="_blank" className="ce-btn ce-btn--secondary">
             👁 Visualizar como aluno
           </Link>
+          {status !== 'publicado' && (
+            <button onClick={handleSoonToggle} className="ce-btn ce-btn--secondary"
+              style={status === 'em_breve' ? { background: '#4f46e5', color: '#fff', borderColor: '#4f46e5' } : undefined}
+              title="Exibe o curso no catálogo como 'Em breve', com o botão 'Tenho interesse'">
+              {status === 'em_breve' ? '📅 Em breve (ativo)' : '📅 Marcar Em breve'}
+            </button>
+          )}
           <button onClick={handlePublishToggle} className="ce-btn ce-btn--primary"
             style={status === 'publicado' ? { background: '#64748b' } : { background: '#10b981' }}>
             {status === 'publicado' ? 'Despublicar' : '🚀 Publicar curso'}
@@ -1107,6 +1145,39 @@ export default function CourseEditor() {
       {/* ════════ ABA: ALUNOS ════════ */}
       {activeTab === 'students' && (
         <div className="ce-form">
+          {/* Interessados — captação de demanda dos cursos "Em breve" */}
+          {interessados.length > 0 && (
+            <div className="ce-section">
+              <div className="ce-modules__header">
+                <h3 className="ce-section__title" style={{ margin: 0 }}>
+                  ❤ Interessados ({interessados.length})
+                </h3>
+                <button className="ce-btn ce-btn--secondary ce-btn--sm" onClick={loadInteressados}>
+                  ↻ Atualizar
+                </button>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '8px 0 16px' }}>
+                Pessoas que clicaram em "Tenho interesse" enquanto o curso está como "Em breve".
+              </p>
+              <div className="admin-table-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr><th>Nome</th><th>E-mail</th><th>Interesse em</th></tr>
+                  </thead>
+                  <tbody>
+                    {interessados.map(p => (
+                      <tr key={p.id}>
+                        <td style={{ fontWeight: 500 }}>{p.nome}</td>
+                        <td style={{ fontSize: '0.9rem' }}>{p.email}</td>
+                        <td>{p.interesse_em ? new Date(p.interesse_em).toLocaleDateString('pt-BR') : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div className="ce-section">
             <div className="ce-modules__header">
               <h3 className="ce-section__title" style={{ margin: 0 }}>

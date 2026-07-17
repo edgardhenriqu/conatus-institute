@@ -128,6 +128,23 @@ export const api = {
   matricular: async (cursoId) =>
     request(`${API_URL}/cursos/${cursoId}/matricular`, { method: 'POST' }),
 
+  // Compra de curso pago. Enquanto nenhum gateway estiver configurado no
+  // servidor, responde 501 (pagamento em breve); com gateway, retorna
+  // { checkout: { url, referencia } } para redirecionar o aluno.
+  comprarCurso: async (cursoId, dados = {}) =>
+    request(`${API_URL}/cursos/${cursoId}/comprar`, {
+      method: 'POST',
+      body: JSON.stringify(dados),
+    }),
+
+  // "Tenho interesse" em curso ainda não lançado (status em_breve).
+  // Retorna { total_interesse, interesse_registrado }.
+  registrarInteresse: async (cursoId) =>
+    request(`${API_URL}/cursos/${cursoId}/interesse`, { method: 'POST' }),
+
+  removerInteresse: async (cursoId) =>
+    request(`${API_URL}/cursos/${cursoId}/interesse`, { method: 'DELETE' }),
+
   // Aluno
   getMatriculas: async () => request(`${API_URL}/cursos/aluno/matriculas`),
 

@@ -8,6 +8,7 @@ import { PageLoader } from '../../components/ui/PageLoader';
 
 const STATUS_BADGE = {
   rascunho:  { label: 'Rascunho',  bg: '#f1f5f9', color: '#475569' },
+  em_breve:  { label: 'Em breve',  bg: '#e0e7ff', color: '#3730a3' },
   publicado: { label: 'Publicado', bg: '#dcfce7', color: '#166534' },
   inativo:   { label: 'Inativo',   bg: '#fee2e2', color: '#991b1b' },
 };
@@ -218,7 +219,14 @@ export function AdminCursos() {
                       </div>
                     </td>
                     <td><Pill map={ACESSO_BADGE} value={curso.acesso || 'publico'} /></td>
-                    <td><Pill map={STATUS_BADGE} value={curso.status || 'rascunho'} /></td>
+                    <td>
+                      <Pill map={STATUS_BADGE} value={curso.status || 'rascunho'} />
+                      {curso.status === 'em_breve' && Number(curso.total_interesse) > 0 && (
+                        <div style={{ marginTop: '4px', fontSize: '0.78rem', color: '#7a5c00', fontWeight: 700 }}>
+                          ❤ {curso.total_interesse} {Number(curso.total_interesse) === 1 ? 'interessado' : 'interessados'}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'center' }}>{curso.total_modulos || 0}</td>
                     <td style={{ textAlign: 'center' }}>{curso.total_aulas || 0}</td>
                     <td style={{ textAlign: 'center' }}>{curso.total_matriculas || 0}</td>

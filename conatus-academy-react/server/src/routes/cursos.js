@@ -3,7 +3,10 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../../db/connection');
 const { authMiddleware } = require('../middlewares/auth');
-const { podeAcessarCurso, MSG_ACESSO_NEGADO } = require('../services/accessControl');
+const { podeAcessarCurso, MSG_ACESSO_NEGADO, MSG_CURSO_PAGO } = require('../services/accessControl');
+const { possuiCurso, vendaDoCurso } = require('../services/payments/compras');
+const { getGateway, GatewayIndisponivelError } = require('../services/payments');
+const { registrarInteresse, removerInteresse, infoInteresse, infoInteresseEmLote } = require('../services/interesse');
 const { ADMIN_ROLES } = require('../utils/roles');
 const { embedQuery, toVectorLiteral } = require('../services/ragGemini');
 const { generate } = require('../services/ragChat');
@@ -31,7 +34,12 @@ async function checarAcessoCurso(curso, req) {
     return { ok: false, status: 404, erro: 'Curso não encontrado' };
   }
   const autorizado = await podeAcessarCurso(req.alunoId, curso);
-  if (!autorizado) return { ok: false, status: 403, erro: MSG_ACESSO_NEGADO };
+  if (!autorizado) {
+    if (curso.acesso === 'pago') {
+      return { ok: false, status: 403, erro: MSG_CURSO_PAGO, pago: true };
+    }
+    return { ok: false, status: 403, erro: MSG_ACESSO_NEGADO };
+  }
   return { ok: true };
 }
 
@@ -40,12 +48,39 @@ async function checarAcessoCurso(curso, req) {
 router.get('/', optionalAuth, async (req, res) => {
   try {
     const resultado = await pool.query(
-      `SELECT * FROM cursos WHERE status = 'publicado' AND visivel = true ORDER BY id`
+      `SELECT * FROM cursos
+        WHERE status IN ('publicado', 'em_breve') AND visivel = true
+        ORDER BY id`
     );
 
     const cursos = [];
     for (const curso of resultado.rows) {
-      if (await podeAcessarCurso(req.alunoId, curso)) cursos.push(curso);
+      // Cursos "em breve" são vitrines de captação de interesse: aparecem para
+      // TODO MUNDO (o objetivo é medir demanda), sem liberar conteúdo.
+      if (curso.status === 'em_breve') {
+        curso.em_breve = true;
+        cursos.push(curso);
+        continue;
+      }
+      if (await podeAcessarCurso(req.alunoId, curso)) {
+        // Em cursos pagos o front distingue "já possui" (Continuar) de
+        // "pode comprar" (Comprar) — os demais modos não usam o flag.
+        if (curso.acesso === 'pago') curso.possui_curso = true;
+        cursos.push(curso);
+      } else if (curso.acesso === 'pago' && curso.a_venda) {
+        // Curso pago à venda aparece no catálogo como vitrine (preço + compra).
+        curso.possui_curso = false;
+        cursos.push(curso);
+      }
+    }
+
+    // Contagem de interesse dos cursos "em breve" (uma consulta em lote).
+    const emBreveIds = cursos.filter(c => c.em_breve).map(c => c.id);
+    if (emBreveIds.length > 0) {
+      const info = await infoInteresseEmLote(emBreveIds, req.alunoId);
+      for (const c of cursos) {
+        if (c.em_breve) Object.assign(c, info.get(c.id));
+      }
     }
 
     // Anexa os fabricantes (empresas) de cada curso, para a seção "Fabricantes"
@@ -126,9 +161,34 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
 
     const curso = resultado.rows[0];
+
+    // Curso "em breve": a página é uma vitrine pública de captação de interesse
+    // (contagem + botão "Tenho interesse"), sem acesso ao conteúdo. Basta estar
+    // visível (ou ser admin) — não passa pelo controle de acesso normal.
+    if (curso.status === 'em_breve') {
+      const isAdmin = ADMIN_ROLES.includes(req.userRole);
+      if (!curso.visivel && !isAdmin) {
+        return res.status(404).json({ erro: 'Curso não encontrado' });
+      }
+      const contagem = await pool.query(
+        `SELECT
+          (SELECT COUNT(*) FROM modulos WHERE curso_id = $1) as total_modulos,
+          (SELECT COUNT(*) FROM aulas a JOIN modulos m ON m.id = a.modulo_id WHERE m.curso_id = $1) as total_aulas`,
+        [id]
+      );
+      const info = await infoInteresse(id, req.alunoId);
+      return res.json({ ...curso, ...contagem.rows[0], em_breve: true, ...info });
+    }
+
     const acesso = await checarAcessoCurso(curso, req);
     if (!acesso.ok) {
-      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
+      // Curso pago à venda: a página de detalhes é a vitrine (preço + botão
+      // Comprar), então ela abre mesmo sem posse. Só o CONTEÚDO fica bloqueado
+      // (rota /conteudo e matrícula continuam exigindo a compra).
+      const vitrine = curso.acesso === 'pago' && curso.a_venda && curso.status === 'publicado';
+      if (!vitrine) {
+        return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403, pago: Boolean(acesso.pago) });
+      }
     }
 
     // total de módulos/aulas para a página de detalhes
@@ -139,7 +199,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
       [id]
     );
 
-    res.json({ ...curso, ...contagem.rows[0] });
+    const extra = curso.acesso === 'pago' ? { possui_curso: acesso.ok } : {};
+    res.json({ ...curso, ...contagem.rows[0], ...extra });
   } catch (error) {
     console.error('Erro ao buscar curso:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
@@ -161,7 +222,7 @@ router.post('/:cursoId/matricular', authMiddleware, async (req, res) => {
     const curso = cursoRes.rows[0];
     const acesso = await checarAcessoCurso(curso, req);
     if (!acesso.ok) {
-      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403, pago: Boolean(acesso.pago) });
     }
 
     const matriculaExiste = await pool.query(
@@ -187,6 +248,79 @@ router.post('/:cursoId/matricular', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Compra de curso pago ─────────────────────────────────────────────────────
+// Ponto de entrada da comercialização. Toda a lógica de provedor fica atrás de
+// getGateway() (services/payments): quando um gateway real for configurado,
+// esta rota passa a devolver a URL de checkout sem nenhuma outra mudança.
+router.post('/:cursoId/comprar', authMiddleware, async (req, res) => {
+  try {
+    const { cursoId } = req.params;
+
+    const cursoRes = await pool.query('SELECT * FROM cursos WHERE id = $1', [cursoId]);
+    if (cursoRes.rows.length === 0) {
+      return res.status(404).json({ erro: 'Curso não encontrado' });
+    }
+    const curso = cursoRes.rows[0];
+
+    if (curso.acesso !== 'pago' || curso.status !== 'publicado') {
+      return res.status(400).json({ erro: 'Este curso não está disponível para compra.' });
+    }
+    if (!curso.a_venda) {
+      return res.status(400).json({ erro: 'As vendas deste curso não estão abertas no momento.' });
+    }
+    if (await possuiCurso(req.alunoId, curso.id)) {
+      return res.status(409).json({ erro: 'Você já possui este curso.' });
+    }
+
+    const venda = vendaDoCurso(curso);
+    const parcelas = Math.min(Math.max(1, Number(req.body?.parcelas) || 1), venda.max_parcelas);
+    const cupom = venda.permite_cupom ? String(req.body?.cupom || '').trim().slice(0, 60) || null : null;
+
+    const checkout = await getGateway().criarCheckout({
+      curso, aluno: { id: req.alunoId }, parcelas, cupom,
+    });
+    res.json({ checkout });
+  } catch (error) {
+    if (error instanceof GatewayIndisponivelError) {
+      return res.status(501).json({ erro: error.message });
+    }
+    console.error('Erro ao iniciar compra do curso:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+// ── "Tenho interesse" (cursos em breve) ──────────────────────────────────────
+// Registra/remove a manifestação de interesse do aluno logado num curso ainda
+// não lançado. Deduplicado por (curso, aluno): a contagem mede pessoas.
+router.post('/:cursoId/interesse', authMiddleware, async (req, res) => {
+  try {
+    const { cursoId } = req.params;
+    const curso = await pool.query('SELECT id, status, visivel FROM cursos WHERE id = $1', [cursoId]);
+    if (curso.rows.length === 0) {
+      return res.status(404).json({ erro: 'Curso não encontrado' });
+    }
+    if (curso.rows[0].status !== 'em_breve' || !curso.rows[0].visivel) {
+      return res.status(400).json({ erro: 'Este curso não está aberto para manifestação de interesse.' });
+    }
+    await registrarInteresse(req.alunoId, cursoId);
+    res.status(201).json(await infoInteresse(cursoId, req.alunoId));
+  } catch (error) {
+    console.error('Erro ao registrar interesse:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
+router.delete('/:cursoId/interesse', authMiddleware, async (req, res) => {
+  try {
+    const { cursoId } = req.params;
+    await removerInteresse(req.alunoId, cursoId);
+    res.json(await infoInteresse(cursoId, req.alunoId));
+  } catch (error) {
+    console.error('Erro ao remover interesse:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
+});
+
 // ── Conteúdo do curso (player do aluno) ──────────────────────────────────────
 
 router.get('/:cursoId/conteudo', authMiddleware, async (req, res) => {
@@ -202,7 +336,7 @@ router.get('/:cursoId/conteudo', authMiddleware, async (req, res) => {
     const curso = cursoRes.rows[0];
     const acesso = await checarAcessoCurso(curso, req);
     if (!acesso.ok) {
-      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403, pago: Boolean(acesso.pago) });
     }
 
     const modulos = await pool.query(
@@ -294,7 +428,7 @@ router.get('/:cursoId/aulas/:aulaId/narracao/:ordem/audio', authMiddleware, asyn
 
     const acesso = await checarAcessoCurso(cursoRes.rows[0], req);
     if (!acesso.ok) {
-      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403, pago: Boolean(acesso.pago) });
     }
 
     // O JOIN com módulos amarra a aula ao curso: sem ele, um aluno com acesso a um
@@ -369,7 +503,7 @@ router.post('/:cursoId/assistente', authMiddleware, async (req, res) => {
     // Mesmo controle de acesso do player: aluno só pergunta sobre curso liberado.
     const acesso = await checarAcessoCurso(curso, req);
     if (!acesso.ok) {
-      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403 });
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403, pago: Boolean(acesso.pago) });
     }
 
     // Busca semântica escopada ao curso (top-K trechos mais próximos da pergunta).

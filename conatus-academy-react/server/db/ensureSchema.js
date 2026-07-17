@@ -131,6 +131,60 @@ const STATEMENTS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_regra_usuario ON curso_acesso_regras(curso_id, aluno_id)   WHERE tipo = 'usuario'`,
   `CREATE INDEX IF NOT EXISTS idx_regras_curso ON curso_acesso_regras(curso_id)`,
 
+  // ── Venda de cursos pagos (acesso = 'pago') ────────────────────────────────
+  // Infraestrutura de comercialização SEM gateway: os campos de precificação
+  // vivem no curso e a posse (compra aprovada) em curso_compras. A integração
+  // de pagamento futura (Stripe/Mercado Pago/Asaas/PagSeguro/PayPal) só
+  // preenche curso_compras — ver server/src/services/payments/.
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS preco NUMERIC(10,2)`,
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS preco_promocional NUMERIC(10,2)`,
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS moeda VARCHAR(3) NOT NULL DEFAULT 'BRL'`,
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS max_parcelas INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS permite_cupom BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS mensagem_compra TEXT`,
+  // a_venda = "disponível para compra": um curso pago pode existir sem estar
+  // à venda (ex.: em preparação) — aí ele some do catálogo para quem não o tem.
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS a_venda BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS ocultar_preco BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE cursos ADD COLUMN IF NOT EXISTS destaque_promocao BOOLEAN NOT NULL DEFAULT false`,
+
+  // Compras: fonte da posse de cursos pagos. Só status 'aprovada' dá acesso
+  // (accessControl.js). gateway/gateway_ref identificam a transação externa.
+  `CREATE TABLE IF NOT EXISTS curso_compras (
+    id          SERIAL PRIMARY KEY,
+    curso_id    INTEGER NOT NULL REFERENCES cursos(id) ON DELETE CASCADE,
+    aluno_id    UUID    NOT NULL REFERENCES alunos(id) ON DELETE CASCADE,
+    status      VARCHAR(20) NOT NULL DEFAULT 'pendente',
+    valor       NUMERIC(10,2),
+    moeda       VARCHAR(3) NOT NULL DEFAULT 'BRL',
+    parcelas    INTEGER NOT NULL DEFAULT 1,
+    cupom       VARCHAR(60),
+    gateway     VARCHAR(30),
+    gateway_ref VARCHAR(120),
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT compra_status_valido CHECK (
+      status IN ('pendente', 'aprovada', 'recusada', 'cancelada', 'reembolsada')
+    )
+  )`,
+  // no máximo UMA compra aprovada por aluno/curso
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_compra_aprovada
+     ON curso_compras(curso_id, aluno_id) WHERE status = 'aprovada'`,
+  `CREATE INDEX IF NOT EXISTS idx_compras_aluno ON curso_compras(aluno_id)`,
+
+  // ── "Tenho interesse" em cursos que serão lançados (status = 'em_breve') ────
+  // Mede a demanda por um curso ainda não publicado. UMA manifestação por
+  // aluno/curso (o UNIQUE evita contar a mesma pessoa duas vezes). O status
+  // 'em_breve' do curso é apenas texto na coluna cursos.status (sem ENUM).
+  `CREATE TABLE IF NOT EXISTS curso_interesses (
+    id         SERIAL PRIMARY KEY,
+    curso_id   INTEGER NOT NULL REFERENCES cursos(id)  ON DELETE CASCADE,
+    aluno_id   UUID    NOT NULL REFERENCES alunos(id)  ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (curso_id, aluno_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_interesses_curso ON curso_interesses(curso_id)`,
+
   // Seed dos fabricantes parceiros. O slug é o identificador interno e não muda
   // (agrupa cursos por fabricante); só o nome exibido pode ser reeditado — ex.:
   // o parceiro de slug 'huawei' é exibido como "Soluções WDC".

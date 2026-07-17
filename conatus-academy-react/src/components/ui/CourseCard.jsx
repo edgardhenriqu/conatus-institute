@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Badge } from './Badge';
+import { InterestButton } from './InterestButton';
+import { formatarPreco, precoVigente } from '../../utils/currency';
 
 /** Nível padrão quando o curso não define um. */
 function courseLevel(curso) {
@@ -16,9 +18,16 @@ function courseLevel(curso) {
 export function CourseCard({ curso, variant = 'catalog', enrollment = null }) {
   const isFree = curso.gratuito;
   const isInternal = curso.restrito;
+  const isPaid = curso.pago;
+  const isSoon = curso.emBreve;
   const nivel = courseLevel(curso);
   const progresso = enrollment ? Math.min(100, enrollment.progresso || 0) : null;
   const concluido = progresso === 100;
+
+  // Preço no card: só para curso pago que o aluno ainda não possui e sem
+  // "ocultar preço" marcado no painel de venda.
+  const mostrarPreco = isPaid && !isSoon && !curso.possuiCurso && !enrollment && !curso.ocultar_preco && curso.preco != null;
+  const temPromo = mostrarPreco && curso.preco_promocional != null;
 
   const image = (
     <img
@@ -32,8 +41,13 @@ export function CourseCard({ curso, variant = 'catalog', enrollment = null }) {
 
   const badges = (
     <div className="ccard-badges">
-      {isFree && <Badge variant="free">Gratuito</Badge>}
-      {isInternal && <Badge variant="internal">Restrito</Badge>}
+      {isSoon && <Badge variant="soon">Em Breve</Badge>}
+      {!isSoon && isFree && <Badge variant="free">Gratuito</Badge>}
+      {!isSoon && isInternal && <Badge variant="internal">Restrito</Badge>}
+      {!isSoon && isPaid && <Badge variant="paid">Curso Pago</Badge>}
+      {isPaid && curso.destaque_promocao && curso.preco_promocional != null && !curso.possuiCurso && (
+        <span className="ccard-promo-tag">Promoção</span>
+      )}
       {enrollment && (
         <span className={`ccard-status ${concluido ? 'done' : 'progress'}`}>
           {concluido ? '✓ Concluído' : 'Em andamento'}
@@ -46,6 +60,13 @@ export function CourseCard({ curso, variant = 'catalog', enrollment = null }) {
     <div className="ccard-meta">
       <span className="ccard-meta-item" title="Carga horária">🕐 {curso.duracao || '—'}</span>
       <span className="ccard-meta-item" title="Nível">📊 {nivel}</span>
+    </div>
+  );
+
+  const priceTag = mostrarPreco && (
+    <div className="ccard-preco">
+      {temPromo && <s className="ccard-preco-antigo">{formatarPreco(curso.preco, curso.moeda)}</s>}
+      <strong className="ccard-preco-atual">{formatarPreco(precoVigente(curso), curso.moeda)}</strong>
     </div>
   );
 
@@ -86,17 +107,29 @@ export function CourseCard({ curso, variant = 'catalog', enrollment = null }) {
         <h3><Link to={`/cursos/${curso.id}`}>{curso.nome}</Link></h3>
         {curso.descricao && <p className="ccard-desc">{curso.descricao}</p>}
         {meta}
+        {priceTag}
         {progressBar}
+        {isSoon && <p className="ccard-soon-hint">🚀 Lançamento em breve</p>}
         <div className="card-buttons">
-          {enrollment ? (
+          {isSoon ? (
+            <>
+              <Link to={`/cursos/${curso.id}`} className="btn-card btn-outline">Saiba Mais</Link>
+              <InterestButton curso={curso} size="md" />
+            </>
+          ) : enrollment ? (
             <Link to={`/cursos/${curso.id}/sala-de-aula`} className="btn-card btn-fill">
               {concluido ? 'Revisar curso' : 'Continuar curso'}
             </Link>
+          ) : isPaid && !curso.possuiCurso ? (
+            <>
+              <Link to={`/cursos/${curso.id}`} className="btn-card btn-outline">Saiba Mais</Link>
+              <Link to={`/cursos/${curso.id}`} className="btn-card btn-fill">Comprar curso</Link>
+            </>
           ) : (
             <>
               <Link to={`/cursos/${curso.id}`} className="btn-card btn-outline">Saiba Mais</Link>
               <Link to={`/cursos/${curso.id}#matricular`} className="btn-card btn-fill">
-                {isInternal ? 'Acessar curso' : 'Matricular-se'}
+                {isPaid ? 'Continuar curso' : isInternal ? 'Acessar curso' : 'Matricular-se'}
               </Link>
             </>
           )}
