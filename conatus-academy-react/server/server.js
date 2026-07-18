@@ -16,6 +16,12 @@ const app = express();
 // Confia no proxy do Replit/Nginx para X-Forwarded-* (IP real, https).
 app.set("trust proxy", 1);
 
+// Cabeçalhos de segurança (CSP, anti-clickjacking, nosniff, HSTS…) em TODA
+// resposta. Vem cedo, antes das rotas: as rotas de download de arquivo definem
+// depois a própria CSP, mais estrita, sobrescrevendo esta para aquele conteúdo.
+const { securityHeaders } = require("./src/middlewares/securityHeaders");
+app.use(securityHeaders);
+
 // ── CORS ────────────────────────────────────────────────────────────────────
 // Em produção no Replit o frontend é servido pelo próprio Express (mesma
 // origem), então o CORS é irrelevante para o SPA. Ele só importa se a API for

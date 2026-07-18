@@ -607,6 +607,26 @@ router.post('/:cursoId/progresso', authMiddleware, async (req, res) => {
       return res.status(400).json({ erro: 'Formato inválido. Envie { aulas: [{ titulo, concluida }] }' });
     }
 
+    // Sem esta guarda, qualquer aluno logado poderia gravar progresso em cursos
+    // nos quais não está matriculado (ou que nem pode acessar, como um curso pago
+    // que não comprou). O curso precisa existir, o aluno precisa ter acesso e
+    // estar matriculado — o progresso pertence a uma matrícula.
+    const cursoRes = await pool.query('SELECT * FROM cursos WHERE id = $1', [cursoId]);
+    if (cursoRes.rows.length === 0) {
+      return res.status(404).json({ erro: 'Curso não encontrado' });
+    }
+    const acesso = await checarAcessoCurso(cursoRes.rows[0], req);
+    if (!acesso.ok) {
+      return res.status(acesso.status).json({ erro: acesso.erro, restrito: acesso.status === 403, pago: Boolean(acesso.pago) });
+    }
+    const matricula = await pool.query(
+      'SELECT id FROM matriculas WHERE aluno_id = $1 AND curso_id = $2',
+      [alunoId, cursoId]
+    );
+    if (matricula.rows.length === 0) {
+      return res.status(403).json({ erro: 'Você não está matriculado neste curso.' });
+    }
+
     for (const aula of aulas) {
       await pool.query(
         `INSERT INTO progresso_aulas (aluno_id, curso_id, aula_titulo, concluida, updated_at)

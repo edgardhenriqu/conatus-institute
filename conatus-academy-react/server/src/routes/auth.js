@@ -4,11 +4,39 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const pool = require('../../db/connection');
 const { authMiddleware } = require('../middlewares/auth');
+const { rateLimit } = require('../middlewares/rateLimit');
 const { createCaptcha } = require('../captcha/svgCaptcha');
 const captchaStore = require('../captcha/captchaStore');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../email/mailer');
 
 const router = express.Router();
+
+/*
+ * Tetos por IP (em memória). Freiam força bruta de senha, credential stuffing e
+ * abuso das rotas que disparam e-mail. Valores propositalmente folgados para não
+ * atrapalhar um usuário real que erra a senha ou reenvia um e-mail algumas vezes.
+ */
+// Login: barra a adivinhação de senha, que o CAPTCHA (pós-senha) não cobre.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 20,
+  erro: 'Muitas tentativas de login deste endereço. Aguarde alguns minutos e tente novamente.',
+});
+// Verificação do CAPTCHA: o desafio já é de uso único, mas o teto evita varrer
+// muitos desafios em sequência.
+const captchaLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 60,
+  erro: 'Muitas tentativas de verificação. Aguarde um instante e tente novamente.',
+});
+// Rotas que enviam e-mail: evitam usar a plataforma para bombardear um endereço.
+const emailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 10,
+  erro: 'Muitas solicitações deste endereço. Aguarde um pouco antes de tentar de novo.',
+});
+// Cadastro: limita criação de contas em massa a partir de um mesmo IP.
+const cadastroLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 15,
+  erro: 'Muitos cadastros deste endereço. Aguarde um pouco antes de tentar de novo.',
+});
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
@@ -164,7 +192,7 @@ function isValidPhone(phone) {
   return true;
 }
 
-router.post('/cadastrar', async (req, res) => {
+router.post('/cadastrar', cadastroLimiter, async (req, res) => {
   try {
     const { nome, email, senha, cpf, data_nascimento, telefone, endereco, cidade, estado, empresa, cargo } = req.body;
 
@@ -236,7 +264,7 @@ router.post('/cadastrar', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, senha } = req.body;
     if (!email || !senha) {
@@ -296,7 +324,7 @@ router.post('/login', async (req, res) => {
  *  - image: o SVG da imagem para exibir ao usuário.
  * Usado tanto na primeira exibição quanto no botão "Gerar nova imagem".
  */
-router.get('/captcha', (req, res) => {
+router.get('/captcha', captchaLimiter, (req, res) => {
   try {
     const { text, image } = createCaptcha(5);
     const captchaId = captchaStore.save(text); // guarda a resposta no servidor
@@ -317,7 +345,7 @@ router.get('/captcha', (req, res) => {
  * Só após o CAPTCHA correto o token de acesso definitivo é emitido. A validação
  * acontece inteiramente no backend.
  */
-router.post('/verificar-captcha', async (req, res) => {
+router.post('/verificar-captcha', captchaLimiter, async (req, res) => {
   try {
     const { ticket, captchaId, texto } = req.body;
 
@@ -414,7 +442,7 @@ router.post('/verificar-email', async (req, res) => {
  * Reenvia o link de confirmação. Corpo: { email }.
  * Resposta sempre genérica (não revela se o e-mail existe ou não).
  */
-router.post('/reenviar-verificacao', async (req, res) => {
+router.post('/reenviar-verificacao', emailLimiter, async (req, res) => {
   const respostaGenerica = {
     mensagem: 'Se houver uma conta pendente com este e-mail, enviamos um novo link de confirmação.',
   };
@@ -450,7 +478,7 @@ router.post('/reenviar-verificacao', async (req, res) => {
  * Solicita o link de redefinição de senha. Corpo: { email }.
  * Resposta sempre genérica (não revela se o e-mail existe).
  */
-router.post('/esqueci-senha', async (req, res) => {
+router.post('/esqueci-senha', emailLimiter, async (req, res) => {
   const respostaGenerica = {
     mensagem: 'Se houver uma conta com este e-mail, enviamos um link para redefinir a senha.',
   };
