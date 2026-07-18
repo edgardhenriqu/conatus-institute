@@ -43,6 +43,18 @@ async function checarAcessoCurso(curso, req) {
   return { ok: true };
 }
 
+/**
+ * A contagem de interessados ("Tenho interesse") é métrica interna de demanda:
+ * só admins a recebem. Para o aluno vai apenas `interesse_registrado` (o estado
+ * do próprio botão). Filtrar AQUI, no servidor, é o que garante o sigilo —
+ * esconder só no front deixaria o número exposto na resposta da API.
+ */
+function filtrarInfoInteresse(info, req) {
+  if (ADMIN_ROLES.includes(req.userRole)) return info;
+  const { total_interesse: _oculto, ...resto } = info;
+  return resto;
+}
+
 // ── Catálogo ─────────────────────────────────────────────────────────────────
 
 router.get('/', optionalAuth, async (req, res) => {
@@ -79,7 +91,7 @@ router.get('/', optionalAuth, async (req, res) => {
     if (emBreveIds.length > 0) {
       const info = await infoInteresseEmLote(emBreveIds, req.alunoId);
       for (const c of cursos) {
-        if (c.em_breve) Object.assign(c, info.get(c.id));
+        if (c.em_breve) Object.assign(c, filtrarInfoInteresse(info.get(c.id), req));
       }
     }
 
@@ -177,7 +189,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
         [id]
       );
       const info = await infoInteresse(id, req.alunoId);
-      return res.json({ ...curso, ...contagem.rows[0], em_breve: true, ...info });
+      return res.json({ ...curso, ...contagem.rows[0], em_breve: true, ...filtrarInfoInteresse(info, req) });
     }
 
     const acesso = await checarAcessoCurso(curso, req);
@@ -303,7 +315,7 @@ router.post('/:cursoId/interesse', authMiddleware, async (req, res) => {
       return res.status(400).json({ erro: 'Este curso não está aberto para manifestação de interesse.' });
     }
     await registrarInteresse(req.alunoId, cursoId);
-    res.status(201).json(await infoInteresse(cursoId, req.alunoId));
+    res.status(201).json(filtrarInfoInteresse(await infoInteresse(cursoId, req.alunoId), req));
   } catch (error) {
     console.error('Erro ao registrar interesse:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
@@ -314,7 +326,7 @@ router.delete('/:cursoId/interesse', authMiddleware, async (req, res) => {
   try {
     const { cursoId } = req.params;
     await removerInteresse(req.alunoId, cursoId);
-    res.json(await infoInteresse(cursoId, req.alunoId));
+    res.json(filtrarInfoInteresse(await infoInteresse(cursoId, req.alunoId), req));
   } catch (error) {
     console.error('Erro ao remover interesse:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
