@@ -58,7 +58,7 @@ export function CourseCard({ curso, variant = 'catalog', enrollment = null }) {
 
   const meta = (
     <div className="ccard-meta">
-      <span className="ccard-meta-item" title="Carga horária">🕐 {curso.duracao || '—'}</span>
+      {curso.duracao && <span className="ccard-meta-item" title="Carga horária">🕐 {curso.duracao}</span>}
       <span className="ccard-meta-item" title="Nível">📊 {nivel}</span>
     </div>
   );

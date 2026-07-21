@@ -205,7 +205,7 @@ export function CourseDetails() {
             <h1>{curso.nome}</h1>
 
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
-              <span className="badge-duracao">🕐 {curso.duracao}</span>
+              {curso.duracao && <span className="badge-duracao">🕐 {curso.duracao}</span>}
               <span className="badge-duracao">📊 {curso.nivel || (isFree ? 'Introdutório' : 'Profissional')}</span>
               {isMopCourse && (
                 <span className="badge-duracao">📚 {mopCourseContent.modules.length} módulos</span>

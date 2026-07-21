@@ -29,6 +29,13 @@ const TIPOS_CONTEUDO = [
 const contentIcon = (tipo) =>
   TIPOS_CONTEUDO.find(t => t.value === tipo)?.icon || '📝';
 
+// Hosts que exigem login/redirecionam e não servem a imagem bruta para um <img>.
+// Colar um link desses como capa quase sempre falha para o aluno.
+const RESTRICTED_IMAGE_HOSTS = /(sharepoint\.com|onedrive\.live\.com|1drv\.ms|drive\.google\.com|docs\.google\.com|dropbox\.com)/i;
+
+const isRestrictedImageUrl = (value) =>
+  typeof value === 'string' && /^https?:\/\//i.test(value) && RESTRICTED_IMAGE_HOSTS.test(value);
+
 const EMPTY_LESSON = {
   titulo: '', descricao: '', conteudo: '', tipo_conteudo: 'texto',
   video_url: '', material_url: '', duracao_minutos: '', obrigatoria: true, ordem: '',
@@ -157,6 +164,9 @@ export default function CourseEditor() {
       setCurso(data.curso);
       setForm(data.curso);
       toast.success('Curso salvo com sucesso!');
+      if (isRestrictedImageUrl(data.curso?.image)) {
+        toast.warning('A capa usa um link de SharePoint/Drive que não abre para os alunos. Anexe a imagem.');
+      }
     } catch (err) {
       toast.error(err.message || 'Erro ao salvar curso.');
     } finally {
@@ -586,6 +596,18 @@ export default function CourseEditor() {
                 <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                   JPG, PNG, WEBP ou GIF — até 15 MB.
                 </small>
+                {isRestrictedImageUrl(form.image) && (
+                  <div style={{
+                    marginTop: '8px', padding: '10px 12px', borderRadius: '8px',
+                    background: 'rgba(234, 179, 8, 0.12)', border: '1px solid rgba(234, 179, 8, 0.4)',
+                    color: 'var(--text)', fontSize: '0.85rem', lineHeight: 1.45,
+                  }}>
+                    ⚠️ <strong>Esse link não vai funcionar como capa.</strong> Links do
+                    SharePoint, OneDrive, Google Drive e Dropbox exigem login e não entregam
+                    a imagem direto para os alunos. Baixe o arquivo e use o botão
+                    <strong> 📎 Anexar imagem</strong> acima.
+                  </div>
+                )}
                 {form.image && (
                   <img src={form.image.startsWith('http') ? form.image : `/${form.image}`}
                     alt="Preview" className="ce-img-preview"
