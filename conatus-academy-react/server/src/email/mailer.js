@@ -9,9 +9,18 @@
  *   SMTP_PASS     senha de app (Gmail: gere em myaccount.google.com → Segurança)
  *   MAIL_FROM     remetente exibido (default: SMTP_USER)
  *
- * Se o SMTP não estiver configurado, o transporte não é criado: as funções de
- * envio lançam erro com mensagem clara, mas o link de confirmação é registrado
- * no console para não travar o desenvolvimento.
+ * PROVEDOR DE ENVIO (MAIL_PROVIDER):
+ *   - MAIL_PROVIDER=graph → envia pela Microsoft Graph API (POST /sendMail),
+ *     que NÃO depende de SMTP AUTH no tenant. Requer as credenciais OAuth2
+ *     (MICROSOFT_CLIENT_ID/SECRET/TENANT_ID) e a permissão de APLICAÇÃO
+ *     "Microsoft Graph → Mail.Send" com consentimento de admin (idealmente
+ *     restrita à caixa remetente via Application Access Policy).
+ *   - qualquer outro valor → usa SMTP (OAuth2 XOAUTH2 se as vars Microsoft
+ *     existirem; senão usuário+senha). O SMTP exige SMTP AUTH habilitado.
+ *
+ * Se nada estiver configurado, o transporte não é criado: as funções de envio
+ * lançam erro com mensagem clara, mas o link é registrado no console para não
+ * travar o desenvolvimento.
  */
 const nodemailer = require('nodemailer');
 
@@ -74,18 +83,29 @@ const OAUTH = {
 };
 const usaOAuth = Boolean(OAUTH.clientId && OAUTH.clientSecret && OAUTH.tenantId);
 
-let tokenCache = { value: null, expiraEm: 0 };
+// Provedor de envio. 'graph' usa a Microsoft Graph API (não depende de SMTP
+// AUTH no tenant); qualquer outro valor mantém o SMTP. Só vale com as
+// credenciais Microsoft presentes.
+const usaGraph = usaOAuth && String(process.env.MAIL_PROVIDER || '').toLowerCase() === 'graph';
 
-/** Access token app-only do Azure AD, cacheado até ~2 min antes de expirar. */
-async function getAccessTokenMicrosoft() {
-  if (tokenCache.value && Date.now() < tokenCache.expiraEm - 120000) return tokenCache.value;
+// Escopos .default do fluxo client-credentials: cada recurso tem o seu.
+const SCOPE_SMTP  = 'https://outlook.office365.com/.default'; // SMTP AUTH (SMTP.SendAsApp)
+const SCOPE_GRAPH = 'https://graph.microsoft.com/.default';   // Graph sendMail (Mail.Send)
+
+// Cache de token POR escopo (SMTP e Graph têm audiências diferentes).
+const tokenCache = new Map(); // scope → { value, expiraEm }
+
+/** Access token app-only do Azure AD para o escopo dado, cacheado até ~2 min antes de expirar. */
+async function getAccessTokenMicrosoft(scope = SCOPE_SMTP) {
+  const cached = tokenCache.get(scope);
+  if (cached && Date.now() < cached.expiraEm - 120000) return cached.value;
 
   const url = `https://login.microsoftonline.com/${OAUTH.tenantId}/oauth2/v2.0/token`;
   const body = new URLSearchParams({
     client_id: OAUTH.clientId,
     client_secret: OAUTH.clientSecret,
     grant_type: 'client_credentials',
-    scope: 'https://outlook.office365.com/.default',
+    scope,
   });
   const resp = await fetch(url, {
     method: 'POST',
@@ -98,13 +118,78 @@ async function getAccessTokenMicrosoft() {
       `Falha ao obter token OAuth2 do Azure AD (${resp.status}): ${data.error_description || data.error || 'sem detalhe'}`
     );
   }
-  tokenCache = { value: data.access_token, expiraEm: Date.now() + (Number(data.expires_in || 3600) * 1000) };
-  return tokenCache.value;
+  tokenCache.set(scope, { value: data.access_token, expiraEm: Date.now() + (Number(data.expires_in || 3600) * 1000) });
+  return data.access_token;
+}
+
+/* ── Envio via Microsoft Graph (POST /sendMail) ─────────────────────────────
+ * Alternativa ao SMTP que NÃO depende de SMTP AUTH no tenant. O "transporter"
+ * exposto imita a interface do nodemailer (sendMail/verify), então os 5 call
+ * sites e verificarTransporte não mudam. */
+
+/** Extrai { name, address } de um From no formato '"Nome" <addr>' ou 'addr'. */
+function parseFrom(str) {
+  const m = String(str || '').match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1].trim() || undefined, address: m[2].trim() };
+  return { name: undefined, address: String(str || '').trim() };
+}
+
+/** Converte uma string de destinatários (vírgula separa vários) em recipients Graph. */
+function graphRecipients(str) {
+  return String(str || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(address => ({ emailAddress: { address } }));
+}
+
+/** Envia uma mensagem (mesmo formato do nodemailer) via Graph sendMail. */
+async function enviarViaGraph(msg) {
+  const token = await getAccessTokenMicrosoft(SCOPE_GRAPH);
+  const remetente = parseFrom(msg.from);
+  // A caixa no path é quem envia; precisa ser um mailbox que o app pode usar
+  // (Mail.Send + Application Access Policy). Usamos o endereço do From.
+  const mailbox = remetente.address;
+  const message = {
+    subject: msg.subject,
+    body: { contentType: 'HTML', content: msg.html || msg.text || '' },
+    toRecipients: graphRecipients(msg.to),
+    from: { emailAddress: { address: remetente.address, name: remetente.name } },
+  };
+  if (msg.replyTo) message.replyTo = graphRecipients(msg.replyTo);
+
+  const resp = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(mailbox)}/sendMail`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, saveToSentItems: false }),
+    }
+  );
+  // Sucesso do sendMail é 202 Accepted, sem corpo.
+  if (resp.status !== 202) {
+    const data = await resp.json().catch(() => ({}));
+    const detalhe = data.error?.message || data.error_description || `HTTP ${resp.status}`;
+    throw new Error(`Graph sendMail falhou: ${detalhe}`);
+  }
+}
+
+/** "Transporter" do Graph com a mesma interface do nodemailer (sendMail/verify). */
+function graphTransporter() {
+  return {
+    sendMail: enviarViaGraph,
+    // verify apenas confirma que o token do Graph é emitido (app creds +
+    // consentimento). Não lê caixa nem envia — evita exigir permissões extras.
+    async verify() { await getAccessTokenMicrosoft(SCOPE_GRAPH); return true; },
+  };
 }
 
 /** Transporter do nodemailer (OAuth2 se configurado; senão usuário+senha). Async
  *  porque o modo OAuth2 pode precisar buscar um token novo. */
 async function getTransporter() {
+  // Graph tem prioridade quando MAIL_PROVIDER=graph — não usa host/porta SMTP.
+  if (usaGraph) return graphTransporter();
+
   const SMTP_USER = process.env.SMTP_USER;
   const host = process.env.SMTP_HOST || 'smtp.office365.com';
   const port = Number(process.env.SMTP_PORT || 587);
@@ -143,7 +228,11 @@ async function verificarTransporte() {
   const tx = await getTransporter();
   if (!tx) throw new Error(configError || 'Transporter indisponível');
   await tx.verify();
-  return { modo: usaOAuth ? 'OAuth2 (Microsoft 365)' : 'básico (usuário+senha)' };
+  return {
+    modo: usaGraph
+      ? 'Graph API (Microsoft 365)'
+      : usaOAuth ? 'OAuth2 SMTP (Microsoft 365)' : 'básico (usuário+senha)',
+  };
 }
 
 function montarHtml(nome, link) {
