@@ -10,9 +10,13 @@ const { registrarInteresse, removerInteresse, infoInteresse, infoInteresseEmLote
 const { ADMIN_ROLES } = require('../utils/roles');
 const { embedQuery, toVectorLiteral } = require('../services/ragGemini');
 const { generate } = require('../services/ragChat');
-const { MOP_NOME } = require('../../db/seedMopCourse');
 
 const router = express.Router();
+
+// Nome estável do curso MOP no banco — usado para resolver o slug 'mop-interno'
+// (viewer estático do MOP) para o curso DB no assistente RAG. Antes vinha de
+// db/seedMopCourse.js; inlined aqui porque o seed foi removido do projeto.
+const MOP_NOME = 'Especialização Operacional: Elaboração de MOPs para Data Centers';
 
 /** Auth opcional: identifica o usuário se houver token válido, sem bloquear. */
 function optionalAuth(req, _res, next) {
