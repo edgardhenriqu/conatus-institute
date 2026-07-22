@@ -1,4 +1,9 @@
-modules = ["web", "postgresql-16", "nodejs-20"]
+# Configuração do Replit — Conatus Institute
+# O código da aplicação fica em ./conatus-academy-react (React + Express).
+# Os scripts do package.json na raiz orquestram o build e a execução.
+
+# Banco é externo (Supabase), então NÃO usamos o módulo postgresql do Replit.
+modules = ["nodejs-20", "web"]
 
 # Botão "Run": compila o frontend e sobe o servidor Express (API + site) numa
 # única porta. É intencional recompilar aqui para o dist/ existir na primeira vez.
@@ -33,83 +38,21 @@ DB_PORT = "5432"
 DB_SSL = "true"
 DB_SSL_CA = "./supabase-ca.crt"
 DB_USER = "postgres.zatmhjfpjutimscfxtny"
-MAIL_FROM = "suporte.ti@conatusprocedures.com"
-<<<<<<< HEAD
-MAIL_PROVIDER = "graph"
-=======
->>>>>>> 82a9215 (Published your App)
+MAIL_FROM = "suporte.conatus.institute@gmail.com"
 NODE_ENV = "production"
-SMTP_HOST = "smtp.office365.com"
-SMTP_PORT = "587"
-SMTP_SECURE = "false"
-SMTP_USER = "suporte.ti@conatusprocedures.com"
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = "465"
+SMTP_SECURE = "true"
+SMTP_USER = "suporte.conatus.institute@gmail.com"
 OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free,openai/gpt-oss-120b:free,meta-llama/llama-3.3-70b-instruct:free,qwen/qwen3-next-80b-a3b-instruct:free"
 ELEVENLABS_VOICE_ID = "HXmVs82qUTKZy5PrSBjo"
 TTS_PROVIDER = "elevenlabs"
-MICROSOFT_CLIENT_ID = "ad519dd0-d255-49f5-9f8b-ca4b42da9838"
-MICROSOFT_TENANT_ID = "0e7ad7e0-24f5-4023-9800-522ac611b913"
 
 [userenv.development]
 OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free,openai/gpt-oss-120b:free,meta-llama/llama-3.3-70b-instruct:free,qwen/qwen3-next-80b-a3b-instruct:free"
 ELEVENLABS_VOICE_ID = "HXmVs82qUTKZy5PrSBjo"
 TTS_PROVIDER = "elevenlabs"
-PORT = "5000"
-MAIL_FROM = "suporte.ti@conatusprocedures.com"
-<<<<<<< HEAD
-MAIL_PROVIDER = "graph"
-=======
->>>>>>> 82a9215 (Published your App)
-SMTP_HOST = "smtp.office365.com"
-SMTP_PORT = "587"
-SMTP_SECURE = "false"
-SMTP_USER = "suporte.ti@conatusprocedures.com"
-<<<<<<< HEAD
-MICROSOFT_CLIENT_ID = "ad519dd0-d255-49f5-9f8b-ca4b42da9838"
-MICROSOFT_TENANT_ID = "0e7ad7e0-24f5-4023-9800-522ac611b913"
-APP_URL = "https://conatus-institute-deploy--edgardhenriqu.replit.app"
-CORS_ORIGIN = "https://conatus-institute-deploy--edgardhenriqu.replit.app"
-DB_HOST = "aws-1-sa-east-1.pooler.supabase.com"
-DB_NAME = "postgres"
-DB_PORT = "5432"
-DB_SSL = "true"
-DB_SSL_CA = "./supabase-ca.crt"
-DB_USER = "postgres.zatmhjfpjutimscfxtny"
-NODE_ENV = "production"
-=======
->>>>>>> 82a9215 (Published your App)
-
-[userenv.shared]
-MICROSOFT_TENANT_ID = "0e7ad7e0-24f5-4023-9800-522ac611b913"
-MICROSOFT_CLIENT_ID = "ad519dd0-d255-49f5-9f8b-ca4b42da9838"
 
 [[ports]]
 localPort = 3000
 externalPort = 80
-
-[[ports]]
-localPort = 5000
-externalPort = 5000
-
-[workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run build && npm start"
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
