@@ -1,14 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
-import { staticCourses, normalizeDbCourse } from '../data/courses';
+import { normalizeDbCourse } from '../data/courses';
 import { useAuth } from '../contexts/AuthContext';
 import { Badge } from '../components/ui/Badge';
 import { InterestButton } from '../components/ui/InterestButton';
 import { PageLoader } from '../components/ui/PageLoader';
 import { useToast } from '../components/ui/Toast';
-import { mopCourseContent } from '../data/mopCourseContent';
-import { calcLessonStats, quizStatus, isCertEligible, getStaticEnrollments, saveStaticEnrollments } from '../utils/mopProgress';
 import { formatarPreco, formatarParcelamento, precoVigente } from '../utils/currency';
 
 const INTERNAL_DENIED_MSG =
@@ -25,33 +23,8 @@ export function CourseDetails() {
   const [restricted, setRestricted] = useState(false);
   const [comprando, setComprando] = useState(false);
 
-  // MOP progress (only computed when viewing the legacy static MOP route).
-  // Atenção: NÃO incluir o id '6' aqui — hoje o id 6 é um curso do banco
-  // (Huawei Module800). O curso MOP migrou para o banco (id 1) e usa o fluxo
-  // normal de matrícula; só a rota estática legada 'mop-interno' usa localStorage.
-  const isMopCourse = id === 'mop-interno';
-  const allMopLessons = useMemo(() =>
-    isMopCourse ? mopCourseContent.modules.flatMap(m => m.lessons) : [],
-    [isMopCourse]);
-  const mopStats = useMemo(() => calcLessonStats(allMopLessons), [allMopLessons]);
-  const mopQuiz  = useMemo(() => quizStatus(), []);
-  const mopCertOk = useMemo(() => isCertEligible(mopStats.pct), [mopStats.pct]);
-
-  const isAlreadyEnrolled = useMemo(() => {
-    if (!isMopCourse) return false;
-    const se = getStaticEnrollments();
-    return !!(se['mop-interno'] || se['6']);
-  }, [isMopCourse]);
-
   useEffect(() => {
     async function loadCourse() {
-      const staticCourse = staticCourses.find(c => c.id === id);
-      if (staticCourse) {
-        setCurso(staticCourse);
-        setLoading(false);
-        return;
-      }
-
       try {
         const dbCourse = await api.getCurso(id);
         if (dbCourse.erro) {
@@ -120,30 +93,6 @@ export function CourseDetails() {
     // são controlados pelo BACKEND (accessControl.js). Se o curso chegou até aqui,
     // o acesso já foi liberado. NÃO reaplicamos regra de cargo no frontend — era
     // isso que ignorava o vínculo de empresa parceira e barrava alunos autorizados.
-    if (isMopCourse && isAlreadyEnrolled) {
-      navigate(`/cursos/${id}/sala-de-aula`);
-      return;
-    }
-
-    if (isMopCourse) {
-      const staticEnrollments = getStaticEnrollments();
-      if (!staticEnrollments[curso.id]) {
-        staticEnrollments[curso.id] = {
-          curso_id: curso.id,
-          nome_curso: curso.nome,
-          duracao: curso.duracao,
-          image: curso.image,
-          status: 'em_andamento',
-          progresso: 0,
-          data_matricula: new Date().toISOString(),
-          tipo: 'estatico',
-        };
-        saveStaticEnrollments(staticEnrollments);
-      }
-      navigate(`/cursos/${id}/sala-de-aula`);
-      return;
-    }
-
     try {
       const data = await api.matricular(curso.id);
       if (data.erro) { toast.error(data.erro); return; }
@@ -207,10 +156,7 @@ export function CourseDetails() {
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
               {curso.duracao && <span className="badge-duracao">🕐 {curso.duracao}</span>}
               <span className="badge-duracao">📊 {curso.nivel || (isFree ? 'Introdutório' : 'Profissional')}</span>
-              {isMopCourse && (
-                <span className="badge-duracao">📚 {mopCourseContent.modules.length} módulos</span>
-              )}
-              {!isMopCourse && Number(curso.total_modulos) > 0 && (
+              {Number(curso.total_modulos) > 0 && (
                 <span className="badge-duracao">📚 {curso.total_modulos} módulos · {curso.total_aulas} aulas</span>
               )}
               {curso.categoria && (
@@ -223,34 +169,6 @@ export function CourseDetails() {
             {isRestrito && curso.regrasAcesso && (
               <div style={{ background: 'rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', marginTop: '15px', borderLeft: '4px solid var(--secondary)' }}>
                 <strong>Acesso Restrito:</strong> {curso.regrasAcesso}
-              </div>
-            )}
-
-            {/* MOP requirements box */}
-            {isMopCourse && (
-              <div className="cd-requirements-box">
-                <h4>Requisitos para Certificado</h4>
-                <div className="cd-req-item">
-                  <span className={`cd-req-icon ${mopStats.pct === 100 ? 'ok' : 'pend'}`}>
-                    {mopStats.pct === 100 ? '✅' : '○'}
-                  </span>
-                  <span>100% das aulas concluídas
-                    {mopStats.total > 0 && <span className="cd-req-note"> ({mopStats.done}/{mopStats.total})</span>}
-                  </span>
-                </div>
-                <div className="cd-req-item">
-                  <span className={`cd-req-icon ${mopQuiz.passed ? 'ok' : 'pend'}`}>
-                    {mopQuiz.passed ? '✅' : '○'}
-                  </span>
-                  <span>Aprovação na avaliação final ≥ 80%
-                    {mopQuiz.attempts > 0 && <span className="cd-req-note"> (melhor nota: {mopQuiz.best}%, {mopQuiz.attempts}/3 tentativas)</span>}
-                  </span>
-                </div>
-                {mopCertOk && (
-                  <p style={{ marginTop: '10px', color: 'var(--success)', fontWeight: 700 }}>
-                    🏆 Certificado disponível! Acesse o Dashboard para emitir.
-                  </p>
-                )}
               </div>
             )}
 
@@ -306,9 +224,7 @@ export function CourseDetails() {
                 onClick={handleMatricular}
                 style={{ marginTop: '30px' }}
               >
-                {isMopCourse
-                  ? (isAlreadyEnrolled ? 'Continuar Curso →' : 'Acessar Curso →')
-                  : curso.pago ? 'Continuar Curso →' : 'Matricule-se Agora'}
+                {curso.pago ? 'Continuar Curso →' : 'Matricule-se Agora'}
               </button>
             )}
           </div>

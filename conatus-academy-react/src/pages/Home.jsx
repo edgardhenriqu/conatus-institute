@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { HeroSection } from '../components/sections/HeroSection';
 import { StatsSection } from '../components/sections/StatsSection';
 import { FreeCoursesCTA } from '../components/sections/FreeCoursesCTA';
@@ -8,30 +7,26 @@ import { MethodologySection } from '../components/sections/MethodologySection';
 import { ProfessorsSection } from '../components/sections/ProfessorsSection';
 import { NewsSection } from '../components/sections/NewsSection';
 import { api } from '../services/api';
-import { staticCourses, normalizeDbCourse } from '../data/courses';
-import { canAccessInternalCourse } from '../utils/permissions';
+import { normalizeDbCourse } from '../data/courses';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 
 export function Home() {
-  const { user } = useAuth();
   const [courses, setCourses] = useState([]);
 
   useScrollReveal([courses]);
 
   useEffect(() => {
     async function loadCourses() {
-      const availableStatic = staticCourses.filter(c => !c.restrito || canAccessInternalCourse(user));
-
       try {
         const dbCourses = await api.getCursos();
-        setCourses([...dbCourses.map(normalizeDbCourse), ...availableStatic]);
+        setCourses(dbCourses.map(normalizeDbCourse));
       } catch (err) {
         console.error("Erro ao carregar cursos na home:", err);
-        setCourses(availableStatic);
+        setCourses([]);
       }
     }
     loadCourses();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <main>

@@ -1,5 +1,4 @@
 import { createContext, useState, useEffect, useContext } from 'react';
-import { initMopProgress } from '../utils/mopProgress';
 import { isAdmin as isAdminRole, isSuperAdmin as isSuperAdminRole, isInstrutor as isInstrutorRole, isStaff as isStaffRole, isDiretor as isDiretorRole } from '../utils/permissions';
 
 const AuthContext = createContext();
@@ -13,7 +12,6 @@ export function AuthProvider({ children }) {
     const token      = sessionStorage.getItem('token');
 
     if (!storedUser || !token) {
-      initMopProgress(null);
       setLoading(false);
       return;
     }
@@ -21,12 +19,10 @@ export function AuthProvider({ children }) {
     let parsed;
     try {
       parsed = JSON.parse(storedUser);
-      initMopProgress(parsed.id);
       setUser(parsed);
     } catch {
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('token');
-      initMopProgress(null);
       setLoading(false);
       return;
     }
@@ -43,7 +39,6 @@ export function AuthProvider({ children }) {
         const refreshed = { ...parsed, ...data.aluno };
         delete refreshed.senha;
         sessionStorage.setItem('user', JSON.stringify(refreshed));
-        initMopProgress(refreshed.id);
         setUser(refreshed);
       })
       .catch(() => {/* token expirado ou servidor offline — mantém sessão existente */});
@@ -52,14 +47,12 @@ export function AuthProvider({ children }) {
   const login = (userData, token) => {
     sessionStorage.setItem('user', JSON.stringify(userData));
     sessionStorage.setItem('token', token);
-    initMopProgress(userData.id);
     setUser(userData);
   };
 
   const logout = () => {
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('token');
-    initMopProgress(null);
     setUser(null);
   };
 

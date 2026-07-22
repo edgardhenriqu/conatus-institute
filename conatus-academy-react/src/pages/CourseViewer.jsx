@@ -1,25 +1,14 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { mopCourseContent } from '../data/mopCourseContent';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import { normalizeQuillHtml } from '../utils/quillHtml';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import { PageLoader } from '../components/ui/PageLoader';
-import {
-  getLessonProgress, markLessonDone, calcLessonStats,
-  setTotalLessons, canTakeQuiz, isCertEligible, quizStatus,
-} from '../utils/mopProgress';
-import { canAccessInternalCourse } from '../utils/permissions';
 import { CourseAssistant } from '../components/course/CourseAssistant';
 import { NarrationDock } from '../components/course/NarrationDock';
 import { useNarracao } from '../hooks/useNarracao';
-
-// Só a rota estática legada 'mop-interno' usa o fluxo MOP em localStorage.
-// NÃO incluir o id 6 (hoje é o curso do banco Huawei Module800); o MOP migrou
-// para o banco (id 1) e é servido pelo fluxo normal de cursos.
-const isMopId = (id) => id === 'mop-interno';
 
 /** Seta dos botões de navegação. `dir` = -1 (esquerda) ou 1 (direita). */
 function Chevron({ dir }) {
@@ -73,8 +62,6 @@ export function CourseViewer() {
   const { user } = useAuth();
   const toast = useToast();
   const mainRef = useRef(null);
-
-  const isMop = isMopId(id);
 
   const [courseContent, setCourseContent]   = useState(null); // { title, modules: [{id, title, lessons}] }
   const [activeLesson, setActiveLesson]     = useState(null);
@@ -188,10 +175,10 @@ export function CourseViewer() {
     if (document.fullscreenElement) document.exitFullscreen?.()?.catch(() => {});
   }, []);
 
-  // Chave de progresso da aula: MOP usa o id estático; DB usa "aula-<id>"
+  // Chave de progresso da aula (curso do banco): "aula-<id>"
   const lessonKey = useCallback(
-    (lesson) => isMop ? lesson.id : `aula-${lesson.id}`,
-    [isMop]
+    (lesson) => `aula-${lesson.id}`,
+    []
   );
 
   // Lista plana de aulas
@@ -204,12 +191,11 @@ export function CourseViewer() {
 
   // Progresso (% de aulas obrigatórias concluídas)
   const stats = useMemo(() => {
-    if (isMop) return calcLessonStats(allLessons);
     const obrigatorias = allLessons.filter(l => l.obrigatoria !== false);
     const done = obrigatorias.filter(l => lessonProgress[lessonKey(l)]).length;
     const pct = obrigatorias.length > 0 ? Math.round((done / obrigatorias.length) * 100) : 0;
     return { done, total: obrigatorias.length, pct: dbProgressPct || pct };
-  }, [allLessons, lessonProgress, dbProgressPct, isMop, lessonKey]);
+  }, [allLessons, lessonProgress, dbProgressPct, lessonKey]);
 
   const currentIndex = useMemo(() => {
     if (!activeLesson || allLessons.length === 0) return -1;
@@ -359,24 +345,6 @@ export function CourseViewer() {
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
 
-    if (isMop) {
-      if (!canAccessInternalCourse(user)) {
-        setAccessDenied(true);
-        setDeniedMsg('Este curso é exclusivo para funcionários autorizados da Conatus. Solicite liberação ao administrador.');
-        return;
-      }
-      setCourseContent(mopCourseContent);
-      setLessonProgress(getLessonProgress());
-
-      const total = mopCourseContent.modules.reduce((s, m) => s + m.lessons.length, 0);
-      setTotalLessons(total);
-
-      if (mopCourseContent.modules[0]?.lessons[0]) {
-        setActiveLesson(mopCourseContent.modules[0].lessons[0]);
-      }
-      return;
-    }
-
     // Curso do banco — busca módulos/aulas reais
     async function loadDbCourse() {
       try {
@@ -422,7 +390,7 @@ export function CourseViewer() {
       }
     }
     loadDbCourse();
-  }, [id, user, navigate, isMop]);
+  }, [id, user, navigate]);
 
   // Volta ao topo do conteúdo ao trocar de aula
   useEffect(() => {
@@ -440,24 +408,11 @@ export function CourseViewer() {
     if (currentIndex < allLessons.length - 1) setActiveLesson(allLessons[currentIndex + 1]);
   }, [currentIndex, allLessons]);
 
-  // Conclui a aula de fato (MOP em localStorage ou curso do banco). É chamada
+  // Conclui a aula de fato no curso do banco (persiste no servidor). É chamada
   // tanto pelo botão manual quanto pela conclusão automática ao fim da narração.
   const marcarConcluida = useCallback(async () => {
     if (!activeLesson) return;
     if (lessonProgress[lessonKey(activeLesson)]) return; // já concluída — não repete
-
-    if (isMop) {
-      markLessonDone(activeLesson.id);
-      const updated = getLessonProgress();
-      setLessonProgress(updated);
-      const { done, total } = calcLessonStats(allLessons);
-      if (done === total) {
-        toast.success('🎓 Parabéns! Você concluiu todas as aulas. A avaliação final está liberada.', 7000);
-      } else {
-        toast.success('Aula concluída! Seu progresso foi atualizado.');
-      }
-      return;
-    }
 
     // Curso DB — persiste no servidor
     const key = lessonKey(activeLesson);
@@ -473,7 +428,7 @@ export function CourseViewer() {
     } catch {
       toast.error('Erro ao salvar progresso. Verifique sua conexão.');
     }
-  }, [activeLesson, isMop, allLessons, id, lessonKey, toast, lessonProgress]);
+  }, [activeLesson, id, lessonKey, toast, lessonProgress]);
 
   const handleMarkDone = useCallback(() => {
     // Trava de narração: o botão já vem desabilitado, mas a checagem também mora
@@ -534,14 +489,7 @@ export function CourseViewer() {
   let quizCta = null;   // { to, label, enabled }
   let certCta = null;
 
-  if (isMop) {
-    const quizCheck = canTakeQuiz(stats.pct);
-    const certOk = isCertEligible(stats.pct);
-    const passed = quizStatus().passed;
-    if (certOk) certCta = { to: '/cursos/mop-interno/certificado' };
-    if (quizCheck.ok) quizCta = { to: '/cursos/mop-interno/avaliacao', enabled: true };
-    else if (stats.pct === 100 && !passed) quizCta = { to: '/cursos/mop-interno/avaliacao', enabled: false };
-  } else if (dbQuiz?.existe) {
+  if (dbQuiz?.existe) {
     if (dbQuiz.aprovado && stats.pct === 100) {
       certCta = { to: `/cursos/${id}/certificado` };
     } else if (stats.pct === 100 && dbQuiz.restantes > 0 && !dbQuiz.aprovado) {
@@ -549,7 +497,7 @@ export function CourseViewer() {
     } else if (stats.pct < 100) {
       quizCta = { to: `/cursos/${id}/avaliacao`, enabled: false };
     }
-  } else if (!isMop && stats.pct === 100) {
+  } else if (stats.pct === 100) {
     // curso sem avaliação — certificado direto
     certCta = { to: `/cursos/${id}/certificado` };
   }

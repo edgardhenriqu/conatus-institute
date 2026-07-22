@@ -1,24 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import { PageLoader } from '../components/ui/PageLoader';
-import { legacyMopCourse } from '../data/courses';
-import { mopCourseContent } from '../data/mopCourseContent';
-import {
-  calcLessonStats, quizStatus, isCertEligible, getOrIssueCertificate,
-  PASS_PERCENT,
-} from '../utils/mopProgress';
-import { canAccessInternalCourse } from '../utils/permissions';
-
-// Só o viewer estático legado é MOP. O id 6 é um curso Huawei do banco (não o
-// MOP) — mantê-lo aqui roteava o certificado dele para o certificado estático.
-const MOP_IDS = ['mop-interno'];
 
 export function Certificate() {
   const { id } = useParams();
-  const isMop = MOP_IDS.includes(id);
-  return isMop ? <MopCertificate /> : <DbCertificate cursoId={id} />;
+  return <DbCertificate cursoId={id} />;
 }
 
 /* ── Layout compartilhado do certificado ───────────────────────────────────── */
@@ -352,89 +340,6 @@ function DbCertificate({ cursoId }) {
         assinatura={cert.cert_assinatura || curso?.cert_assinatura}
         texto={cert.cert_texto || curso?.cert_texto}
         empresas={curso?.empresas}
-      />
-    </div>
-  );
-}
-
-/* ── Certificado do curso MOP (estático) ───────────────────────────────────── */
-
-function MopCertificate() {
-  const { user } = useAuth();
-  const curso = legacyMopCourse;
-
-  const allLessons = useMemo(() =>
-    mopCourseContent.modules.flatMap(m => m.lessons), []);
-  const stats = useMemo(() => calcLessonStats(allLessons), [allLessons]);
-  const quiz = useMemo(() => quizStatus(), []);
-  const eligible = isCertEligible(stats.pct);
-  const cert = useMemo(() =>
-    eligible ? getOrIssueCertificate(stats.pct) : null, [eligible, stats.pct]);
-
-  if (!canAccessInternalCourse(user)) {
-    return (
-      <div className="cert-page">
-        <div className="cert-locked">
-          <div className="cert-locked-icon">🔒</div>
-          <h2>Acesso Restrito</h2>
-          <p>Este curso é exclusivo para funcionários autorizados da Conatus. Solicite liberação ao administrador.</p>
-          <Link to="/cursos" className="btn-cert-print">Voltar ao Catálogo</Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (!eligible || !cert) {
-    return (
-      <div className="cert-page">
-        <div className="cert-locked">
-          <div className="cert-locked-icon">🔒</div>
-          <h2>Certificado ainda não liberado</h2>
-          <p>Para emitir o certificado deste curso você precisa cumprir os requisitos abaixo:</p>
-          <ul className="cert-locked-reqs">
-            <li className={stats.pct === 100 ? 'ok' : 'pend'}>
-              <span>{stats.pct === 100 ? '✅' : '○'}</span>
-              <span>Concluir 100% das aulas ({stats.done}/{stats.total} — {stats.pct}%)</span>
-            </li>
-            <li className={quiz.passed ? 'ok' : 'pend'}>
-              <span>{quiz.passed ? '✅' : '○'}</span>
-              <span>
-                Aprovação na avaliação final (mínimo {PASS_PERCENT}%)
-                {quiz.attempts > 0 && ` — melhor nota: ${quiz.best}%`}
-              </span>
-            </li>
-          </ul>
-          <div className="cert-toolbar-actions" style={{ justifyContent: 'center' }}>
-            <Link to={`/cursos/mop-interno/sala-de-aula`} className="btn-cert-print">
-              {stats.pct < 100 ? 'Continuar Aulas' : 'Revisar Aulas'}
-            </Link>
-            {stats.pct === 100 && !quiz.passed && (
-              <Link to="/cursos/mop-interno/avaliacao" className="btn-cert-print"
-                style={{ background: 'var(--gold)', color: 'var(--primary)' }}>
-                Fazer Avaliação
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const issuedDate = new Date(cert.issuedAt).toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric',
-  });
-
-  return (
-    <div className="cert-page">
-      <CertToolbar />
-      <CertificateSheet
-        studentName={user?.nome || 'Aluno'}
-        courseName={curso?.nome}
-        duration={curso?.duracao || '16h'}
-        score={cert.score}
-        issuedDate={issuedDate}
-        code={cert.code}
-        responsavel="Coordenação de Operações Conatus"
       />
     </div>
   );

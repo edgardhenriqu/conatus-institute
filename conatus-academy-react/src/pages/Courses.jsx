@@ -3,15 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { CourseCard } from '../components/ui/CourseCard';
 import { PageLoader } from '../components/ui/PageLoader';
 import { api } from '../services/api';
-import { staticCourses, normalizeDbCourse, NIVEL_LABELS } from '../data/courses';
-import { canAccessInternalCourse } from '../utils/permissions';
-import { getStaticEnrollments, calcLessonStats, isCertEligible } from '../utils/mopProgress';
-import { mopCourseContent } from '../data/mopCourseContent';
-
-// Curso MOP legado no fluxo estático (localStorage). NÃO incluir o id 6: hoje ele
-// é um curso do banco (Huawei Module800). O MOP migrou para o banco (id 1) e usa
-// o fluxo normal de matrícula/progresso.
-const MOP_IDS = ['mop-interno'];
+import { normalizeDbCourse, NIVEL_LABELS } from '../data/courses';
 
 // Busca sem diferenciar acento/caixa ("eletrica" acha "Elétrica").
 const normalizar = (s) =>
@@ -43,26 +35,15 @@ export function Courses() {
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroNivel, setFiltroNivel] = useState('');
 
-  const hasInternalAccess = canAccessInternalCourse(user);
-
-  // Progresso real do MOP (localStorage)
-  const mopPct = useMemo(() => {
-    const lessons = mopCourseContent.modules.flatMap(m => m.lessons);
-    return calcLessonStats(lessons).pct;
-  }, []);
-  const mopDone = useMemo(() => isCertEligible(mopPct), [mopPct]);
-
   useEffect(() => {
     async function loadAll() {
-      const availableStatic = staticCourses.filter(c => !c.restrito || hasInternalAccess);
-
       // Catálogo — o backend já filtra publicados/visíveis e cursos internos
-      let list = availableStatic;
+      let list = [];
       try {
         const dbCourses = await api.getCursos();
-        list = [...dbCourses.map(normalizeDbCourse), ...availableStatic];
+        list = dbCourses.map(normalizeDbCourse);
       } catch {
-        // servidor offline — usa apenas os cursos estáticos
+        // servidor offline — catálogo vazio
       }
       setCourses(list);
 
@@ -75,25 +56,17 @@ export function Courses() {
             map[String(m.curso_id)] = { progresso: m.progresso || 0, status: m.status };
           }
         } catch { /* servidor offline */ }
-        for (const m of Object.values(getStaticEnrollments())) {
-          const isMop = MOP_IDS.includes(m.curso_id);
-          map[String(m.curso_id)] = {
-            progresso: isMop ? mopPct : (m.progresso || 0),
-            status: m.status,
-          };
-        }
       }
       setEnrollments(map);
       setLoading(false);
     }
     loadAll();
-  }, [user, hasInternalAccess, mopPct]);
+  }, [user]);
 
   const getEnrollment = (curso) => enrollments[String(curso.id)] || null;
   const isCompleted = (curso) => {
     const e = getEnrollment(curso);
     if (!e) return false;
-    if (MOP_IDS.includes(curso.id)) return mopDone;
     return (e.progresso || 0) === 100;
   };
 
