@@ -57,6 +57,15 @@ SMTP_SECURE = "false"
 SMTP_USER = "suporte.ti@conatusprocedures.com"
 MICROSOFT_CLIENT_ID = "ad519dd0-d255-49f5-9f8b-ca4b42da9838"
 MICROSOFT_TENANT_ID = "0e7ad7e0-24f5-4023-9800-522ac611b913"
+APP_URL = "https://conatus-institute-deploy--edgardhenriqu.replit.app"
+CORS_ORIGIN = "https://conatus-institute-deploy--edgardhenriqu.replit.app"
+DB_HOST = "aws-1-sa-east-1.pooler.supabase.com"
+DB_NAME = "postgres"
+DB_PORT = "5432"
+DB_SSL = "true"
+DB_SSL_CA = "./supabase-ca.crt"
+DB_USER = "postgres.zatmhjfpjutimscfxtny"
+NODE_ENV = "production"
 
 [userenv.shared]
 
