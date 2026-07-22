@@ -44,7 +44,7 @@ const TIPOS_IMAGEM = {
 
 const uploadImagem = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB — GIFs animados são pesados
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB — GIFs animados e imagens de alta resolução são pesados
   fileFilter: (req, file, cb) => {
     if (TIPOS_IMAGEM[file.mimetype]) return cb(null, true);
     cb(new Error('Formato inválido. Envie uma imagem JPG, PNG, WEBP ou GIF.'));
@@ -55,7 +55,7 @@ router.post('/upload/imagem', (req, res) => {
   uploadImagem.single('imagem')(req, res, async (err) => {
     if (err) {
       const msg = err.code === 'LIMIT_FILE_SIZE'
-        ? 'Imagem muito grande. O tamanho máximo é 15 MB.'
+        ? 'Imagem muito grande. O tamanho máximo é 50 MB.'
         : err.message || 'Erro ao enviar a imagem.';
       return res.status(400).json({ erro: msg });
     }
