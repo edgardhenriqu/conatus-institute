@@ -54,19 +54,37 @@ function buildSsl() {
   return { rejectUnauthorized: true };
 }
 
-// Fallback para o Postgres integrado do Replit (PGHOST/PGPORT/...), disponível
-// automaticamente em todo Repl. Só é usado quando as variáveis DB_* (usadas
-// para apontar para Supabase em produção) não estão definidas — isto é,
-// no ambiente de desenvolvimento local do Replit.
-const pool = new Pool({
-  host: process.env.DB_HOST || process.env.PGHOST,
-  port: process.env.DB_PORT || process.env.PGPORT,
-  database: process.env.DB_NAME || process.env.PGDATABASE,
-  user: process.env.DB_USER || process.env.PGUSER,
-  password: process.env.DB_PASSWORD || process.env.PGPASSWORD,
-  options: '-c client_encoding=UTF8',
-  ssl: buildSsl()
-});
+// Usa o conjunto Supabase (DB_*) SOMENTE quando host, usuário e senha estiverem
+// todos definidos. Se qualquer um faltar, cai inteiramente no Postgres integrado
+// do Replit (PGHOST/PGPORT/…). Misturar variáveis dos dois bancos causaria
+// "password authentication failed" (senha do Supabase tentada no Replit PG).
+const useCustomDb = !!(process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD);
+
+if (!useCustomDb) {
+  console.warn('[AVISO] DB_HOST não definido. Configure as credenciais do banco nos Secrets do Replit (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_SSL).');
+}
+
+const pool = new Pool(
+  useCustomDb
+    ? {
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        database: process.env.DB_NAME,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        options: '-c client_encoding=UTF8',
+        ssl: buildSsl(),
+      }
+    : {
+        host: process.env.PGHOST,
+        port: process.env.PGPORT,
+        database: process.env.PGDATABASE,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        options: '-c client_encoding=UTF8',
+        ssl: false,
+      }
+);
 
 pool.on('connect', () => {
   console.log('Conectado ao PostgreSQL');
