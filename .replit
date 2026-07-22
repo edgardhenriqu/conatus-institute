@@ -34,7 +34,10 @@ DB_SSL = "true"
 DB_SSL_CA = "./supabase-ca.crt"
 DB_USER = "postgres.zatmhjfpjutimscfxtny"
 MAIL_FROM = "suporte.ti@conatusprocedures.com"
+<<<<<<< HEAD
 MAIL_PROVIDER = "graph"
+=======
+>>>>>>> 82a9215 (Published your App)
 NODE_ENV = "production"
 SMTP_HOST = "smtp.office365.com"
 SMTP_PORT = "587"
@@ -52,11 +55,15 @@ ELEVENLABS_VOICE_ID = "HXmVs82qUTKZy5PrSBjo"
 TTS_PROVIDER = "elevenlabs"
 PORT = "5000"
 MAIL_FROM = "suporte.ti@conatusprocedures.com"
+<<<<<<< HEAD
 MAIL_PROVIDER = "graph"
+=======
+>>>>>>> 82a9215 (Published your App)
 SMTP_HOST = "smtp.office365.com"
 SMTP_PORT = "587"
 SMTP_SECURE = "false"
 SMTP_USER = "suporte.ti@conatusprocedures.com"
+<<<<<<< HEAD
 MICROSOFT_CLIENT_ID = "ad519dd0-d255-49f5-9f8b-ca4b42da9838"
 MICROSOFT_TENANT_ID = "0e7ad7e0-24f5-4023-9800-522ac611b913"
 APP_URL = "https://conatus-institute-deploy--edgardhenriqu.replit.app"
@@ -68,8 +75,12 @@ DB_SSL = "true"
 DB_SSL_CA = "./supabase-ca.crt"
 DB_USER = "postgres.zatmhjfpjutimscfxtny"
 NODE_ENV = "production"
+=======
+>>>>>>> 82a9215 (Published your App)
 
 [userenv.shared]
+MICROSOFT_TENANT_ID = "0e7ad7e0-24f5-4023-9800-522ac611b913"
+MICROSOFT_CLIENT_ID = "ad519dd0-d255-49f5-9f8b-ca4b42da9838"
 
 [[ports]]
 localPort = 3000
