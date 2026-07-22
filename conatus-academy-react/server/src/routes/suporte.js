@@ -14,10 +14,10 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 const pool = require('../../db/connection');
-const { authMiddleware, adminMiddleware } = require('../middlewares/auth');
-const { ADMIN_ROLES } = require('../utils/roles');
+const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../middlewares/auth');
+const { ADMIN_ROLES, SUPERADMIN_ROLES } = require('../utils/roles');
 const captchaStore = require('../captcha/captchaStore');
-const { sendChamadoEmail } = require('../email/mailer');
+const { sendChamadoEmail, sendNovoChamadoEquipe, sendChamadoConfirmacaoAluno } = require('../email/mailer');
 
 const router = express.Router();
 
@@ -82,6 +82,31 @@ function hashToken(token) {
 /** Link de acompanhamento do chamado, recomputável a qualquer momento. */
 function linkDoChamado(ticketId) {
   return `${APP_URL}/chamado/${tokenDoChamado(ticketId)}`;
+}
+
+/** Link do chamado no painel administrativo (para o aviso interno da equipe). */
+function linkPainelChamado(ticketId) {
+  return `${APP_URL}/admin/suporte/${ticketId}`;
+}
+
+/**
+ * Aviso interno de novo chamado, disparado em fire-and-forget: o chamado já está
+ * gravado quando isto roda, então falha de SMTP só vira log — nunca desfaz a
+ * abertura nem devolve erro a quem abriu.
+ */
+function avisarEquipeNovoChamado({ ticketId, numero, assunto, categoria, mensagem, solicitanteNome, solicitanteEmail, origem }) {
+  sendNovoChamadoEquipe({
+    numero,
+    assunto,
+    categoria,
+    mensagem,
+    solicitanteNome,
+    solicitanteEmail,
+    origem,
+    link: linkPainelChamado(ticketId),
+  }).catch(err => {
+    console.error(`[Suporte] Falha ao avisar a equipe do novo chamado ${numero}:`, err.message);
+  });
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -386,6 +411,12 @@ router.post('/publico', async (req, res) => {
       emailEnviado = false;
       console.error(`[Suporte] Falha ao enviar link do chamado ${numero} para ${email}:`, err.message);
     }
+
+    // A equipe é avisada de todo chamado novo (independente do e-mail ao visitante).
+    avisarEquipeNovoChamado({
+      ticketId: ticket.id, numero, assunto, categoria, mensagem,
+      solicitanteNome: nome, solicitanteEmail: email, origem: 'visitante',
+    });
 
     res.status(201).json({ numero, link, emailEnviado, chamado: ticket });
   } catch (error) {
@@ -707,6 +738,17 @@ router.put('/admin/:id', adminMiddleware, async (req, res) => {
     if (antesRes.rows.length === 0) return res.status(404).json({ erro: 'Chamado não encontrado.' });
     const antes = antesRes.rows[0];
 
+    // Fechar (status → 'fechado') é privilégio de superadmin/diretor. O admin
+    // comum pode mexer em prioridade, responsável e nota, e até REABRIR um
+    // chamado — mas não encerrá-lo. Só barra a TRANSIÇÃO para fechado: re-salvar
+    // um chamado que já estava fechado (mexendo em outro campo) segue liberado.
+    if (status === 'fechado' && antes.status !== 'fechado'
+        && !SUPERADMIN_ROLES.includes(req.userRole)) {
+      return res.status(403).json({
+        erro: 'Apenas o superadministrador ou o diretor podem fechar um chamado.',
+      });
+    }
+
     await client.query('BEGIN');
 
     // COALESCE mantém o valor atual quando o campo não veio no corpo. A exceção
@@ -774,7 +816,10 @@ router.put('/admin/:id', adminMiddleware, async (req, res) => {
 //
 // O log do chamado morre junto (é filho dele), então a exclusão é registrada no
 // console do servidor — é o único rastro que sobrevive.
-router.delete('/admin/:id', adminMiddleware, async (req, res) => {
+//
+// Exclusão é ação destrutiva e irreversível: fica restrita a superadmin/diretor
+// (superAdminMiddleware), fora do alcance do admin comum.
+router.delete('/admin/:id', superAdminMiddleware, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -902,6 +947,28 @@ router.post('/', authMiddleware, comAnexos, async (req, res) => {
       await salvarAnexos(client, m.rows[0].id, ticket.id, req.files);
     }
     await client.query('COMMIT');
+
+    // Avisa a equipe E confirma ao aluno. Os dados do aluno saem do banco (não do
+    // token) e os envios ficam fora da transação — falha de SMTP não desfaz o
+    // chamado já gravado.
+    const numero = `#${String(ticket.id).padStart(5, '0')}`;
+    const aluno = await pool.query('SELECT nome, email FROM alunos WHERE id = $1', [req.alunoId]);
+    avisarEquipeNovoChamado({
+      ticketId: ticket.id, numero, assunto, categoria, mensagem,
+      solicitanteNome: aluno.rows[0]?.nome, solicitanteEmail: aluno.rows[0]?.email,
+      origem: 'aluno',
+    });
+    if (aluno.rows[0]?.email) {
+      sendChamadoConfirmacaoAluno({
+        to: aluno.rows[0].email,
+        nome: aluno.rows[0].nome,
+        numero,
+        assunto,
+        link: `${APP_URL}/suporte`,
+      }).catch(err => {
+        console.error(`[Suporte] Falha ao confirmar o chamado ${numero} ao aluno:`, err.message);
+      });
+    }
 
     res.status(201).json({ chamado: ticket });
   } catch (error) {

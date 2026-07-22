@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { CourseCard } from '../components/ui/CourseCard';
 import { PageLoader } from '../components/ui/PageLoader';
 import { api } from '../services/api';
-import { staticCourses, normalizeDbCourse } from '../data/courses';
+import { staticCourses, normalizeDbCourse, NIVEL_LABELS } from '../data/courses';
 import { canAccessInternalCourse } from '../utils/permissions';
 import { getStaticEnrollments, calcLessonStats, isCertEligible } from '../utils/mopProgress';
 import { mopCourseContent } from '../data/mopCourseContent';
@@ -12,6 +12,10 @@ import { mopCourseContent } from '../data/mopCourseContent';
 // é um curso do banco (Huawei Module800). O MOP migrou para o banco (id 1) e usa
 // o fluxo normal de matrícula/progresso.
 const MOP_IDS = ['mop-interno'];
+
+// Busca sem diferenciar acento/caixa ("eletrica" acha "Elétrica").
+const normalizar = (s) =>
+  (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 function CatalogSection({ icon, title, count, children, note }) {
   return (
@@ -33,6 +37,11 @@ export function Courses() {
   const [courses, setCourses] = useState([]);
   const [enrollments, setEnrollments] = useState({}); // curso_id → { progresso, status }
   const [loading, setLoading] = useState(true);
+
+  // Filtros do catálogo (busca por texto + categoria + nível)
+  const [busca, setBusca] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtroNivel, setFiltroNivel] = useState('');
 
   const hasInternalAccess = canAccessInternalCourse(user);
 
@@ -88,10 +97,38 @@ export function Courses() {
     return (e.progresso || 0) === 100;
   };
 
+  // Opções dos filtros derivadas do catálogo carregado (só mostra o que existe).
+  const categorias = useMemo(
+    () => [...new Set(courses.map(c => c.categoria).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [courses]
+  );
+  const niveis = useMemo(
+    () => Object.values(NIVEL_LABELS).filter(l => courses.some(c => c.nivel === l)),
+    [courses]
+  );
+  const filtroAtivo = Boolean(busca.trim() || filtroCategoria || filtroNivel);
+
+  // Aplica a busca por texto (nome + categoria + nível) e os filtros de select.
+  const filtered = useMemo(() => {
+    const termo = normalizar(busca.trim());
+    return courses.filter(c => {
+      if (filtroCategoria && c.categoria !== filtroCategoria) return false;
+      if (filtroNivel && c.nivel !== filtroNivel) return false;
+      if (termo) {
+        const alvo = normalizar([c.nome, c.categoria, c.nivel].filter(Boolean).join(' '));
+        if (!alvo.includes(termo)) return false;
+      }
+      return true;
+    });
+  }, [courses, busca, filtroCategoria, filtroNivel]);
+
+  const limparFiltros = () => { setBusca(''); setFiltroCategoria(''); setFiltroNivel(''); };
+
   // Cursos "em breve" têm sua própria seção de captação de interesse e ficam
   // fora de todas as outras (não são matriculáveis).
-  const emBreveCourses = courses.filter(c => c.emBreve);
-  const disponiveis = courses.filter(c => !c.emBreve);
+  const emBreveCourses = filtered.filter(c => c.emBreve);
+  const disponiveis = filtered.filter(c => !c.emBreve);
 
   // Cursos vinculados a fabricantes (empresas) têm sua própria seção agrupada;
   // ficam fora das seções genéricas para não aparecer duplicados.
@@ -124,6 +161,49 @@ export function Courses() {
           <h1>Catálogo de Cursos</h1>
           <p>Capacitação técnica de alto nível para operação crítica em Data Centers.</p>
         </div>
+
+        {/* Barra de pesquisa e filtros do catálogo */}
+        <div className="catalog-search">
+          <div className="catalog-search__field">
+            <span className="catalog-search__icon" aria-hidden="true">🔎</span>
+            <input
+              type="search"
+              className="catalog-search__input"
+              placeholder="Buscar por nome, categoria ou nível..."
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              aria-label="Buscar cursos"
+            />
+          </div>
+          <select
+            className="catalog-search__select"
+            value={filtroCategoria}
+            onChange={e => setFiltroCategoria(e.target.value)}
+            aria-label="Filtrar por categoria"
+          >
+            <option value="">Todas as categorias</option>
+            {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select
+            className="catalog-search__select"
+            value={filtroNivel}
+            onChange={e => setFiltroNivel(e.target.value)}
+            aria-label="Filtrar por nível"
+          >
+            <option value="">Todos os níveis</option>
+            {niveis.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+          {filtroAtivo && (
+            <button type="button" className="catalog-search__clear" onClick={limparFiltros}>
+              Limpar
+            </button>
+          )}
+        </div>
+        {filtroAtivo && (
+          <p className="catalog-search__result">
+            {filtered.length} {filtered.length === 1 ? 'curso encontrado' : 'cursos encontrados'}
+          </p>
+        )}
       </div>
 
       {/* Cursos em andamento */}
@@ -216,6 +296,17 @@ export function Courses() {
         <div className="catalog-section">
           <div className="catalog-empty">
             Nenhum curso disponível no momento. Volte em breve!
+          </div>
+        </div>
+      )}
+
+      {courses.length > 0 && filtered.length === 0 && (
+        <div className="catalog-section">
+          <div className="catalog-empty">
+            Nenhum curso encontrado para a busca. <button
+              type="button" className="catalog-empty__link" onClick={limparFiltros}>
+              Limpar filtros
+            </button>
           </div>
         </div>
       )}

@@ -1124,6 +1124,7 @@ header[id] {
 .home-carousel-dots {
     display: flex;
     justify-content: center;
+    flex-wrap: wrap;
     gap: 10px;
     margin: 25px 0;
 }
@@ -2295,6 +2296,104 @@ header[id] {
 .cursos-header p {
     font-size: clamp(1rem, 1.6vw, 1.2rem);
     color: var(--text-muted);
+}
+
+/* Barra de pesquisa / filtros do catálogo */
+.catalog-search {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    max-width: 900px;
+    margin: 0 auto 12px;
+}
+
+.catalog-search__field {
+    position: relative;
+    flex: 1 1 260px;
+    min-width: 200px;
+}
+
+.catalog-search__icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.95rem;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.catalog-search__input,
+.catalog-search__select {
+    width: 100%;
+    height: 46px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg-white);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.catalog-search__input {
+    padding: 0 16px 0 40px;
+}
+
+.catalog-search__select {
+    flex: 0 1 200px;
+    min-width: 160px;
+    padding: 0 16px;
+    cursor: pointer;
+}
+
+.catalog-search__input:focus,
+.catalog-search__select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.12);
+}
+
+.catalog-search__clear {
+    height: 46px;
+    padding: 0 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.catalog-search__clear:hover {
+    background: var(--surface-hover);
+}
+
+.catalog-search__result {
+    max-width: 900px;
+    margin: 0 auto 8px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.catalog-empty__link {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--primary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+    .catalog-search__field,
+    .catalog-search__select { flex: 1 1 100%; }
 }
 
 /* ============================================
@@ -4084,6 +4183,46 @@ body.focus-mode-open { overflow: hidden; }
 
 .admin-search:focus {
     border-color: var(--primary);
+}
+
+/* Barra de filtros dos painéis admin (ex.: Gerenciar Cursos) */
+.admin-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 16px 20px 0;
+}
+
+/* Dentro da barra a busca deixa de ter largura fixa e divide a linha com os
+   selects, mantendo todos os filtros alinhados. */
+.admin-filters .admin-search {
+    flex: 1 1 200px;
+    width: auto;
+    min-width: 180px;
+}
+
+.admin-filter-select {
+    flex: 0 1 auto;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    background: var(--bg-white);
+    color: var(--text-main);
+    outline: none;
+    cursor: pointer;
+    transition: border-color var(--transition);
+}
+
+.admin-filter-select:focus {
+    border-color: var(--primary);
+}
+
+@media (max-width: 640px) {
+    .admin-filters { padding: 16px 14px 0; }
+    .admin-filters .admin-search,
+    .admin-filter-select { flex: 1 1 100%; width: 100%; }
 }
 
 .admin-table {

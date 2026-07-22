@@ -6,13 +6,16 @@ import { useToast } from './Toast';
 
 /**
  * Botão "Tenho interesse" para cursos em breve. Alterna o registro do aluno
- * logado e mostra a contagem de pessoas interessadas (medição de demanda).
+ * logado. A contagem de demanda é métrica interna e NÃO aparece no botão: o
+ * aluno nem recebe o número (filtrado no servidor) e, para o admin, o badge é
+ * ocultado aqui — a demanda é consultada no painel admin. O admin acompanha
+ * pelas telas de /admin (AdminCursos / CourseEditor).
  *
  * Autossuficiente: guarda o próprio estado a partir de `curso.interesseRegistrado`
  * e `curso.totalInteresse`. `onChange` propaga o novo total para quem quiser.
  */
 export function InterestButton({ curso, size = 'md', showCount = true, onChange }) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [registrado, setRegistrado] = useState(Boolean(curso.interesseRegistrado));
@@ -56,7 +59,7 @@ export function InterestButton({ curso, size = 'md', showCount = true, onChange 
       <span className="interest-btn__label">
         {registrado ? '✓ Interesse registrado' : '☆ Tenho interesse'}
       </span>
-      {showCount && total > 0 && (
+      {showCount && !isAdmin && total > 0 && (
         <span className="interest-btn__count" title={`${total} ${total === 1 ? 'pessoa interessada' : 'pessoas interessadas'}`}>
           {total}
         </span>

@@ -106,11 +106,15 @@ export function quizStatus() {
   };
 }
 
-/** Verifica se o aluno pode iniciar uma nova tentativa */
-export function canTakeQuiz(lessonPct) {
-  if (lessonPct < 100) return { ok: false, reason: 'Conclua 100% das aulas para liberar a avaliação.' };
+/** Verifica se o aluno pode iniciar uma nova tentativa.
+ * A avaliação NÃO exige mais 100% das aulas — o aluno pode usar as tentativas
+ * antes de concluir tudo. O gate de 100% permanece só no certificado
+ * (isCertEligible/certBlockReason). O parâmetro é mantido por compatibilidade. */
+export function canTakeQuiz(lessonPct) { // eslint-disable-line no-unused-vars
   const qs = quizStatus();
-  if (qs.passed)    return { ok: false, reason: 'Você já foi aprovado na avaliação.' };
+  // Aprovado não trava mais: só a nota máxima (100%) encerra. Assim o aluno pode
+  // refazer para buscar 100% enquanto tiver tentativas.
+  if (qs.best >= 100) return { ok: false, reason: 'Você já atingiu a nota máxima (100%).' };
   if (qs.attempts >= MAX_ATTEMPTS) return { ok: false, reason: `Limite de ${MAX_ATTEMPTS} tentativas atingido.` };
   return { ok: true };
 }

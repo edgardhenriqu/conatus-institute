@@ -11,7 +11,9 @@ import {
 } from '../utils/mopProgress';
 import { canAccessInternalCourse } from '../utils/permissions';
 
-const MOP_IDS = ['mop-interno', '6'];
+// Só o viewer estático legado é MOP. O id 6 é um curso Huawei do banco (não o
+// MOP) — mantê-lo aqui roteava o certificado dele para o certificado estático.
+const MOP_IDS = ['mop-interno'];
 
 export function Certificate() {
   const { id } = useParams();
@@ -63,14 +65,23 @@ function useInkColor(src) {
   return color;
 }
 
-function CertificateSheet({ studentName, courseName, duration, score, issuedDate, code, responsavel, assinatura, texto }) {
+function CertificateSheet({ studentName, courseName, duration, score, issuedDate, code, responsavel, assinatura, texto, empresas }) {
   const assinaturaSrc = assinatura?.trim()
     ? (assinatura.startsWith('http') ? assinatura : `/${assinatura}`)
     : null;
   const inkColor = useInkColor(assinaturaSrc);
+  // Cursos Huawei (empresa "Soluções WDC", slug 'huawei') levam os logos da WDC
+  // e da Huawei no canto direito do certificado.
+  const ehHuawei = Array.isArray(empresas) && empresas.some(e => e.slug === 'huawei');
   return (
-    <div className="certificate" id="certificate">
+    <div className={`certificate${ehHuawei ? ' has-partner-logos' : ''}`} id="certificate">
       <img src="/images/logo-institute.svg" alt="Conatus Institute" className="cert-logo" />
+      {ehHuawei && (
+        <div className="cert-partner-logos">
+          <img src="/images/logo-wdc.png" alt="Soluções WDC" className="cert-partner-logo" />
+          <img src="/images/huawei.svg" alt="Huawei" className="cert-partner-logo cert-partner-logo-sub" />
+        </div>
+      )}
       <div className="cert-brand">Conatus Institute</div>
       <div className="cert-brand-sub">Educação e Pesquisa em Infraestrutura Crítica</div>
 
@@ -186,15 +197,31 @@ ${appStyles}
     margin: 0 !important;
     box-shadow: none !important;
     border-width: 8px !important;
-    padding: 28px 48px !important;
+    padding: 12px 48px !important;
     page-break-inside: avoid;
   }
-  .cert-logo { top: 10mm !important; left: 12mm !important; width: 28mm !important; }
-  .cert-brand-sub { margin-bottom: 18px !important; }
-  .cert-title { margin-bottom: 14px !important; }
-  .cert-course { margin-bottom: 18px !important; }
-  .cert-details { margin-bottom: 20px !important; }
-  .cert-signatures { margin-bottom: 16px !important; }
+  .cert-logo { top: 2mm !important; left: 12mm !important; width: 58mm !important; }
+  .cert-partner-logos { top: 9mm !important; right: 12mm !important; flex-direction: column !important; align-items: center !important; gap: 2mm !important; }
+  /* huawei.svg recortado → preenche a caixa; mesma altura que o WDC, casada com
+     a altura de tinta do logo Conatus (47mm * 0.34 ≈ 16mm). */
+  .cert-partner-logo { height: 15mm !important; }
+  .cert-partner-logo-sub { height: 8mm !important; }
+  /* Compacta o layout na vertical: o A4 paisagem tem só ~194mm de área útil e,
+     sem isto, o certificado passava de 218mm e o rodapé (código de validação)
+     era cortado. O margin-top empurra o título central para baixo dos logos
+     empilhados (WDC em cima, Huawei menor abaixo). */
+  .has-partner-logos .cert-brand { margin-top: 32mm !important; }
+  .cert-brand { font-size: 1.25rem !important; margin-bottom: 2px !important; }
+  .cert-brand-sub { margin-bottom: 10px !important; }
+  .cert-title { font-size: 2.1rem !important; margin: 6px 0 8px !important; }
+  .cert-lead { margin: 2px 0 !important; }
+  .cert-student { margin: 4px 0 !important; }
+  /* mantém 'auto' nas laterais: sem isso o bloco max-width:700px perde a
+     centralização e o texto abaixo do nome sai desalinhado na impressão. */
+  .cert-course { margin: 8px auto 10px !important; }
+  .cert-details { margin: 8px 0 12px !important; }
+  .cert-signatures { margin: 10px 0 8px !important; }
+  .cert-validation { margin-top: 8px !important; }
 </style>
 </head>
 <body>${cert.outerHTML}</body>
@@ -324,6 +351,7 @@ function DbCertificate({ cursoId }) {
         responsavel={cert.cert_responsavel || curso?.cert_responsavel}
         assinatura={cert.cert_assinatura || curso?.cert_assinatura}
         texto={cert.cert_texto || curso?.cert_texto}
+        empresas={curso?.empresas}
       />
     </div>
   );

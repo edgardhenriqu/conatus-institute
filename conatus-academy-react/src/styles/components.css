@@ -247,6 +247,18 @@ textarea:focus-visible {
 .interest-btn--md { padding: 10px 18px; font-size: 0.9rem; }
 .interest-btn--lg { padding: 15px 32px; font-size: 1.05rem; }
 
+/* Dentro dos cards do catálogo, o botão de interesse divide o espaço em
+   partes iguais ao lado do "Saiba Mais", igual ao par "Saiba Mais/Matricular-se". */
+.card-buttons .interest-btn {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    padding: 12px 10px;
+    justify-content: center;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+}
+
 .interest-btn__count {
     display: inline-flex;
     align-items: center;
@@ -515,14 +527,43 @@ textarea:focus-visible {
     pointer-events: none;
 }
 
-/* Logo no canto superior esquerdo do certificado (ancorada em .certificate) */
+/* Logo no canto superior esquerdo do certificado (ancorada em .certificate).
+   Largura calibrada para que a ALTURA DA TINTA (o SVG tem margem no viewBox)
+   fique igual à altura dos logos de fabricante à direita. */
 .cert-logo {
     position: absolute;
-    top: clamp(18px, 3.5vw, 34px);
+    /* top menor que o dos parceiros compensa a margem em branco no topo do SVG
+       (o conteúdo começa a ~21% da altura), alinhando a TINTA das três no topo. */
+    top: clamp(2px, 1.1vw, 11px);
     left: clamp(18px, 3.5vw, 34px);
-    width: clamp(72px, 11vw, 116px);
+    width: clamp(140px, 20.8vw, 200px);
     height: auto;
     z-index: 1;
+}
+
+/* Logos de fabricante no canto superior direito: WDC em cima e a Huawei,
+   menor, empilhada abaixo. */
+.cert-partner-logos {
+    position: absolute;
+    top: clamp(18px, 3.5vw, 34px);
+    right: clamp(18px, 3.5vw, 34px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(5px, 0.9vw, 9px);
+    z-index: 1;
+}
+
+/* WDC (topo): recortado ao conteúdo, preenche a caixa. Altura de tinta casada
+   com o logo Conatus à esquerda. */
+.cert-partner-logo {
+    height: clamp(38px, 5.6vw, 54px);
+    width: auto;
+}
+
+/* Huawei (abaixo do WDC): menor. */
+.cert-partner-logo-sub {
+    height: clamp(26px, 3.8vw, 37px);
 }
 
 .cert-brand {
@@ -533,6 +574,12 @@ textarea:focus-visible {
     letter-spacing: 2px;
     text-transform: uppercase;
     margin-bottom: 4px;
+}
+
+/* Com logos de fabricante nos cantos, o título central desce para não colidir
+   com eles (o logo largo da WDC alcançava o texto "CONATUS INSTITUTE"). */
+.certificate.has-partner-logos .cert-brand {
+    margin-top: clamp(46px, 6.6vw, 76px);
 }
 
 .cert-brand-sub {
@@ -575,7 +622,7 @@ textarea:focus-visible {
     line-height: 1.6;
 }
 
-.cert-course strong { color: var(--primary); }
+.cert-course strong { color: var(--primary); font-size: 1.2em; }
 
 .cert-details {
     display: flex;

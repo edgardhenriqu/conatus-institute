@@ -141,12 +141,13 @@ if (!process.env.DB_HOST) {
 }
 
 const ensureSchema = require('./db/ensureSchema');
-const seedMopCourse = require('./db/seedMopCourse');
+// Seed do curso MOP DESATIVADO (2026-07-21): o curso foi retirado do catálogo.
+// Não semeamos mais no boot para que ele não reapareça (nem em banco novo/limpo).
+// O módulo segue sendo importado só pelo MOP_NOME em routes/cursos.js.
 const migrateUploads = require('./db/migrateUploads');
 const { iniciarFechamentoAutomatico } = require('./src/services/fecharChamados');
 
 ensureSchema()
-  .then(() => seedMopCourse())
   .then(() => migrateUploads())
   .catch(err => console.error('Aviso: não foi possível atualizar o schema/seed automaticamente:', err.message))
   .finally(() => {

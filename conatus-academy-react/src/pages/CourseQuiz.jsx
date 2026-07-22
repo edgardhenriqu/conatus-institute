@@ -227,8 +227,10 @@ function DbQuiz({ cursoId }) {
               </span>
             </div>
 
-            {/* Ainda tem tentativa sobrando? Permite tentar de novo direto da revisão. */}
-            {status && !status.aprovado && (status.restantes ?? 0) > 0 && (status.progresso ?? 0) >= 100 && (
+            {/* Ainda tem tentativa sobrando? Permite tentar de novo direto da revisão.
+                Só a nota máxima (100%) encerra — aprovado com nota menor pode refazer.
+                Não exige 100% das aulas: isso vale só para o certificado. */}
+            {status && (status.melhor ?? 0) < 100 && (status.restantes ?? 0) > 0 && (
               <button className="btn-quiz-start" style={{ marginTop: '18px' }} onClick={startQuiz}>
                 Tentar Novamente ({status.restantes} {status.restantes === 1 ? 'restante' : 'restantes'})
               </button>
@@ -245,8 +247,15 @@ function DbQuiz({ cursoId }) {
   /* ── INTRO ── */
   if (phase === 'intro') {
     const semAvaliacao = !status?.existe;
-    const bloqueadaAulas = status?.existe && (status.progresso ?? 0) < 100;
-    const semTentativas = status?.existe && status.restantes === 0 && !status.aprovado;
+    // A prova não é mais bloqueada pelas aulas — o aluno pode usar as tentativas
+    // antes de concluir 100%. Abaixo de 100% mostramos só um aviso de que o
+    // CERTIFICADO ainda depende de completar as aulas.
+    const aulasIncompletas = status?.existe && (status.progresso ?? 0) < 100;
+    // Só a NOTA MÁXIMA (100%) encerra a avaliação. Aprovado com nota menor pode
+    // refazer para buscar 100%, desde que ainda tenha tentativas.
+    const notaMaxima = status?.existe && (status.melhor ?? 0) >= 100;
+    const podeTentar = status?.existe && !notaMaxima && (status.restantes ?? 0) > 0;
+    const semTentativas = status?.existe && (status.restantes ?? 0) === 0 && !notaMaxima && !status.aprovado;
 
     return (
       <div className="quiz-page">
@@ -315,12 +324,12 @@ function DbQuiz({ cursoId }) {
                 </ul>
               </div>
 
-              {bloqueadaAulas && (
+              {aulasIncompletas && !notaMaxima && (
                 <div className="quiz-blocked">
-                  <span className="blocked-icon">🔒</span>
+                  <span className="blocked-icon">ℹ️</span>
                   <div>
-                    <strong>Avaliação bloqueada</strong>
-                    <p>Conclua 100% das aulas para liberar. Progresso atual: <strong>{status.progresso}%</strong></p>
+                    <strong>Você já pode fazer a avaliação</strong>
+                    <p>Progresso das aulas: <strong>{status.progresso}%</strong>. A prova está liberada e você pode usar suas tentativas — mas o <strong>certificado</strong> só é emitido após concluir 100% das aulas.</p>
                     <Link to={`/cursos/${cursoId}/sala-de-aula`} className="btn-quiz-secondary">Continuar aulas</Link>
                   </div>
                 </div>
@@ -336,18 +345,31 @@ function DbQuiz({ cursoId }) {
                 </div>
               )}
 
-              {status.aprovado && (
+              {notaMaxima && (
                 <div className="quiz-blocked success">
                   <span className="blocked-icon">🏆</span>
                   <div>
-                    <strong>Você já foi aprovado!</strong>
-                    <p>Pontuação: <strong>{status.melhor}%</strong>.</p>
+                    <strong>Você atingiu a nota máxima (100%)!</strong>
+                    <p>Não há mais o que melhorar nesta avaliação.</p>
                     <Link to={`/cursos/${cursoId}/certificado`} className="btn-quiz-primary">🏆 Ver Certificado</Link>
                   </div>
                 </div>
               )}
 
-              {!bloqueadaAulas && !semTentativas && !status.aprovado && (
+              {status.aprovado && !notaMaxima && (
+                <div className="quiz-blocked success">
+                  <span className="blocked-icon">🎉</span>
+                  <div>
+                    <strong>Você já foi aprovado!</strong>
+                    <p>Sua melhor pontuação é <strong>{status.melhor}%</strong>. {podeTentar
+                      ? 'Se quiser, refaça para buscar 100% — sua melhor nota é sempre a que vale.'
+                      : 'Você já usou todas as tentativas; a nota fica registrada.'}</p>
+                    <Link to={`/cursos/${cursoId}/certificado`} className="btn-quiz-primary">🏆 Ver Certificado</Link>
+                  </div>
+                </div>
+              )}
+
+              {podeTentar && (
                 <button className="btn-quiz-start" onClick={startQuiz}>
                   {status.tentativas === 0
                     ? 'Iniciar Avaliação'
@@ -485,7 +507,9 @@ function DbQuiz({ cursoId }) {
             {result.aprovado && (
               <Link to={`/cursos/${cursoId}/certificado`} className="btn-quiz-primary">🏆 Emitir Certificado</Link>
             )}
-            {!result.aprovado && result.restantes > 0 && (
+            {/* Refazer: enquanto não tiver 100% e ainda houver tentativas — vale
+                inclusive para quem já foi aprovado e quer melhorar a nota. */}
+            {result.nota < 100 && result.restantes > 0 && (
               <button className="btn-quiz-start" onClick={startQuiz}>
                 Tentar Novamente ({result.restantes} restantes)
               </button>
@@ -633,20 +657,20 @@ function MopQuiz() {
             </ul>
           </div>
 
-          {/* Requisito de aulas */}
-          {pct < 100 && (
+          {/* Aulas incompletas: a prova já está liberada; só o certificado espera 100% */}
+          {pct < 100 && !qs.passed && (
             <div className="quiz-blocked">
-              <span className="blocked-icon">🔒</span>
+              <span className="blocked-icon">ℹ️</span>
               <div>
-                <strong>Avaliação bloqueada</strong>
-                <p>Conclua 100% das aulas para liberar a avaliação. Progresso atual: <strong>{pct}%</strong></p>
+                <strong>Você já pode fazer a avaliação</strong>
+                <p>Progresso das aulas: <strong>{pct}%</strong>. A prova está liberada e você pode usar suas tentativas — mas o <strong>certificado</strong> só é emitido após concluir 100% das aulas.</p>
                 <Link to="/cursos/mop-interno/sala-de-aula" className="btn-quiz-secondary">Continuar aulas</Link>
               </div>
             </div>
           )}
 
-          {/* Máximo de tentativas */}
-          {pct === 100 && !access.ok && qs.attempts >= MAX_ATTEMPTS && !qs.passed && (
+          {/* Máximo de tentativas (só para quem ainda não passou e não fez 100%) */}
+          {qs.attempts >= MAX_ATTEMPTS && qs.best < 100 && !qs.passed && (
             <div className="quiz-blocked danger">
               <span className="blocked-icon">⛔</span>
               <div>
@@ -656,13 +680,27 @@ function MopQuiz() {
             </div>
           )}
 
-          {/* Já aprovado */}
-          {qs.passed && (
+          {/* Nota máxima: encerra a avaliação */}
+          {qs.best >= 100 && (
             <div className="quiz-blocked success">
               <span className="blocked-icon">🏆</span>
               <div>
+                <strong>Você atingiu a nota máxima (100%)!</strong>
+                <p>Não há mais o que melhorar nesta avaliação.</p>
+                <Link to="/cursos/mop-interno/certificado" className="btn-quiz-primary">🏆 Ver Certificado</Link>
+              </div>
+            </div>
+          )}
+
+          {/* Aprovado com nota < 100%: pode refazer para buscar 100% */}
+          {qs.passed && qs.best < 100 && (
+            <div className="quiz-blocked success">
+              <span className="blocked-icon">🎉</span>
+              <div>
                 <strong>Você já foi aprovado!</strong>
-                <p>Pontuação: <strong>{qs.best}%</strong>. Seu certificado já está disponível.</p>
+                <p>Sua melhor pontuação é <strong>{qs.best}%</strong>. {access.ok
+                  ? 'Se quiser, refaça para buscar 100% — sua melhor nota é sempre a que vale.'
+                  : 'Você já usou todas as tentativas; a nota fica registrada.'}</p>
                 <Link to="/cursos/mop-interno/certificado" className="btn-quiz-primary">🏆 Ver Certificado</Link>
               </div>
             </div>
@@ -785,7 +823,8 @@ function MopQuiz() {
                 🏆 Emitir Certificado
               </Link>
             )}
-            {!result.passed && newQs.remaining > 0 && (
+            {/* Refazer enquanto não tiver 100% e ainda houver tentativas — inclusive aprovado. */}
+            {result.score < 100 && newQs.remaining > 0 && (
               <button className="btn-quiz-start" onClick={startQuiz}>
                 Tentar Novamente ({newQs.remaining} restantes)
               </button>

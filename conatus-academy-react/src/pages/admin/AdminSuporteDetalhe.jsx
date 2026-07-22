@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { adminApi } from '../../services/adminApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { PageLoader } from '../../components/ui/PageLoader';
 import { TicketPill } from '../../components/ui/TicketPill';
@@ -45,6 +46,8 @@ export function AdminSuporteDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  // Só superadmin/diretor podem fechar um chamado. isSuperAdmin cobre os dois.
+  const { isSuperAdmin } = useAuth();
 
   const [chamado, setChamado] = useState(null);
   const [mensagens, setMensagens] = useState([]);
@@ -191,6 +194,13 @@ export function AdminSuporteDetalhe() {
   }
 
   const fechado = chamado.status === 'fechado';
+
+  // O admin comum não pode fechar: a opção "Fechado" some do seletor. Fica
+  // visível só para superadmin/diretor — ou quando o chamado JÁ está fechado,
+  // para o valor atual renderizar certo e ainda ser possível reabri-lo.
+  const opcoesStatus = TICKET_STATUS.filter(
+    s => s.value !== 'fechado' || isSuperAdmin || fechado
+  );
 
   return (
     <div className="admin-body">
@@ -350,7 +360,7 @@ export function AdminSuporteDetalhe() {
                 <label className="ticket-filtro-label" htmlFor="g-status">Editar status</label>
                 <select id="g-status" className="ticket-filtro-campo" value={gestao.status}
                   onChange={e => setGestao(g => ({ ...g, status: e.target.value }))}>
-                  {TICKET_STATUS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  {opcoesStatus.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
               <div>

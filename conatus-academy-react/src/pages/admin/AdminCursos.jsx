@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { adminApi } from '../../services/adminApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { PageLoader } from '../../components/ui/PageLoader';
+import { NIVEL_LABELS } from '../../data/courses';
 
 const STATUS_BADGE = {
   rascunho:  { label: 'Rascunho',  bg: '#f1f5f9', color: '#475569' },
@@ -18,6 +19,10 @@ const ACESSO_BADGE = {
   restrito: { label: 'Restrito', bg: '#f8d7da', color: '#721c24' },
   pago:     { label: 'Pago',     bg: '#e3f2fd', color: '#0d47a1' },
 };
+
+// Busca sem diferenciar acento/caixa ("eletrica" acha "Elétrica").
+const normalizar = (s) =>
+  (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 function Pill({ map, value }) {
   const cfg = map[value] || map[Object.keys(map)[0]];
@@ -43,6 +48,14 @@ export function AdminCursos() {
   const [matriculadosAbertos, setMatriculadosAbertos] = useState(null); // cursoId
   const [matriculados, setMatriculados] = useState([]);
   const [loadingMatriculados, setLoadingMatriculados] = useState(false);
+
+  // Filtros do painel
+  const [busca, setBusca] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroAcesso, setFiltroAcesso] = useState('');
+  const [filtroNivel, setFiltroNivel] = useState('');
+  const [filtroInteresse, setFiltroInteresse] = useState(''); // mínimo de interessados
 
   const carregarCursos = useCallback(async () => {
     setLoading(true);
@@ -140,6 +153,44 @@ export function AdminCursos() {
     }
   }
 
+  // Categorias existentes no catálogo (para o dropdown).
+  const categorias = useMemo(
+    () => [...new Set(cursos.map(c => c.categoria).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [cursos]
+  );
+  const filtroAtivo = Boolean(
+    busca.trim() || filtroCategoria || filtroStatus || filtroAcesso || filtroNivel || filtroInteresse
+  );
+
+  // Aplica busca por texto (nome + categoria) + filtros de categoria/status/acesso/interesse.
+  const cursosFiltrados = useMemo(() => {
+    const termo = normalizar(busca.trim());
+    const minInteresse = Number(filtroInteresse);
+    const lista = cursos.filter(c => {
+      if (filtroCategoria && c.categoria !== filtroCategoria) return false;
+      if (filtroStatus && (c.status || 'rascunho') !== filtroStatus) return false;
+      if (filtroAcesso && (c.acesso || 'publico') !== filtroAcesso) return false;
+      if (filtroNivel && (c.nivel || 'basico') !== filtroNivel) return false;
+      if (filtroInteresse && (Number(c.total_interesse) || 0) < minInteresse) return false;
+      if (termo) {
+        const alvo = normalizar([c.nome, c.categoria].filter(Boolean).join(' '));
+        if (!alvo.includes(termo)) return false;
+      }
+      return true;
+    });
+    // Ao filtrar por interesse, mostra os mais demandados primeiro (priorização).
+    if (filtroInteresse) {
+      lista.sort((a, b) => (Number(b.total_interesse) || 0) - (Number(a.total_interesse) || 0));
+    }
+    return lista;
+  }, [cursos, busca, filtroCategoria, filtroStatus, filtroAcesso, filtroNivel, filtroInteresse]);
+
+  const limparFiltros = () => {
+    setBusca(''); setFiltroCategoria(''); setFiltroStatus('');
+    setFiltroAcesso(''); setFiltroNivel(''); setFiltroInteresse('');
+  };
+
   if (loading) return <PageLoader message="Carregando cursos..." />;
 
   return (
@@ -176,7 +227,60 @@ export function AdminCursos() {
 
         <div className="admin-table-container">
           <div className="admin-table-header">
-            <h2>Cursos da Plataforma ({cursos.length})</h2>
+            <h2>
+              Cursos da Plataforma ({filtroAtivo ? `${cursosFiltrados.length} de ${cursos.length}` : cursos.length})
+            </h2>
+          </div>
+
+          <div className="admin-filters">
+            <input
+              type="search"
+              className="admin-search"
+              placeholder="Buscar por nome ou categoria..."
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              aria-label="Buscar cursos"
+            />
+            <select className="admin-filter-select" value={filtroCategoria}
+              onChange={e => setFiltroCategoria(e.target.value)} aria-label="Filtrar por categoria">
+              <option value="">Todas as categorias</option>
+              {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="admin-filter-select" value={filtroStatus}
+              onChange={e => setFiltroStatus(e.target.value)} aria-label="Filtrar por status">
+              <option value="">Todos os status</option>
+              {Object.entries(STATUS_BADGE).map(([v, cfg]) => (
+                <option key={v} value={v}>{cfg.label}</option>
+              ))}
+            </select>
+            <select className="admin-filter-select" value={filtroAcesso}
+              onChange={e => setFiltroAcesso(e.target.value)} aria-label="Filtrar por acesso">
+              <option value="">Todos os acessos</option>
+              {Object.entries(ACESSO_BADGE).map(([v, cfg]) => (
+                <option key={v} value={v}>{cfg.label}</option>
+              ))}
+            </select>
+            <select className="admin-filter-select" value={filtroNivel}
+              onChange={e => setFiltroNivel(e.target.value)} aria-label="Filtrar por nível">
+              <option value="">Todos os níveis</option>
+              {Object.entries(NIVEL_LABELS).map(([v, label]) => (
+                <option key={v} value={v}>{label}</option>
+              ))}
+            </select>
+            <select className="admin-filter-select" value={filtroInteresse}
+              onChange={e => setFiltroInteresse(e.target.value)} aria-label="Filtrar por interessados">
+              <option value="">Interesse</option>
+              <option value="1">1+ interessados</option>
+              <option value="5">5+ interessados</option>
+              <option value="10">10+ interessados</option>
+              <option value="25">25+ interessados</option>
+            </select>
+            {filtroAtivo && (
+              <button type="button" className="admin-btn" onClick={limparFiltros}
+                style={{ background: 'var(--surface-2)', color: 'var(--text-main)' }}>
+                Limpar
+              </button>
+            )}
           </div>
 
           <div className="admin-table-scroll">
@@ -199,8 +303,17 @@ export function AdminCursos() {
                     Nenhum curso cadastrado. Clique em "+ Criar Novo Curso" para começar.
                   </td>
                 </tr>
+              ) : cursosFiltrados.length === 0 ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                    Nenhum curso encontrado para o filtro.{' '}
+                    <button type="button" className="catalog-empty__link" onClick={limparFiltros}>
+                      Limpar filtros
+                    </button>
+                  </td>
+                </tr>
               ) : (
-                cursos.map(curso => (
+                cursosFiltrados.map(curso => (
                   <Fragment key={curso.id}>
                   <tr>
                     <td>

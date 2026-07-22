@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Outlet, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -93,6 +93,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Curso MOP retirado (2026-07-21): a rota estática legada foi
+                desativada. Precisam ser rotas EXPLÍCITAS (não splat): no ranking
+                do React Router um `/cursos/mop-interno/*` perderia para
+                `/cursos/:id/sala-de-aula`. Cada segmento estático vence o :id. */}
+            <Route path="/cursos/mop-interno" element={<Navigate to="/cursos" replace />} />
+            <Route path="/cursos/mop-interno/sala-de-aula" element={<Navigate to="/cursos" replace />} />
+            <Route path="/cursos/mop-interno/avaliacao" element={<Navigate to="/cursos" replace />} />
+            <Route path="/cursos/mop-interno/certificado" element={<Navigate to="/cursos" replace />} />
             <Route path="/cursos/:id" element={<CourseDetails />} />
             <Route path="/validar-certificado" element={<ValidarCertificado />} />
             <Route path="/validar-certificado/:codigo" element={<ValidarCertificado />} />

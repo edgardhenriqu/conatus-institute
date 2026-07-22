@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { adminApi } from '../../services/adminApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { TicketPill } from '../../components/ui/TicketPill';
 import {
@@ -26,6 +27,10 @@ const CARDS = [
 export function AdminSuporte() {
   const toast = useToast();
   const navigate = useNavigate();
+  // Fechar e excluir chamados são exclusivos de superadmin/diretor. isSuperAdmin
+  // já cobre os dois papéis. O backend é a autoridade — aqui só escondemos os
+  // controles que o admin comum não pode acionar.
+  const { isSuperAdmin } = useAuth();
   const [chamados, setChamados] = useState([]);
   const [resumo, setResumo] = useState(RESUMO_VAZIO);
   const [paginacao, setPaginacao] = useState({ pagina: 1, totalPaginas: 1, total: 0 });
@@ -277,18 +282,22 @@ export function AdminSuporte() {
                               title="Editar status, prioridade e responsável">
                               Editar
                             </button>
-                            <button className="admin-btn admin-btn-edit"
-                              onClick={() => handleEncerrar(c)}
-                              disabled={c.status === 'fechado'}
-                              style={c.status === 'fechado' ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                              title={c.status === 'fechado' ? 'Chamado já encerrado' : 'Encerrar o chamado'}>
-                              Encerrar
-                            </button>
-                            <button className="admin-btn admin-btn-delete"
-                              onClick={() => handleExcluir(c)}
-                              title="Excluir o chamado e toda a conversa">
-                              Excluir
-                            </button>
+                            {isSuperAdmin && (
+                              <>
+                                <button className="admin-btn admin-btn-edit"
+                                  onClick={() => handleEncerrar(c)}
+                                  disabled={c.status === 'fechado'}
+                                  style={c.status === 'fechado' ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                                  title={c.status === 'fechado' ? 'Chamado já encerrado' : 'Encerrar o chamado'}>
+                                  Encerrar
+                                </button>
+                                <button className="admin-btn admin-btn-delete"
+                                  onClick={() => handleExcluir(c)}
+                                  title="Excluir o chamado e toda a conversa">
+                                  Excluir
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

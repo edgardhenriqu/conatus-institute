@@ -14,10 +14,13 @@ export function Footer() {
           <p><Link to="/validar-certificado">Validar certificado</Link></p>
         </div>
         <div className="footer-col">
-          <h4>Contato</h4>
-          <p>Sede Digital - Ensino Remoto Global</p>
-          <p>giovanni.silva@conatusprocedures.com</p>
-          <p>+55 (11) 91230-1413</p>
+          <h4>Suporte</h4>
+          <p>Central de Ajuda</p>
+          <p>suporte.ti@conatusprocedures.com</p>
+          {/* /suporte é rota aberta e se adapta sozinha: o visitante cai no
+              formulário público e o aluno logado vê/abre os próprios chamados —
+              por isso o mesmo destino serve aos dois estados de sessão. */}
+          <p><Link to="/suporte">Abrir Chamado</Link></p>
         </div>
       </div>
 

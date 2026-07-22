@@ -174,6 +174,17 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     const curso = resultado.rows[0];
 
+    // Fabricantes vinculados (vitrine "Fabricantes" e logos no certificado).
+    // Buscado uma vez e devolvido em todos os caminhos (inclusive "em breve").
+    const empRes = await pool.query(
+      `SELECT e.id, e.nome, e.slug
+         FROM curso_acesso_regras r
+         JOIN empresas e ON e.id = r.empresa_id
+        WHERE r.tipo = 'empresa' AND r.curso_id = $1`,
+      [id]
+    );
+    const empresas = empRes.rows;
+
     // Curso "em breve": a página é uma vitrine pública de captação de interesse
     // (contagem + botão "Tenho interesse"), sem acesso ao conteúdo. Basta estar
     // visível (ou ser admin) — não passa pelo controle de acesso normal.
@@ -189,7 +200,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
         [id]
       );
       const info = await infoInteresse(id, req.alunoId);
-      return res.json({ ...curso, ...contagem.rows[0], em_breve: true, ...filtrarInfoInteresse(info, req) });
+      return res.json({ ...curso, ...contagem.rows[0], em_breve: true, empresas, ...filtrarInfoInteresse(info, req) });
     }
 
     const acesso = await checarAcessoCurso(curso, req);
@@ -212,7 +223,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     );
 
     const extra = curso.acesso === 'pago' ? { possui_curso: acesso.ok } : {};
-    res.json({ ...curso, ...contagem.rows[0], ...extra });
+    res.json({ ...curso, ...contagem.rows[0], ...extra, empresas });
   } catch (error) {
     console.error('Erro ao buscar curso:', error);
     res.status(500).json({ erro: 'Erro interno do servidor' });
@@ -729,13 +740,15 @@ router.post('/:cursoId/avaliacao/iniciar', authMiddleware, async (req, res) => {
     if (matricula.rows.length === 0) {
       return res.status(403).json({ erro: 'Você não está matriculado neste curso' });
     }
-    if ((matricula.rows[0].progresso || 0) < 100) {
-      return res.status(400).json({ erro: 'Conclua 100% das aulas para liberar a avaliação' });
-    }
+    // A avaliação NÃO exige mais 100% das aulas para ser feita: o aluno pode usar
+    // as tentativas que tiver antes de concluir tudo. O gate de 100% permanece só
+    // na EMISSÃO do certificado (POST /:cursoId/certificado).
 
     const status = await statusTentativas(alunoId, cursoId);
-    if (status.aprovado) {
-      return res.status(400).json({ erro: 'Você já foi aprovado na avaliação' });
+    // Aprovado NÃO trava mais a prova: o aluno pode refazer para buscar nota maior,
+    // enquanto não tiver 100% e ainda tiver tentativas. Só a nota máxima encerra.
+    if (status.melhor >= 100) {
+      return res.status(400).json({ erro: 'Você já atingiu a nota máxima (100%) na avaliação' });
     }
     if (status.tentativas >= config.max_tentativas) {
       return res.status(400).json({ erro: `Limite de ${config.max_tentativas} tentativas atingido` });
@@ -777,8 +790,9 @@ router.post('/:cursoId/avaliacao/submeter', authMiddleware, async (req, res) => 
     const config = avaliacaoRes.rows[0];
 
     const status = await statusTentativas(alunoId, cursoId);
-    if (status.aprovado) {
-      return res.status(400).json({ erro: 'Você já foi aprovado na avaliação' });
+    // Ver /iniciar: aprovado não trava; só a nota máxima (100%) ou o teto de tentativas.
+    if (status.melhor >= 100) {
+      return res.status(400).json({ erro: 'Você já atingiu a nota máxima (100%) na avaliação' });
     }
     if (status.tentativas >= config.max_tentativas) {
       return res.status(400).json({ erro: `Limite de ${config.max_tentativas} tentativas atingido` });

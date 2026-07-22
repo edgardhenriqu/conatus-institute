@@ -16,6 +16,20 @@ const NIVEIS = [
   { value: 'avancado',      label: 'Avançado' },
 ];
 
+// Categorias oficiais dos cursos. Mantenha em sincronia com o seed em
+// server/db/seed-cursos-datacenter.sql e com seedMopCourse.js.
+const CATEGORIAS = [
+  'Operações Críticas',
+  'Sistemas de Energia',
+  'HVAC',
+  'Diesel',
+  'SDAI',
+  'Automação',
+  'Civil',
+  'Infraestrutura',
+  'Segurança do Trabalho',
+];
+
 const STATUS_LABEL = { rascunho: 'Rascunho', em_breve: 'Em breve', publicado: 'Publicado', inativo: 'Inativo' };
 
 const TIPOS_CONTEUDO = [
@@ -546,9 +560,14 @@ export default function CourseEditor() {
               </div>
               <div className="ce-field">
                 <label>Categoria</label>
-                <input type="text" value={form.categoria || ''}
-                  onChange={e => setField('categoria', e.target.value)}
-                  placeholder="Ex.: Energia, Refrigeração, Operações" />
+                <select value={form.categoria || ''}
+                  onChange={e => setField('categoria', e.target.value)}>
+                  <option value="">— Sem categoria —</option>
+                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                  {form.categoria && !CATEGORIAS.includes(form.categoria) && (
+                    <option value={form.categoria}>{form.categoria}</option>
+                  )}
+                </select>
               </div>
               <div className="ce-field">
                 <label>Nível</label>
