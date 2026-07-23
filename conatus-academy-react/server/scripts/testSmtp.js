@@ -1,5 +1,5 @@
 /*
- * Verifica conexão + autenticação do e-mail (OAuth2 ou básico) via mailer, e
+ * Verifica a configuração de e-mail (Microsoft Graph) via mailer e
  * opcionalmente envia um e-mail de teste.
  *   node scripts/testSmtp.js [destino]
  */
@@ -7,9 +7,9 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.e
 const { verificarTransporte, sendChamadoConfirmacaoAluno } = require('../src/email/mailer');
 
 (async () => {
-  const oauth = Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && process.env.MICROSOFT_TENANT_ID);
-  console.log('Modo:', oauth ? 'OAuth2 (Microsoft 365)' : 'básico (usuário+senha)');
-  console.log('SMTP_USER:', process.env.SMTP_USER, '| host:', process.env.SMTP_HOST || 'smtp.office365.com');
+  const graph = Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET && process.env.MICROSOFT_TENANT_ID);
+  console.log('Modo:', graph ? 'Microsoft Graph (client credentials)' : 'NÃO configurado');
+  console.log('Caixa de envio (MAIL_FROM):', process.env.MAIL_FROM || '(não definido)');
 
   try {
     const info = await verificarTransporte();
